@@ -5,14 +5,13 @@ import logging
 import queue
 import sys
 import time
-from pathlib import Path
+import logging.handlers
 
 from . import __version__
 from .obs_controller import setup
 from .obs_controller.client import Obs, ObsDown, ObsError
 
-# ponytail: assumes Videos is not redirected; use SHGetKnownFolderPath if someone's is.
-VIDEOS = Path.home() / "Videos" / "Laqta"
+from .storage import clips, config
 
 ENABLE_WS = (
     "OBS WebSocket server is turned off.\n"
@@ -37,7 +36,7 @@ def obs_check(watch: bool) -> int:
         setup.connect(obs)
         version = obs.call("GetVersion")
         print(f"connected: OBS {version['obsVersion']}, obs-websocket {version['obsWebSocketVersion']}")
-        setup.ensure_laqta(obs, VIDEOS / "_check")
+        setup.ensure_laqta(obs, clips.ROOT / "_check")
         print("Laqta profile, scene collection and capture source ready")
 
         obs.call("StartRecord")
@@ -85,11 +84,24 @@ def main(argv: list[str] | None = None) -> int:
     check = sub.add_parser("obs-check", help="verify Laqta can drive OBS on this machine")
     check.add_argument("--watch", action="store_true", help="stay connected and prove reconnect")
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    fmt = "%(asctime)s %(levelname)s %(name)s %(message)s"
     if args.command == "obs-check":
+        logging.basicConfig(level=logging.INFO, format=fmt)
         return obs_check(args.watch)
-    parser.print_help()
-    return 0
+
+    config.DIR.mkdir(parents=True, exist_ok=True)
+    log_file = logging.handlers.RotatingFileHandler(config.DIR / "laqta.log", maxBytes=1_000_000, backupCount=2, encoding="utf-8")
+    logging.basicConfig(level=logging.INFO, format=fmt, handlers=[log_file, logging.StreamHandler()])
+    try:
+        cfg = config.load()
+    except (ValueError, OSError) as e:  # tomllib.TOMLDecodeError is a ValueError
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(None, f"{config.PATH}\n\n{e}", "Laqta: settings file problem", 0x10)
+        return 1
+    from .ui import tray  # imported late so obs-check works without Qt
+
+    return tray.run(cfg)
 
 
 if __name__ == "__main__":

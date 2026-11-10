@@ -49,7 +49,7 @@ class Recorder:
         obs,
         connect: Callable[[], None],  # make `obs` usable (launch + connect); raises ObsDown
         prepare: Callable[[dict], None],  # point OBS at this game; raises ObsBusy
-        on_clip: Callable[[Path, dict, list[GameEvent], float], None],  # path, game, events, seconds to keep
+        on_clip: Callable[[Path, dict, list[GameEvent], float, float], None],  # path, game, events, seconds to keep, pre-roll
         on_recording: Callable[[Path, dict], None],
         notify: Callable[[str], None],
         clock: Callable[[], float] = time.monotonic,
@@ -134,7 +134,7 @@ class Recorder:
     def obs_event(self, name: str, data: dict) -> None:
         if name == "ReplayBufferSaved" and self._pending:
             (game, events, keep), self._pending, self._save_timeout = self._pending, None, None
-            self.on_clip(Path(data["savedReplayPath"]), game, events, keep)
+            self.on_clip(Path(data["savedReplayPath"]), game, events, keep, self.pre)
             if self.game is None:
                 self.obs.call("StopReplayBuffer")
         elif name == "ExitStarted":
@@ -204,6 +204,13 @@ class Recorder:
             self.game, self.ready, self._interrupted = None, False, False
             self._exit_at = self._retry_at = self._window = None
             self._last.clear()
+
+    @_obs_guard
+    def stop_now(self) -> None:
+        """Laqta is quitting: stop without waiting for the debounce."""
+        if self.game is not None:
+            self._exit_at = self.clock()
+            self.tick()
 
     def _down(self) -> None:
         if self._window or self._pending:

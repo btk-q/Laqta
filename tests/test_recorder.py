@@ -112,10 +112,10 @@ def test_close_events_merge_into_one_clip_with_post_roll(rig):
     assert rig.obs.count("SaveReplayBuffer") == 1
 
     rig.rec.obs_event("ReplayBufferSaved", {"savedReplayPath": "C:/v/r.mkv"})
-    (path, game, events, keep), = rig.clips
+    (path, game, events, keep, pre), = rig.clips
     assert path == Path("C:/v/r.mkv") and game is EVENTS
     assert [e.type for e in events] == ["kill", "death"]
-    assert keep == 15 + 8  # pre-roll + first event to deadline
+    assert (keep, pre) == (15 + 8, 15)  # pre-roll + first event to deadline
 
 
 def test_merge_is_capped_by_replay_buffer_length(rig):
