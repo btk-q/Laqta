@@ -77,7 +77,7 @@ class Recorder:
         # events mode
         self._window: list[float] | None = None  # [first event time, save deadline]
         self._events: list[GameEvent] = []
-        self._pending: tuple[dict, list[GameEvent], float] | None = None  # save requested, not yet reported
+        self._pending: tuple[dict, list[GameEvent], float, float] | None = None  # game, events, keep, pre-roll
         self._save_timeout: float | None = None
         # recording modes
         self._rec_start: float | None = None  # clock when the current recording started
@@ -159,8 +159,8 @@ class Recorder:
     @_obs_guard
     def obs_event(self, name: str, data: dict) -> None:
         if name == "ReplayBufferSaved" and self._pending:
-            (game, events, keep), self._pending, self._save_timeout = self._pending, None, None
-            self.on_clip(Path(data["savedReplayPath"]), game, events, keep, self.pre)
+            (game, events, keep, pre), self._pending, self._save_timeout = self._pending, None, None
+            self.on_clip(Path(data["savedReplayPath"]), game, events, keep, pre)
             if self.game is None:
                 self.obs.call("StopReplayBuffer")
         elif name == "ExitStarted":
@@ -189,6 +189,27 @@ class Recorder:
             if now >= self._live_at:
                 self._live_at = now + LIVENESS
                 self.obs.call("GetVersion")
+
+    @_obs_guard
+    def instant_replay(self, ev: GameEvent, seconds: float) -> bool:
+        """The "what just happened" key: keep the last `seconds`, ending now, with no post-roll.
+        In events mode that is a clip at once; while recording it is a mark. False = nothing to do."""
+        if self.game is None or not self.ready:
+            return False
+        if self.game["mode"] == "events":
+            if self._pending:
+                return False  # OBS is still writing the previous clip
+            events = [*(self._events if self._window else []), ev]  # an open clip is covered by this one
+            self._window = None
+            keep = min(float(seconds), float(self.replay_seconds))
+            self.obs.call("SaveReplayBuffer")
+            self._pending = (self.game, events, keep, keep - (ev.t - events[0].t))
+            self._save_timeout = self.clock() + SAVE_TIMEOUT
+            return True
+        if self._rec_start is not None and self.game["mode"] != "session":
+            self._marks.append(ev)
+            return True
+        return False
 
     @_obs_guard
     def stop_now(self) -> None:
@@ -249,7 +270,7 @@ class Recorder:
         self._window = None
         self.obs.call("SaveReplayBuffer")
         # ponytail: one save in flight at a time; a second within SAVE_TIMEOUT replaces the first's metadata.
-        self._pending = (self.game, self._events, self.pre + deadline - first)
+        self._pending = (self.game, self._events, self.pre + deadline - first, self.pre)
         self._save_timeout = self.clock() + SAVE_TIMEOUT
 
     def _finish(self) -> None:

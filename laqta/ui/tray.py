@@ -65,6 +65,7 @@ class TrayApp:
         self.settings: SettingsWindow | None = None
         self.library: LibraryWindow | None = None
         self.hotkey: Hotkey | None = None
+        self.replay_key: Hotkey | None = None
 
         base = QPixmap(str(ICON))
         self.icons = {"idle": QIcon(base), "busy": _with_dot(base, "#F5A524"), "rec": _with_dot(base, theme.REC)}
@@ -95,6 +96,8 @@ class TrayApp:
         self.menu.addSeparator()
         self.clip = self.menu.addAction(f"{t('menu.clip')}\t{self.cfg['hotkey']}")
         self.clip.triggered.connect(self.core.clip_now)
+        self.replay = self.menu.addAction(f"{t('menu.replay', seconds=self.cfg['replay_seconds'])}\t{self.cfg['replay_hotkey']}")
+        self.replay.triggered.connect(self.core.replay_now)
         self.menu.addAction(t("menu.library")).triggered.connect(self.open_library)
         self.menu.addAction(t("menu.folder")).triggered.connect(self._open_folder)
         self.menu.addAction(t("menu.settings")).triggered.connect(self.open_settings)
@@ -103,17 +106,22 @@ class TrayApp:
         self._on_state(self.state)
 
     def _bind_hotkey(self) -> None:
-        if self.hotkey is not None:
-            self.app.removeNativeEventFilter(self.hotkey)
-            self.hotkey.unregister()
-            self.hotkey = None
+        self.hotkey = self._bind(self.hotkey, self.cfg["hotkey"], self.core.clip_now, 1)
+        self.replay_key = self._bind(self.replay_key, self.cfg["replay_hotkey"], self.core.replay_now, 2)
+
+    def _bind(self, old: Hotkey | None, combo: str, callback, id: int) -> Hotkey | None:
+        if old is not None:
+            self.app.removeNativeEventFilter(old)
+            old.unregister()
         try:
-            self.hotkey = Hotkey(self.cfg["hotkey"], self.core.clip_now)
+            new = Hotkey(combo, callback, id)
         except ValueError:
-            return self.toast(t("toast.hotkey_bad", hotkey=self.cfg["hotkey"]))
-        self.app.installNativeEventFilter(self.hotkey)
-        if not self.hotkey.registered:
-            self.toast(t("toast.hotkey_taken", hotkey=self.cfg["hotkey"]))
+            self.toast(t("toast.hotkey_bad", hotkey=combo))
+            return None
+        self.app.installNativeEventFilter(new)
+        if not new.registered:
+            self.toast(t("toast.hotkey_taken", hotkey=combo))
+        return new
 
     # -- core -> UI -------------------------------------------------------------------
 
@@ -124,6 +132,7 @@ class TrayApp:
         self.tray.setToolTip(f"Laqta — {text}"[:127])  # Windows truncates tray tooltips
         live = s["state"] == "active" and (s["recording"] or s["mode"] == "events")
         self.clip.setEnabled(live and s["mode"] != "session")
+        self.replay.setEnabled(live and s["mode"] != "session")
         self.tray.setIcon(self.icons["rec" if live else "idle" if s["state"] == "idle" else "busy"])
 
     def toast(self, text: str) -> None:
@@ -186,9 +195,10 @@ class TrayApp:
         self._save()
         clips.set_root(self.cfg["save_folder"])  # so "Open clips folder" and the library follow at once
         self.core.apply(self.cfg)
-        if self.cfg["language"] != old["language"] or self.cfg["hotkey"] != old["hotkey"]:
+        keys = ("hotkey", "replay_hotkey", "replay_seconds")
+        if self.cfg["language"] != old["language"] or any(self.cfg[k] != old[k] for k in keys):
             self._apply_language()
-        if self.cfg["hotkey"] != old["hotkey"]:
+        if any(self.cfg[k] != old[k] for k in keys[:2]):
             self._bind_hotkey()
         theme.apply(self.app, self.cfg["accent"])
 
@@ -217,8 +227,9 @@ def run(cfg: dict) -> int:
     code = app.exec()
     tray.core.quit()
     tray.core.join(timeout=10)
-    if tray.hotkey is not None:
-        tray.hotkey.unregister()
+    for key in (tray.hotkey, tray.replay_key):
+        if key is not None:
+            key.unregister()
     tray.tray.hide()
     del mutex
     return code

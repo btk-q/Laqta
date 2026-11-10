@@ -32,11 +32,9 @@ def parse(combo: str) -> tuple[int, int]:
 class Hotkey(QAbstractNativeEventFilter):
     """Install with app.installNativeEventFilter(hotkey). Must be created on the Qt main thread."""
 
-    ID = 1
-
-    def __init__(self, combo: str, callback: Callable[[], None]):
+    def __init__(self, combo: str, callback: Callable[[], None], id: int = 1):
         super().__init__()
-        self.callback = callback
+        self.callback, self.ID = callback, id  # each hotkey in the app needs its own id
         flags, vk = parse(combo)
         self.registered = bool(ctypes.windll.user32.RegisterHotKey(None, self.ID, flags | MOD_NOREPEAT, vk))
 

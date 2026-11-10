@@ -96,6 +96,9 @@ class Core(threading.Thread):
     def clip_now(self) -> None:
         self.inbox.put(("event", GameEvent("manual", time.monotonic(), source="manual")))
 
+    def replay_now(self) -> None:
+        self.inbox.put(("replay", GameEvent("replay", time.monotonic(), source="manual")))
+
     def quit(self) -> None:
         self.inbox.put(("quit",))
 
@@ -173,8 +176,7 @@ class Core(threading.Thread):
 
     def _on_recording(self, path: Path, game: dict, marks: list[GameEvent], start: float) -> None:
         try:
-            if game["mode"] != "session":
-                clips.write_sidecar(path, game, marks, start)
+            clips.write_sidecar(path, game, marks, start, seconds=round(time.monotonic() - start, 1), kind="recording")
         except OSError:
             log.exception("could not write event marks for %s", path)
         self.notify(t("toast.recording_saved", name=path.name))
@@ -215,6 +217,11 @@ class Core(threading.Thread):
             rec.event(ev)
         elif kind == "obs":
             rec.obs_event(*args)
+        elif kind == "replay":
+            if not rec.instant_replay(args[0], self.cfg["replay_seconds"]):
+                self.notify(t("toast.hotkey_idle") if rec.state == "active" else t("toast.no_game"))
+            elif rec.game["mode"] != "events":
+                self.notify(t("toast.marked"))
         elif kind == "config":
             self.cfg = cfg = args[0]
             clips.set_root(cfg["save_folder"])  # applies to the next game; a running recording stays put

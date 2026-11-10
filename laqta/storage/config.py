@@ -24,6 +24,8 @@ FPS = (30, 60, 120)
 DEFAULTS = {
     "language": "en",
     "hotkey": "Ctrl+Alt+F9",
+    "replay_hotkey": "Ctrl+Alt+F10",  # "what just happened": keep the last replay_seconds
+    "replay_seconds": 30,
     "default_mode": "session",
     "pre_seconds": 15,
     "post_seconds": 5,
@@ -66,6 +68,7 @@ def _check(cfg: dict) -> dict:
     need(isinstance(cfg["save_folder"], str) and (not cfg["save_folder"] or Path(cfg["save_folder"]).is_absolute()),
          "save_folder must be a full path such as D:\\Recordings, or empty for the default")
     need(isinstance(cfg["accent"], str) and re.fullmatch(r"#[0-9a-fA-F]{6}", cfg["accent"]) is not None, "accent must look like #8B5CF6")
+    need(isinstance(cfg["replay_seconds"], int) and 5 <= cfg["replay_seconds"] <= 300, "replay_seconds must be between 5 and 300")
     for key in ("cleanup_days", "cleanup_gb"):
         need(isinstance(cfg[key], (int, float)) and 0 <= cfg[key] <= 100000, f"{key} must be 0 or more")
     for key in ("pre_seconds", "post_seconds", "max_clip_seconds", "exit_debounce_seconds"):

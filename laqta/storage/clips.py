@@ -52,14 +52,18 @@ def finish_clip(path: Path, game: dict, events: list[GameEvent], keep: float, pr
             log.warning("trim failed, keeping full replay: %s", done.stderr.decode(errors="replace")[:300])
             tmp.unlink(missing_ok=True)
     first = events[0].t if events else 0.0
-    write_sidecar(path, game, events, start=first - pre, seconds=keep)
+    write_sidecar(path, game, events, start=first - pre, seconds=keep, kind="clip")
     return path
 
 
-def write_sidecar(path: Path, game: dict, events: list[GameEvent], start: float, seconds: float | None = None) -> None:
+def write_sidecar(
+    path: Path, game: dict, events: list[GameEvent], start: float, seconds: float | None = None, kind: str = "recording"
+) -> None:
     """<video>.json next to the video: what it is and where in it each event happened.
-    `start` is the clock value at the video's first frame."""
+    `start` is the clock value at the video's first frame. Tags and favourites the user adds
+    later live in the same file (see storage.library.set_meta)."""
     sidecar = {
+        "kind": kind,  # "clip" (saved around events) | "recording" (a session or a match)
         "game": game.get("name") or game["exe"],
         "exe": game["exe"],
         "mode": game.get("mode"),

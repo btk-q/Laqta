@@ -10,7 +10,7 @@ from pathlib import Path
 from PySide6.QtCore import QFile, QObject, QRunnable, QSize, Qt, QThreadPool, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QListView, QListWidget,
+    QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
     QListWidgetItem, QPushButton, QVBoxLayout, QWidget,
 )  # fmt: skip
 
@@ -50,7 +50,23 @@ def caption(clip: Clip, today: datetime.date | None = None) -> str:
         parts.append(", ".join(t(f"event.{k}") for k in kinds[:3]))
     elif clip.kind == "recording":
         parts.append(size_text(clip.size))
-    return f"{clip.game}\n{'   '.join(parts)}"
+    star = "★ " if clip.favorite else ""
+    return f"{star}{clip.game}\n{'   '.join(parts)}"
+
+
+def summary_text(clip: Clip) -> str:
+    """One line about the selected video: length, score line, result, tags."""
+    parts = []
+    stats = library.summary(clip)
+    if clip.seconds:
+        parts.append(clock(clip.seconds))
+    if stats:
+        parts.append(t("summary.kda", kills=stats["kills"], deaths=stats["deaths"], assists=stats["assists"]))
+        if stats["result"]:
+            parts.append(t(f"summary.{stats['result']}"))
+    if clip.tags:
+        parts.append(t("summary.tags", tags=", ".join(clip.tags)))
+    return "     ".join(parts)
 
 
 def placeholder(game: str) -> QPixmap:
@@ -136,7 +152,7 @@ class LibraryWindow(QDialog):
         self.clips: list[Clip] = []
         self.items: dict[str, QListWidgetItem] = {}
         self.setWindowTitle(t("library.title"))
-        self.resize(1010, 680)
+        self.resize(1160, 700)
         self.pool = QThreadPool(self)
         self.pool.setMaxThreadCount(2)  # thumbnails must not compete with a game for CPU
         self.signals = _Signals(self)
@@ -149,13 +165,23 @@ class LibraryWindow(QDialog):
             self.kind.addItem(t(label), value)
         self.count = QLabel()
         self.count.setObjectName("muted")
+        self.search = QLineEdit()
+        self.search.setPlaceholderText(t("library.search"))
+        self.search.setClearButtonEnabled(True)
+        self.search.setMinimumWidth(210)
+        self.search.textChanged.connect(self._filter)
+        self.favorites = QCheckBox(t("library.favorites"))
+        self.favorites.setToolTip(t("library.fav_hint"))
+        self.favorites.toggled.connect(self._filter)
         filters = QHBoxLayout()
         filters.setContentsMargins(20, 16, 20, 10)
         filters.setSpacing(10)
+        filters.addWidget(self.search)
         for combo in (self.game, self.event, self.days, self.kind):
-            combo.setMinimumWidth(150)
+            combo.setMinimumWidth(130)
             combo.currentIndexChanged.connect(self._filter)
             filters.addWidget(combo)
+        filters.addWidget(self.favorites)
         filters.addStretch(1)
         filters.addWidget(self.count)
 
@@ -180,8 +206,13 @@ class LibraryWindow(QDialog):
         actions = QHBoxLayout()
         actions.setContentsMargins(20, 10, 20, 16)
         actions.setSpacing(10)
+        self.summary = QLabel()
+        self.summary.setObjectName("muted")
+        self.summary.setContentsMargins(22, 8, 22, 0)
         for key, handler, name in (
             ("library.play", self._play, "primary"),
+            ("library.favorite", self._favorite, ""),
+            ("library.tags", self._tags, ""),
             ("library.trim", self._trim, ""),
             ("library.export", self._export, ""),
             ("library.show", self._show, ""),
@@ -201,6 +232,7 @@ class LibraryWindow(QDialog):
         layout.addLayout(filters)
         layout.addWidget(self.grid, 1)
         layout.addWidget(self.empty, 1)
+        layout.addWidget(self.summary)
         layout.addLayout(actions)
         QShortcut(QKeySequence(Qt.Key.Key_F5), self, self.reload)
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self, self._delete)
@@ -208,7 +240,7 @@ class LibraryWindow(QDialog):
 
     # -- contents ----------------------------------------------------------------
 
-    def reload(self) -> None:
+    def reload(self, select: Path | None = None) -> None:
         self.clips = library.scan(self.root)
         chosen = (self.game.currentData(), self.event.currentData())
         for combo, first, values, label in (
@@ -234,6 +266,8 @@ class LibraryWindow(QDialog):
             self.grid.addItem(item)
             self.items[str(clip.path)] = item
             self.pool.start(_Thumbnailer(clip.path, self.signals))
+            if select is not None and clip.path == select:
+                self.grid.setCurrentItem(item)
         self._filter()
 
     def _thumb_ready(self, video: str, thumb: str) -> None:
@@ -248,7 +282,8 @@ class LibraryWindow(QDialog):
         for i in range(self.grid.count()):
             item = self.grid.item(i)
             clip = item.data(Qt.ItemDataRole.UserRole)
-            visible = library.matches(clip, self.game.currentData(), self.event.currentData(), self.days.currentData(), self.kind.currentData())
+            visible = library.matches(clip, self.game.currentData(), self.event.currentData(), self.days.currentData(),
+                                      self.kind.currentData(), text=self.search.text(), favorite=self.favorites.isChecked())
             item.setHidden(not visible)
             if visible:
                 shown, total = shown + 1, total + clip.size
@@ -265,8 +300,23 @@ class LibraryWindow(QDialog):
         return items[0].data(Qt.ItemDataRole.UserRole) if items else None
 
     def _selection_changed(self) -> None:
+        clip = self.selected()
         for button in self.buttons:
-            button.setEnabled(self.selected() is not None)
+            button.setEnabled(clip is not None)
+        self.summary.setText(summary_text(clip) if clip else "")
+        self.buttons[1].setText(t("library.unfavorite" if clip and clip.favorite else "library.favorite"))
+
+    def _favorite(self) -> None:
+        if clip := self.selected():
+            library.set_meta(clip.path, favorite=not clip.favorite)
+            self.reload(clip.path)
+
+    def _tags(self) -> None:
+        if clip := self.selected():
+            text, ok = QInputDialog.getText(self, t("library.tags"), t("library.tags_prompt"), text=", ".join(clip.tags))
+            if ok:
+                library.set_meta(clip.path, tags=text.replace("،", ",").split(","))  # Arabic comma too
+                self.reload(clip.path)
 
     # -- actions -----------------------------------------------------------------
 

@@ -62,11 +62,17 @@ Recordings go to `Videos\Laqta\<Game>\<date>\`. Change the folder in **Settings 
 | Full match | One file per match. Needs a game with event detection; others record the session. |
 | Events only | Nothing is kept except short clips around each event or hotkey press. |
 
-The clip hotkey is **Ctrl+Alt+F9** by default. It saves a clip in Events only, and adds a mark
-in Hybrid and Full match.
+Two hotkeys, both changeable in **Settings → General**:
 
-**Clips window:** filter by game, event and date; play, trim to a copy, export as MP4, show
-in folder, or delete to the Recycle Bin.
+- **Ctrl+Alt+F9, clip:** in Events only, saves a clip around this moment (with time before and
+  after). In Hybrid and Full match it adds a mark.
+- **Ctrl+Alt+F10, instant replay:** saves the last 30 seconds, ending the moment you press it.
+  In Hybrid and Full match it adds a mark.
+
+**Clips window:** search by game, tag or event; filter by game, event, date and favourites;
+play, tag, trim to a copy, export as MP4, show in folder, or delete to the Recycle Bin.
+Favourites are never removed by automatic cleanup. Selecting a recording from a game with
+event detection shows its length, kills, deaths, assists and result.
 
 **Settings:** language, hotkey, mode for new games, per-game mode / capture method / event
 toggles, quality and frame rate, clip timing, automatic cleanup by age or folder size, and

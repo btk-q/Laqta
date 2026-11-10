@@ -30,6 +30,8 @@ class Clip:
     kind: str  # "clip" (saved around events) | "recording" (session or match)
     events: tuple = ()  # dicts {"type", "offset", ...} from the sidecar
     seconds: float | None = None  # known for clips; recordings are probed on demand
+    tags: tuple = ()
+    favorite: bool = False  # favourites are never removed by automatic cleanup
 
     @property
     def event_types(self) -> set[str]:
@@ -51,16 +53,20 @@ def scan(root: Path | None = None) -> list[Clip]:
             meta = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             pass
-        is_clip = meta.get("seconds") is not None or path.name.startswith("Replay")
+        kind = meta.get("kind")
+        if kind not in ("clip", "recording"):  # files from before the sidecar said so
+            kind = "clip" if meta.get("seconds") is not None or path.name.startswith("Replay") else "recording"
         found.append(
             Clip(
                 path=path,
                 game=meta.get("game") or path.parents[1].name,
                 when=datetime.datetime.fromtimestamp(stat.st_mtime),
                 size=stat.st_size,
-                kind="clip" if is_clip else "recording",
+                kind=kind,
                 events=tuple(meta.get("events") or ()),
                 seconds=meta.get("seconds"),
+                tags=tuple(str(tag) for tag in meta.get("tags") or ()),
+                favorite=bool(meta.get("favorite")),
             )
         )
     return sorted(found, key=lambda c: c.when, reverse=True)
@@ -73,8 +79,16 @@ def matches(
     days: int | None = None,
     kind: str | None = None,
     now: datetime.datetime | None = None,
+    text: str = "",
+    favorite: bool = False,
 ) -> bool:
-    """Library filter. None means "any"."""
+    """Library filter. None, "" and False mean "any"."""
+    if favorite and not clip.favorite:
+        return False
+    if text:
+        haystack = " ".join([clip.game, clip.path.name, *clip.tags, *clip.event_types]).casefold()
+        if not all(word in haystack for word in text.casefold().split()):
+            return False
     if game and clip.game != game:
         return False
     if event and event not in clip.event_types:
@@ -84,6 +98,35 @@ def matches(
     if days is not None and clip.when < (now or datetime.datetime.now()) - datetime.timedelta(days=days):
         return False
     return True
+
+
+def set_meta(path: Path, **fields) -> None:
+    """Update a video's sidecar (favorite=..., tags=[...]). Creates it for old recordings that have none."""
+    sidecar = path.with_suffix(".json")
+    try:
+        meta = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        meta = {"game": path.parents[1].name, "events": []}
+    if "tags" in fields:
+        seen: dict[str, None] = {}
+        for tag in fields["tags"]:
+            if tag.strip():
+                seen.setdefault(tag.strip()[:40])
+        fields["tags"] = list(seen)[:20]
+    meta.update(fields)
+    tmp = sidecar.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    tmp.replace(sidecar)  # never leave half a file where the event marks were
+
+
+def summary(clip: Clip) -> dict | None:
+    """Kills / deaths / assists and the result, for a video whose plugin reported events."""
+    counted = [e["type"] for e in clip.events]
+    if not any(t in counted for t in ("kill", "death", "assist", "win", "lose")):
+        return None
+    result = "win" if "win" in counted else "lose" if "lose" in counted else None
+    return {"kills": counted.count("kill"), "deaths": counted.count("death"), "assists": counted.count("assist"),
+            "result": result, "seconds": clip.seconds}
 
 
 # -- actions ---------------------------------------------------------------------------
@@ -167,7 +210,7 @@ def export(path: Path, root: Path | None = None) -> Path:
 
 def to_delete(clips: list[Clip], max_age_days: int, max_gb: float, now: datetime.datetime) -> list[Clip]:
     """Which files auto-cleanup would remove. 0 switches a rule off. Oldest go first."""
-    settled = [c for c in clips if now - c.when >= RECENT]
+    settled = [c for c in clips if now - c.when >= RECENT and not c.favorite]  # favourites are kept forever
     doomed = [c for c in settled if max_age_days and now - c.when > datetime.timedelta(days=max_age_days)]
     if max_gb:
         total = sum(c.size for c in clips if c not in doomed)
