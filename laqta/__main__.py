@@ -77,17 +77,43 @@ def obs_check(watch: bool) -> int:
     return 0
 
 
+def vision_test(plugin_name: str, video: str, fps: float) -> int:
+    from .plugins import PLUGINS
+    from .plugins.vision import VisionPlugin, run_video
+
+    cls = PLUGINS.get(plugin_name)
+    if cls is None or not issubclass(cls, VisionPlugin):
+        print(f"{plugin_name!r} is not a vision plugin")
+        return 1
+    signals = [s for s in cls().signals() if s.templates]
+    if not signals:
+        print(f"{plugin_name}: no template images installed yet, nothing to detect")
+        return 1
+    count = 0
+    for t, event in run_video(signals, video, fps):
+        count += 1
+        print(f"{int(t // 60):02d}:{t % 60:04.1f}  {event.type:<10} score {event.confidence:.2f}")
+    print(f"{count} event(s)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="laqta")
     parser.add_argument("--version", action="version", version=f"laqta {__version__}")
     sub = parser.add_subparsers(dest="command")
     check = sub.add_parser("obs-check", help="verify Laqta can drive OBS on this machine")
     check.add_argument("--watch", action="store_true", help="stay connected and prove reconnect")
+    vision = sub.add_parser("vision-test", help="run a vision plugin over a recording and list what it detects")
+    vision.add_argument("plugin")
+    vision.add_argument("video")
+    vision.add_argument("--fps", type=float, default=3.0)
     args = parser.parse_args(argv)
     fmt = "%(asctime)s %(levelname)s %(name)s %(message)s"
     if args.command == "obs-check":
         logging.basicConfig(level=logging.INFO, format=fmt)
         return obs_check(args.watch)
+    if args.command == "vision-test":
+        return vision_test(args.plugin, args.video, args.fps)
 
     config.DIR.mkdir(parents=True, exist_ok=True)
     log_file = logging.handlers.RotatingFileHandler(config.DIR / "laqta.log", maxBytes=1_000_000, backupCount=2, encoding="utf-8")

@@ -3,5 +3,6 @@
 from ..core.events import GamePlugin
 from .cs2_gsi import Cs2Plugin
 from .lol_live import LolPlugin
+from .valorant_vision import ValorantPlugin
 
-PLUGINS: dict[str, type[GamePlugin]] = {Cs2Plugin.name: Cs2Plugin, LolPlugin.name: LolPlugin}
+PLUGINS: dict[str, type[GamePlugin]] = {p.name: p for p in (Cs2Plugin, LolPlugin, ValorantPlugin)}
