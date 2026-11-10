@@ -13,12 +13,12 @@ from pathlib import Path
 
 import psutil
 
+from . import capture
 from .client import Obs, ObsDown, ObsError
 
 log = logging.getLogger(__name__)
 
 NAME = "Laqta"  # profile, scene collection and scene name
-CAPTURE = "Laqta Capture"
 OBS_DATA = Path(os.environ.get("APPDATA", "")) / "obs-studio"
 WS_CONFIG = OBS_DATA / "plugin_config/obs-websocket/config.json"
 # OBS 33.0.1 crashed once in its browser component when profiles were switched back to back,
@@ -156,11 +156,4 @@ def ensure_laqta(obs: Obs, record_dir: Path, replay_seconds: int = 30) -> None:
     if NAME not in [s["sceneName"] for s in obs.call("GetSceneList")["scenes"]]:
         obs.call("CreateScene", sceneName=NAME)
     obs.call("SetCurrentProgramScene", sceneName=NAME)
-    if CAPTURE not in [i["inputName"] for i in obs.call("GetInputList")["inputs"]]:
-        obs.call(
-            "CreateInput",
-            sceneName=NAME,
-            inputName=CAPTURE,
-            inputKind="game_capture",
-            inputSettings={"capture_mode": "any_fullscreen"},
-        )
+    capture.ensure_inputs(obs, NAME)

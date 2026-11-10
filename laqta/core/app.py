@@ -12,15 +12,17 @@ from typing import Callable
 
 from ..game_detector.detector import Detector, load_games
 from ..obs_controller import setup
-from ..obs_controller.client import Obs, ObsDown
+from ..obs_controller.capture import Capture
+from ..obs_controller.client import Obs, ObsDown, ObsError
 from ..plugins import PLUGINS
-from ..storage import clips
+from ..storage import clips, config
 from .events import GameEvent, GamePlugin
 from .recorder import Recorder
 
 log = logging.getLogger(__name__)
 
 POLL = 2.0  # seconds between process scans
+CAPTURE_CHECK = 4.0  # seconds between looks at the picture until it is confirmed not black
 ENABLE_WS = "Turn on OBS: Tools > WebSocket Server Settings > Enable WebSocket server"
 
 
@@ -34,7 +36,7 @@ class Core(threading.Thread):
         self.recorder = Recorder(
             self.obs,
             connect=self._connect,
-            prepare=lambda game: setup.ensure_laqta(self.obs, clips.game_dir(game), self.recorder.replay_seconds),
+            prepare=self._prepare,
             on_clip=self._on_clip,
             on_recording=self._on_recording,
             notify=notify,
@@ -43,6 +45,8 @@ class Core(threading.Thread):
             max_clip=cfg["max_clip_seconds"],
             exit_debounce=cfg["exit_debounce_seconds"],
         )
+        self.capture = Capture(self.obs, setup.NAME, config.DIR / "capture.json", notify)
+        self._capture_check_at: float | None = None
         self.plugin: GamePlugin | None = None
         self._plugin_game: dict | None = None  # game we already tried to start a plugin for
         self._obs_error: str | None = None
@@ -76,6 +80,25 @@ class Core(threading.Thread):
             self._obs_error = str(e)
             raise
         self._obs_error = None
+
+    def _prepare(self, game: dict) -> None:
+        setup.ensure_laqta(self.obs, clips.game_dir(game), self.recorder.replay_seconds)
+        self.capture.start(game)
+        self._capture_check_at = time.monotonic() + CAPTURE_CHECK
+
+    def _check_capture(self) -> None:
+        """A few seconds into a game, make sure OBS is not recording a black screen."""
+        if self._capture_check_at is None or time.monotonic() < self._capture_check_at:
+            return
+        if self.recorder.state != "active":
+            self._capture_check_at = None if self.recorder.game is None else time.monotonic() + CAPTURE_CHECK
+            return
+        try:
+            more = self.capture.check()
+        except (ObsDown, ObsError) as e:
+            log.warning("capture check failed: %s", e)
+            more = True
+        self._capture_check_at = time.monotonic() + CAPTURE_CHECK if more else None
 
     def _on_clip(self, path: Path, game: dict, events: list[GameEvent], keep: float, pre: float) -> None:
         # ponytail: trims on the core thread (stream copy, well under a second); move to a
@@ -154,6 +177,7 @@ class Core(threading.Thread):
                     elif change:
                         self.recorder.game_exited()
                 self.recorder.tick()
+                self._check_capture()
                 self._sync_plugin()
             except Exception:
                 log.exception("core loop error")  # never let one bad message kill recording

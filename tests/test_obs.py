@@ -146,7 +146,9 @@ class FakeObs:
             case "GetInputList":
                 return {"inputs": [{"inputName": i} for i in self.inputs]}
             case "CreateInput":
+                assert d["sceneItemEnabled"] is False
                 self.inputs.append(d["inputName"])
+                return {"sceneItemId": len(self.inputs)}
         return {}
 
 
@@ -155,7 +157,7 @@ def test_ensure_laqta_creates_everything_once(tmp_path):
     setup.ensure_laqta(fake, tmp_path / "out")
     assert (fake.profile, fake.collection) == (setup.NAME, setup.NAME)
     assert fake.params[("SimpleOutput", "RecRB")] == "true"
-    assert fake.scenes == [setup.NAME] and fake.inputs == [setup.CAPTURE]
+    assert fake.scenes == [setup.NAME] and fake.inputs == ["Laqta game_capture", "Laqta window_capture", "Laqta monitor_capture"]
     assert fake.loaded_rb and fake.record_dir == str(tmp_path / "out")
     assert (fake.video["outputHeight"], fake.video["fpsNumerator"]) == (1080, 60)
 
