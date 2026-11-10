@@ -13,7 +13,10 @@ dependencies = ["obsws-python>=1.8", "psutil>=5.9"]
 dev = ["pytest>=8"]
 
 [tool.setuptools]
-packages = ["laqta", "laqta.obs_controller"]
+packages = ["laqta", "laqta.core", "laqta.obs_controller", "laqta.game_detector"]
+
+[tool.setuptools.package-data]
+"laqta.game_detector" = ["games.json"]
 
 [tool.setuptools.dynamic]
 version = { attr = "laqta.__version__" }

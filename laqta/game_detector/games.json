@@ -1,0 +1,12 @@
+[
+  {"exe": "cs2.exe", "name": "Counter-Strike 2", "plugin": "cs2"},
+  {"exe": "League of Legends.exe", "name": "League of Legends", "plugin": "lol"},
+  {"exe": "VALORANT-Win64-Shipping.exe", "name": "Valorant", "plugin": "valorant"},
+  {"exe": "dota2.exe", "name": "Dota 2"},
+  {"exe": "RocketLeague.exe", "name": "Rocket League"},
+  {"exe": "r5apex.exe", "name": "Apex Legends"},
+  {"exe": "r5apex_dx12.exe", "name": "Apex Legends"},
+  {"exe": "FortniteClient-Win64-Shipping.exe", "name": "Fortnite"},
+  {"exe": "Overwatch.exe", "name": "Overwatch 2"},
+  {"exe": "cod.exe", "name": "Call of Duty"}
+]
