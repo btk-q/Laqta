@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 from pathlib import Path
 
@@ -27,6 +28,9 @@ DEFAULTS = {
     "exit_debounce_seconds": 10,
     "fps": 60,
     "quality": "Small",
+    "cleanup_days": 0,  # delete recordings older than this; 0 = never
+    "cleanup_gb": 0,  # keep the recordings folder under this size; 0 = no limit
+    "accent": "#8B5CF6",  # UI colour
     "asked": [],  # fullscreen apps we already asked "is this a game?" about
     "games": [],  # user games and overrides of built-in ones, matched by exe
 }
@@ -41,6 +45,9 @@ def _check(cfg: dict) -> dict:
     need(cfg["default_mode"] in MODES, f'default_mode must be one of {", ".join(MODES)}, not {cfg["default_mode"]!r}')
     need(cfg["quality"] in QUALITIES, f'quality must be one of {", ".join(QUALITIES)}')
     need(cfg["fps"] in (30, 60, 120), "fps must be 30, 60 or 120")
+    need(isinstance(cfg["accent"], str) and re.fullmatch(r"#[0-9a-fA-F]{6}", cfg["accent"]) is not None, "accent must look like #8B5CF6")
+    for key in ("cleanup_days", "cleanup_gb"):
+        need(isinstance(cfg[key], (int, float)) and 0 <= cfg[key] <= 100000, f"{key} must be 0 or more")
     for key in ("pre_seconds", "post_seconds", "max_clip_seconds", "exit_debounce_seconds"):
         need(isinstance(cfg[key], (int, float)) and 0 <= cfg[key] <= 600, f"{key} must be between 0 and 600")
     for game in cfg["games"]:

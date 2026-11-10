@@ -19,6 +19,7 @@ from ..i18n import t
 from ..storage import clips, config
 from . import theme
 from .hotkey import Hotkey
+from .library import LibraryWindow
 from .settings import SettingsWindow, set_game
 
 log = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ class TrayApp:
         self.state = {"state": "idle", "game": None, "mode": None, "recording": False, "obs": False, "error": None}
         self.pending: dict | None = None  # unknown app the last toast asked about
         self.settings: SettingsWindow | None = None
+        self.library: LibraryWindow | None = None
         self.hotkey: Hotkey | None = None
 
         base = QPixmap(str(ICON))
@@ -93,6 +95,7 @@ class TrayApp:
         self.menu.addSeparator()
         self.clip = self.menu.addAction(f"{t('menu.clip')}\t{self.cfg['hotkey']}")
         self.clip.triggered.connect(self.core.clip_now)
+        self.menu.addAction(t("menu.library")).triggered.connect(self.open_library)
         self.menu.addAction(t("menu.folder")).triggered.connect(self._open_folder)
         self.menu.addAction(t("menu.settings")).triggered.connect(self.open_settings)
         self.menu.addSeparator()
@@ -157,6 +160,15 @@ class TrayApp:
         clips.ROOT.mkdir(parents=True, exist_ok=True)
         os.startfile(clips.ROOT)
 
+    def open_library(self) -> None:
+        if self.library is not None:
+            self.library.reload()
+            self.library.raise_()
+            return self.library.activateWindow()
+        self.library = window = LibraryWindow()
+        window.finished.connect(lambda _: (setattr(self, "library", None), window.deleteLater()))
+        window.show()
+
     def open_settings(self) -> None:
         if self.settings is not None:
             self.settings.raise_()
@@ -169,7 +181,7 @@ class TrayApp:
         self.settings = None
         window.deleteLater()
         if not result:
-            return
+            return theme.apply(self.app, self.cfg["accent"])  # undo any colour preview
         old, self.cfg = self.cfg, window.cfg
         self._save()
         self.core.apply(self.cfg)
@@ -177,6 +189,7 @@ class TrayApp:
             self._apply_language()
         if self.cfg["hotkey"] != old["hotkey"]:
             self._bind_hotkey()
+        theme.apply(self.app, self.cfg["accent"])
 
 
 def run(cfg: dict) -> int:
@@ -189,7 +202,7 @@ def run(cfg: dict) -> int:
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("Laqta")
     app.setFont(QFont("Segoe UI", 10))  # has Arabic glyphs; Windows substitutes Segoe UI Arabic shapes
-    app.setStyleSheet(theme.QSS)
+    theme.apply(app, cfg["accent"])
     tray = TrayApp(app, cfg)
 
     # Ctrl+C in a terminal: Qt's loop never returns to Python on its own, so the handler

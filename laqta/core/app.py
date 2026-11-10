@@ -16,7 +16,7 @@ from ..obs_controller import setup
 from ..obs_controller.capture import Capture
 from ..obs_controller.client import Obs, ObsDown, ObsError
 from ..plugins import PLUGINS
-from ..storage import clips, config
+from ..storage import clips, config, library
 from .events import GameEvent, GamePlugin
 from .recorder import Recorder
 
@@ -116,11 +116,19 @@ class Core(threading.Thread):
         # worker if clips ever get long enough to delay the next save.
         clips.finish_clip(path, game, events, keep, pre)
         self.notify(t("toast.clip_saved", name=path.name))
+        self._cleanup()
 
     def _on_recording(self, path: Path, game: dict, marks: list[GameEvent], start: float) -> None:
         if game["mode"] != "session":
             clips.write_sidecar(path, game, marks, start)
         self.notify(t("toast.recording_saved", name=path.name))
+        self._cleanup()
+
+    def _cleanup(self) -> None:
+        try:
+            library.cleanup(self.cfg["cleanup_days"], self.cfg["cleanup_gb"])
+        except Exception:
+            log.exception("auto-cleanup failed")
 
     def _handle(self, kind: str, *args) -> None:
         rec = self.recorder
@@ -172,6 +180,7 @@ class Core(threading.Thread):
 
     def run(self) -> None:
         next_poll = 0.0
+        self._cleanup()
         while True:
             deadline = min(next_poll, self.recorder.next_deadline() or float("inf"))
             try:

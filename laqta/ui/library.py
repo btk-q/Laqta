@@ -1,0 +1,315 @@
+"""Clip library window: browse, filter, play, trim, export, delete."""
+
+from __future__ import annotations
+
+import datetime
+import os
+import subprocess
+from pathlib import Path
+
+from PySide6.QtCore import QFile, QObject, QRunnable, QSize, Qt, QThreadPool, Signal
+from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
+from PySide6.QtWidgets import (
+    QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QListView, QListWidget,
+    QListWidgetItem, QPushButton, QVBoxLayout, QWidget,
+)  # fmt: skip
+
+from ..i18n import t
+from ..storage import clips, config, library
+from ..storage.library import Clip
+from . import theme
+
+THUMB = QSize(256, 144)
+CACHE = config.DIR / "thumbs"
+
+
+def clock(seconds: float) -> str:
+    seconds = int(round(seconds))
+    hours, rest = divmod(seconds, 3600)
+    return f"{hours}:{rest // 60:02d}:{rest % 60:02d}" if hours else f"{rest // 60}:{rest % 60:02d}"
+
+
+def size_text(size: int) -> str:
+    return f"{size / 1024**3:.1f} GB" if size >= 1024**3 else f"{max(1, round(size / 1024**2))} MB"
+
+
+def when_text(when: datetime.datetime, today: datetime.date | None = None) -> str:
+    today = today or datetime.date.today()
+    days = (today - when.date()).days
+    day = t("library.today") if days == 0 else t("library.yesterday") if days == 1 else when.strftime("%Y-%m-%d")
+    return f"{day} {when:%H:%M}"
+
+
+def caption(clip: Clip, today: datetime.date | None = None) -> str:
+    """Two lines under a thumbnail: the game, then when / how long / what happened."""
+    parts = [when_text(clip.when, today)]
+    if clip.seconds:
+        parts.append(clock(clip.seconds))
+    kinds = list(dict.fromkeys(e["type"] for e in clip.events if e["type"] not in ("match_start", "match_end")))
+    if kinds:
+        parts.append(", ".join(t(f"event.{k}") for k in kinds[:3]))
+    elif clip.kind == "recording":
+        parts.append(size_text(clip.size))
+    return f"{clip.game}\n{'   '.join(parts)}"
+
+
+def placeholder(game: str) -> QPixmap:
+    pixmap = QPixmap(THUMB)
+    pixmap.fill(QColor(theme.current["panel"]))
+    painter = QPainter(pixmap)
+    painter.setPen(QColor(theme.current["line"]))
+    font = QFont("Segoe UI", 44)
+    font.setBold(True)
+    painter.setFont(font)
+    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, game[:1].upper())
+    painter.end()
+    return pixmap
+
+
+class _Signals(QObject):
+    done = Signal(str, str)  # video path, thumbnail path ("" if none)
+
+
+class _Thumbnailer(QRunnable):
+    def __init__(self, path: Path, signals: _Signals):
+        super().__init__()
+        self.path, self.signals = path, signals
+
+    def run(self) -> None:
+        thumb = library.thumbnail(self.path, CACHE)
+        try:
+            self.signals.done.emit(str(self.path), str(thumb or ""))
+        except RuntimeError:
+            pass  # the window was closed while we worked
+
+
+class TrimDialog(QDialog):
+    def __init__(self, clip: Clip, parent: QWidget):
+        super().__init__(parent)
+        self.setWindowTitle(t("trim.title"))
+        self.setMinimumWidth(420)
+        length = clip.seconds or library.duration(clip.path) or 0.0
+        self.start, self.end = QDoubleSpinBox(), QDoubleSpinBox()
+        for box, value in ((self.start, 0.0), (self.end, length)):
+            box.setRange(0.0, max(length, 0.1))
+            box.setDecimals(1)
+            box.setSingleStep(1.0)
+            box.setValue(value)
+        form = QFormLayout()
+        form.setVerticalSpacing(12)
+        form.addRow(t("trim.start"), self.start)
+        form.addRow(t("trim.end"), self.end)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(22, 20, 22, 16)
+        layout.setSpacing(12)
+        layout.addLayout(form)
+        marks = [f"{clock(e['offset'])} {t('event.' + e['type'])}" for e in clip.events if e.get("offset", -1) >= 0]
+        if marks:
+            layout.addWidget(self._note(t("trim.events", events=", ".join(marks[:12]))))
+        layout.addWidget(self._note(t("trim.hint")))
+        save, cancel = QPushButton(t("trim.save")), QPushButton(t("button.cancel"))
+        save.setObjectName("primary")
+        save.clicked.connect(self.accept)
+        cancel.clicked.connect(self.reject)
+        self.start.valueChanged.connect(lambda: save.setEnabled(self.end.value() > self.start.value()))
+        self.end.valueChanged.connect(lambda: save.setEnabled(self.end.value() > self.start.value()))
+        save.setEnabled(length > 0)
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        row.addStretch(1)
+        row.addWidget(cancel)
+        row.addWidget(save)
+        layout.addLayout(row)
+
+    @staticmethod
+    def _note(text: str) -> QLabel:
+        label = QLabel(text)
+        label.setObjectName("hint")
+        label.setWordWrap(True)
+        return label
+
+
+class LibraryWindow(QDialog):
+    def __init__(self, parent: QWidget | None = None, root: Path = clips.ROOT):
+        super().__init__(parent)
+        self.root = root
+        self.clips: list[Clip] = []
+        self.items: dict[str, QListWidgetItem] = {}
+        self.setWindowTitle(t("library.title"))
+        self.resize(1010, 680)
+        self.pool = QThreadPool(self)
+        self.pool.setMaxThreadCount(2)  # thumbnails must not compete with a game for CPU
+        self.signals = _Signals(self)
+        self.signals.done.connect(self._thumb_ready)
+
+        self.game, self.event, self.days, self.kind = QComboBox(), QComboBox(), QComboBox(), QComboBox()
+        for label, value in (("library.all_time", None), ("library.today", 1), ("library.week", 7), ("library.month", 30)):
+            self.days.addItem(t(label), value)
+        for label, value in (("library.everything", None), ("library.clips", "clip"), ("library.recordings", "recording")):
+            self.kind.addItem(t(label), value)
+        self.count = QLabel()
+        self.count.setObjectName("muted")
+        filters = QHBoxLayout()
+        filters.setContentsMargins(20, 16, 20, 10)
+        filters.setSpacing(10)
+        for combo in (self.game, self.event, self.days, self.kind):
+            combo.setMinimumWidth(150)
+            combo.currentIndexChanged.connect(self._filter)
+            filters.addWidget(combo)
+        filters.addStretch(1)
+        filters.addWidget(self.count)
+
+        self.grid = QListWidget()
+        self.grid.setObjectName("grid")
+        self.grid.setViewMode(QListView.ViewMode.IconMode)
+        self.grid.setIconSize(THUMB)
+        self.grid.setGridSize(QSize(THUMB.width() + 28, THUMB.height() + 66))
+        self.grid.setResizeMode(QListView.ResizeMode.Adjust)
+        self.grid.setMovement(QListView.Movement.Static)
+        self.grid.setWordWrap(True)
+        self.grid.setUniformItemSizes(True)
+        self.grid.itemSelectionChanged.connect(self._selection_changed)
+        self.grid.itemDoubleClicked.connect(lambda _: self._play())
+        self.empty = QLabel()
+        self.empty.setObjectName("hint")
+        self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.status = QLabel()
+        self.status.setObjectName("muted")
+        self.buttons: list[QPushButton] = []
+        actions = QHBoxLayout()
+        actions.setContentsMargins(20, 10, 20, 16)
+        actions.setSpacing(10)
+        for key, handler, name in (
+            ("library.play", self._play, "primary"),
+            ("library.trim", self._trim, ""),
+            ("library.export", self._export, ""),
+            ("library.show", self._show, ""),
+            ("library.delete", self._delete, "danger"),
+        ):
+            button = QPushButton(t(key))
+            button.setObjectName(name)
+            button.clicked.connect(handler)
+            self.buttons.append(button)
+            actions.addWidget(button)
+        actions.addStretch(1)
+        actions.addWidget(self.status)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addLayout(filters)
+        layout.addWidget(self.grid, 1)
+        layout.addWidget(self.empty, 1)
+        layout.addLayout(actions)
+        QShortcut(QKeySequence(Qt.Key.Key_F5), self, self.reload)
+        QShortcut(QKeySequence(Qt.Key.Key_Delete), self, self._delete)
+        self.reload()
+
+    # -- contents ----------------------------------------------------------------
+
+    def reload(self) -> None:
+        self.clips = library.scan(self.root)
+        chosen = (self.game.currentData(), self.event.currentData())
+        for combo, first, values, label in (
+            (self.game, "library.all_games", sorted({c.game for c in self.clips}, key=str.lower), str),
+            (self.event, "library.all_events", sorted({e for c in self.clips for e in c.event_types}), lambda e: t(f"event.{e}")),
+        ):
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem(t(first), None)
+            for value in values:
+                combo.addItem(label(value), value)
+            combo.blockSignals(False)
+        self.game.setCurrentIndex(max(0, self.game.findData(chosen[0])))
+        self.event.setCurrentIndex(max(0, self.event.findData(chosen[1])))
+
+        self.grid.clear()
+        self.items.clear()
+        for clip in self.clips:
+            item = QListWidgetItem(QIcon(placeholder(clip.game)), caption(clip))
+            item.setData(Qt.ItemDataRole.UserRole, clip)
+            item.setToolTip(str(clip.path))
+            item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            self.grid.addItem(item)
+            self.items[str(clip.path)] = item
+            self.pool.start(_Thumbnailer(clip.path, self.signals))
+        self._filter()
+
+    def _thumb_ready(self, video: str, thumb: str) -> None:
+        item = self.items.get(video)
+        if item is not None and thumb:
+            pixmap = QPixmap(thumb).scaled(THUMB, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+            x, y = (pixmap.width() - THUMB.width()) // 2, (pixmap.height() - THUMB.height()) // 2
+            item.setIcon(QIcon(pixmap.copy(x, y, THUMB.width(), THUMB.height())))
+
+    def _filter(self) -> None:
+        shown, total = 0, 0
+        for i in range(self.grid.count()):
+            item = self.grid.item(i)
+            clip = item.data(Qt.ItemDataRole.UserRole)
+            visible = library.matches(clip, self.game.currentData(), self.event.currentData(), self.days.currentData(), self.kind.currentData())
+            item.setHidden(not visible)
+            if visible:
+                shown, total = shown + 1, total + clip.size
+            elif item.isSelected():
+                item.setSelected(False)
+        self.count.setText(t("library.count", count=shown, size=size_text(total)) if shown else "")
+        self.grid.setVisible(shown > 0)
+        self.empty.setVisible(shown == 0)
+        self.empty.setText(t("library.no_match" if self.clips else "library.empty"))
+        self._selection_changed()
+
+    def selected(self) -> Clip | None:
+        items = self.grid.selectedItems()
+        return items[0].data(Qt.ItemDataRole.UserRole) if items else None
+
+    def _selection_changed(self) -> None:
+        for button in self.buttons:
+            button.setEnabled(self.selected() is not None)
+
+    # -- actions -----------------------------------------------------------------
+
+    def _play(self) -> None:
+        if clip := self.selected():
+            os.startfile(clip.path)
+
+    def _show(self) -> None:
+        if clip := self.selected():
+            subprocess.Popen(["explorer", "/select,", str(clip.path)])
+
+    def _attempt(self, work, done_key: str) -> None:
+        """Run a slow file action with a wait cursor; report the result in the status line."""
+        # ponytail: stream copies of long recordings can take a few seconds on the UI thread;
+        # move to the thread pool with a progress line if that becomes annoying.
+        self.status.setText(t("library.working"))
+        self.setCursor(Qt.CursorShape.WaitCursor)
+        self.repaint()
+        try:
+            result = work()
+        except (OSError, ValueError, subprocess.TimeoutExpired) as e:
+            self.status.setText(t("library.failed", error=e))
+            return
+        finally:
+            self.unsetCursor()
+        self.reload()
+        self.status.setText(t(done_key, path=result, name=Path(result).name))
+
+    def _trim(self) -> None:
+        if clip := self.selected():
+            dialog = TrimDialog(clip, self)
+            if dialog.exec():
+                self._attempt(lambda: library.trim(clip.path, dialog.start.value(), dialog.end.value()), "library.trimmed")
+
+    def _export(self) -> None:
+        if clip := self.selected():
+            self._attempt(lambda: library.export(clip.path, self.root), "library.exported")
+
+    def _delete(self) -> None:
+        if clip := self.selected():
+            # Recycle Bin, so a slip is recoverable and no confirmation dialog is needed.
+            if not QFile.moveToTrash(str(clip.path)):
+                return self.status.setText(t("library.failed", error=clip.path.name))
+            QFile.moveToTrash(str(clip.path.with_suffix(".json")))
+            self.reload()
+            self.status.setText(t("library.deleted"))

@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QFormLayout, QFrame, QHBoxLayout, QKeySequenceEdit, QLabel, QLineEdit,
+    QApplication, QCheckBox, QColorDialog, QComboBox, QDialog, QFormLayout, QFrame, QHBoxLayout, QKeySequenceEdit, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )  # fmt: skip
 
@@ -19,6 +19,7 @@ from ..i18n import LANGUAGES, t
 from ..obs_controller.capture import KINDS
 from ..plugins import PLUGINS
 from ..storage import clips, config
+from . import theme
 
 # -- config edits (no Qt: unit-tested) ------------------------------------------------
 
@@ -122,7 +123,8 @@ class SettingsWindow(QDialog):
         self.rail.setObjectName("rail")
         self.rail.setFixedWidth(170)
         self.pages = QStackedWidget()
-        for key, page in (("nav.general", self._general()), ("nav.games", self._games()), ("nav.recording", self._recording())):
+        for key, page in (("nav.general", self._general()), ("nav.games", self._games()), ("nav.recording", self._recording()),
+                          ("nav.appearance", self._appearance())):
             self.rail.addItem(t(key))
             self.pages.addWidget(page)
         self.rail.currentRowChanged.connect(self.pages.setCurrentIndex)
@@ -202,11 +204,59 @@ class SettingsWindow(QDialog):
         form.addRow(t("rec.pre"), self.pre)
         form.addRow(t("rec.post"), self.post)
         form.addRow(t("rec.max_clip"), self.max_clip)
+        self.cleanup_days = _spin(self.cfg["cleanup_days"], 0, 3650)
+        self.cleanup_gb = _spin(self.cfg["cleanup_gb"], 0, 100000)
         form.addRow(t("rec.debounce"), self.debounce)
+        form.addRow(t("rec.cleanup_days"), self.cleanup_days)
+        form.addRow(t("rec.cleanup_gb"), self.cleanup_gb)
         layout.addLayout(form)
+        layout.addWidget(_label(t("rec.cleanup_hint"), "hint"))
         layout.addWidget(_label(t("rec.folder", path=str(clips.ROOT)), "hint"))
         layout.addStretch(1)
         return page
+
+    # -- Appearance ------------------------------------------------------------
+
+    def _appearance(self) -> QWidget:
+        page, layout = self._page("nav.appearance")
+        layout.addWidget(_label(t("look.color")))
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        self.swatches: dict[str, QPushButton] = {}
+        for name, color in theme.PRESETS.items():
+            button = QPushButton()
+            button.setObjectName("swatch")
+            button.setCheckable(True)
+            button.setToolTip(t(f"color.{name}"))
+            button.setAccessibleName(t(f"color.{name}"))
+            button.setStyleSheet(f"QPushButton#swatch {{ background: {color}; }}")
+            button.clicked.connect(lambda _=False, c=color: self._set_accent(c))
+            self.swatches[color] = button
+            row.addWidget(button)
+        custom = QPushButton(t("look.custom"))
+        custom.clicked.connect(self._pick_accent)
+        row.addSpacing(8)
+        row.addWidget(custom)
+        row.addStretch(1)
+        layout.addLayout(row)
+        layout.addWidget(_label(t("look.hint"), "hint"))
+        layout.addStretch(1)
+        self._set_accent(self.cfg["accent"], preview=False)
+        return page
+
+    def _set_accent(self, color: str, preview: bool = True) -> None:
+        self.cfg["accent"] = color.upper()
+        for preset, button in self.swatches.items():
+            button.setChecked(preset.upper() == color.upper())
+        if preview and (app := QApplication.instance()):
+            theme.apply(app, color)  # live preview; Cancel puts the saved colour back
+
+    def _pick_accent(self) -> None:
+        from PySide6.QtGui import QColor
+
+        chosen = QColorDialog.getColor(QColor(self.cfg["accent"]), self, t("look.color"))
+        if chosen.isValid():
+            self._set_accent(chosen.name())
 
     # -- Games -----------------------------------------------------------------
 
@@ -372,5 +422,7 @@ class SettingsWindow(QDialog):
             post_seconds=self.post.value(),
             max_clip_seconds=self.max_clip.value(),
             exit_debounce_seconds=self.debounce.value(),
+            cleanup_days=self.cleanup_days.value(),
+            cleanup_gb=self.cleanup_gb.value(),
         )
         self.accept()
