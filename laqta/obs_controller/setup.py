@@ -57,7 +57,14 @@ def launch_obs() -> None:
     if exe is None:
         raise ObsDown("OBS Studio is not installed")
     # OBS only finds its data files when started from its own folder.
-    args = [str(exe), "--minimize-to-tray", "--disable-shutdown-check"]
+    # OBS 32+ leaves .sentinel/run_* behind when it dies and then blocks startup on a
+    # "launch in safe mode?" dialog (--disable-shutdown-check no longer exists). Nobody is
+    # there to click it mid-game, so clear the markers. Only reached when OBS is not running.
+    # ponytail: this also skips the safe-mode offer after a genuine plugin crash; make it a
+    # setting if someone needs that prompt back.
+    for marker in (OBS_DATA / ".sentinel").glob("run_*"):
+        marker.unlink(missing_ok=True)
+    args = [str(exe), "--minimize-to-tray"]
     if (OBS_DATA / "basic/profiles" / NAME).is_dir() and (OBS_DATA / "basic/scenes" / f"{NAME}.json").is_file():
         args += ["--profile", NAME, "--collection", NAME]
     subprocess.Popen(args, cwd=exe.parent)

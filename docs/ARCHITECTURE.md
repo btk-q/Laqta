@@ -128,9 +128,9 @@ Verified live on OBS 33.0.1 / obs-websocket 5.7.6 (M1):
 - OBS crashed once (in its bundled browser component) when profiles were switched back to back.
   Setup now pauses 1.5 s after every profile or collection change, and Laqta launches OBS with
   `--profile Laqta --collection Laqta` so normal use involves no switching at all.
-- After a kill, OBS relaunches and Laqta reconnects. Whether OBS's "unclean shutdown" prompt
-  can block that unattended is **[verify]**: the log shows the prompt path ran despite
-  `--disable-shutdown-check`.
+- After a crash or kill, OBS 33 blocks startup on a "launch in safe mode?" dialog
+  (`--disable-shutdown-check` no longer exists). Laqta clears OBS's `.sentinel/run_*` markers
+  before launching it; verified: relaunch connects in ~2 s with no prompt.
 
 Capture: Game Capture (`any_fullscreen`, `anti_cheat_hook` on) first. If frames stay black
 after a few seconds, fall back to Window Capture (WGC), then Display Capture **[verify, M1/M5]**.
@@ -179,6 +179,5 @@ Until M6, modes and toggles are edited in the TOML file.
 | Rocket League | Official Stats API (TCP 49123) | Exists since the April 2026 EAC update; payload schema undocumented and whether it works in online matches is unconfirmed. Later plugin. |
 | Apex / Fortnite / OW2 / COD | Vision | Signals are mostly text, so they depend on language and need OCR. Later, using the Valorant plugin as the template. |
 
-General: clips trimmed with stream copy can start up to ~2 s early (keyframes). An OBS crash
-may show a safe-mode prompt on relaunch that blocks automatic recovery **[verify, M1]**. The
+General: clips trimmed with stream copy can start up to ~2 s early (keyframes). The
 OBS WebSocket server must be enabled once by the user (it is currently off on this machine).
