@@ -130,9 +130,9 @@ class TrimDialog(QDialog):
 
 
 class LibraryWindow(QDialog):
-    def __init__(self, parent: QWidget | None = None, root: Path = clips.ROOT):
+    def __init__(self, parent: QWidget | None = None, root: Path | None = None):
         super().__init__(parent)
-        self.root = root
+        self.root = root or clips.ROOT
         self.clips: list[Clip] = []
         self.items: dict[str, QListWidgetItem] = {}
         self.setWindowTitle(t("library.title"))

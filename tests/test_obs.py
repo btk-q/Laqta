@@ -171,6 +171,12 @@ def test_ensure_laqta_creates_everything_once(tmp_path):
     assert fake.loaded_rb and fake.record_dir == str(tmp_path / "out")
     assert (fake.video["baseWidth"], fake.video["outputHeight"], fake.video["fpsNumerator"]) == (3440, 1440, 60)  # primary monitor
     assert fake.transforms[1]["boundsWidth"] == 3440
+    assert (fake.transforms[1]["positionX"], fake.transforms[1]["positionY"]) == (0, 0)
+
+    # OBS re-centres items when the canvas changes shape; the next setup must put them back.
+    fake.transforms[1]["positionX"] = 440.0
+    setup.ensure_laqta(fake, tmp_path / "out")
+    assert fake.transforms[1]["positionX"] == 0
 
     fake.calls.clear()
     setup.ensure_laqta(fake, tmp_path / "out")  # second run changes nothing

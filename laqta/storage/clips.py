@@ -16,12 +16,20 @@ from ..core.events import GameEvent
 log = logging.getLogger(__name__)
 
 # ponytail: assumes Videos is not redirected; use SHGetKnownFolderPath if someone's is.
-ROOT = Path.home() / "Videos" / "Laqta"
+DEFAULT_ROOT = Path.home() / "Videos" / "Laqta"
+ROOT = DEFAULT_ROOT  # where recordings go now; read it as clips.ROOT, it changes with settings
 
 
-def game_dir(game: dict, root: Path = ROOT) -> Path:
+def set_root(folder: str | None) -> Path:
+    """Use the folder from settings ("" or None = the default under Videos)."""
+    global ROOT
+    ROOT = Path(folder) if folder else DEFAULT_ROOT
+    return ROOT
+
+
+def game_dir(game: dict, root: Path | None = None) -> Path:
     name = re.sub(r'[<>:"/\\|?*]', "_", game.get("name") or game["exe"]).strip(". ") or "Unknown"
-    return root / name / datetime.date.today().isoformat()
+    return (root or ROOT) / name / datetime.date.today().isoformat()
 
 
 def finish_clip(path: Path, game: dict, events: list[GameEvent], keep: float, pre: float) -> Path:

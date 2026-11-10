@@ -28,6 +28,7 @@ DEFAULTS = {
     "exit_debounce_seconds": 10,
     "fps": 60,
     "quality": "Small",
+    "save_folder": "",  # where recordings go; "" = Videos\\Laqta
     "cleanup_days": 0,  # delete recordings older than this; 0 = never
     "cleanup_gb": 0,  # keep the recordings folder under this size; 0 = no limit
     "accent": "#8B5CF6",  # UI colour
@@ -45,6 +46,8 @@ def _check(cfg: dict) -> dict:
     need(cfg["default_mode"] in MODES, f'default_mode must be one of {", ".join(MODES)}, not {cfg["default_mode"]!r}')
     need(cfg["quality"] in QUALITIES, f'quality must be one of {", ".join(QUALITIES)}')
     need(cfg["fps"] in (30, 60, 120), "fps must be 30, 60 or 120")
+    need(isinstance(cfg["save_folder"], str) and (not cfg["save_folder"] or Path(cfg["save_folder"]).is_absolute()),
+         "save_folder must be a full path such as D:\\Recordings, or empty for the default")
     need(isinstance(cfg["accent"], str) and re.fullmatch(r"#[0-9a-fA-F]{6}", cfg["accent"]) is not None, "accent must look like #8B5CF6")
     for key in ("cleanup_days", "cleanup_gb"):
         need(isinstance(cfg[key], (int, float)) and 0 <= cfg[key] <= 100000, f"{key} must be 0 or more")

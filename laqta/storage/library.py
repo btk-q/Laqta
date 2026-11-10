@@ -12,7 +12,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .clips import ROOT
+from . import clips
 
 log = logging.getLogger(__name__)
 
@@ -36,10 +36,10 @@ class Clip:
         return {e["type"] for e in self.events}
 
 
-def scan(root: Path = ROOT) -> list[Clip]:
+def scan(root: Path | None = None) -> list[Clip]:
     """Everything Laqta has saved, newest first. Layout: <root>/<Game>/<date>/<video>."""
     found = []
-    for path in root.glob("*/*/*"):
+    for path in (root or clips.ROOT).glob("*/*/*"):
         if path.suffix.lower() not in VIDEO or ".trim" in path.suffixes or path.parents[1].name == EXPORTS:
             continue
         try:
@@ -152,9 +152,9 @@ def trim(path: Path, start: float, end: float) -> Path:
     return target
 
 
-def export(path: Path, root: Path = ROOT) -> Path:
+def export(path: Path, root: Path | None = None) -> Path:
     """An MP4 copy in <root>/Exports: phones, browsers and chat apps play MP4 but often not MKV."""
-    folder = root / EXPORTS
+    folder = (root or clips.ROOT) / EXPORTS
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / f"{path.parents[1].name} {path.stem}.mp4"
     done = _run("-y", "-v", "error", "-i", str(path), "-c", "copy", "-movflags", "+faststart", str(target), timeout=600)
@@ -178,7 +178,7 @@ def to_delete(clips: list[Clip], max_age_days: int, max_gb: float, now: datetime
     return doomed
 
 
-def cleanup(max_age_days: int, max_gb: float, root: Path = ROOT) -> int:
+def cleanup(max_age_days: int, max_gb: float, root: Path | None = None) -> int:
     """Permanently delete what the user's limits say to. Returns how many videos went."""
     if not max_age_days and not max_gb:
         return 0

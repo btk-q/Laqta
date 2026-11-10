@@ -34,7 +34,13 @@ def ensure_inputs(obs: Obs, scene: str) -> None:
     A new scene collection has no audio source at all, so without this recordings are silent."""
     existing = {i["inputName"] for i in obs.call("GetInputList")["inputs"]}
     video = obs.call("GetVideoSettings")
-    fill = {"boundsType": "OBS_BOUNDS_SCALE_INNER", "boundsWidth": video["baseWidth"], "boundsHeight": video["baseHeight"]}
+    # Position is pinned as well as size: when the canvas size changes OBS re-centres existing
+    # items for the old shape, which left a real recording shifted 440 px right and cropped.
+    fill = {
+        "positionX": 0.0, "positionY": 0.0, "alignment": 5,  # 5 = anchored at the top-left corner
+        "boundsType": "OBS_BOUNDS_SCALE_INNER", "boundsAlignment": 0,
+        "boundsWidth": float(video["baseWidth"]), "boundsHeight": float(video["baseHeight"]),
+    }  # fmt: skip
     for kind in KINDS:
         if source(kind) in existing:
             item = obs.call("GetSceneItemId", sceneName=scene, sourceName=source(kind))["sceneItemId"]

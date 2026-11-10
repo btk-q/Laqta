@@ -53,7 +53,7 @@ Check that Laqta can drive your OBS (records 5 seconds and saves a replay, then 
 Start a game from the list and Laqta records it. The tray icon gains a red dot while
 recording. Right-click the tray icon for **Clip now**, **Clips**, **Settings** and **Quit**.
 
-Recordings go to `Videos\Laqta\<Game>\<date>\`.
+Recordings go to `Videos\Laqta\<Game>\<date>\`. Change the folder in **Settings → Recording**.
 
 | Mode | What you get |
 |---|---|

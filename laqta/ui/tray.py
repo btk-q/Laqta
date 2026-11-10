@@ -184,6 +184,7 @@ class TrayApp:
             return theme.apply(self.app, self.cfg["accent"])  # undo any colour preview
         old, self.cfg = self.cfg, window.cfg
         self._save()
+        clips.set_root(self.cfg["save_folder"])  # so "Open clips folder" and the library follow at once
         self.core.apply(self.cfg)
         if self.cfg["language"] != old["language"] or self.cfg["hotkey"] != old["hotkey"]:
             self._apply_language()

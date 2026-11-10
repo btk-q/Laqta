@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QColorDialog, QComboBox, QDialog, QFormLayout, QFrame, QHBoxLayout, QKeySequenceEdit, QLabel, QLineEdit,
+    QApplication, QCheckBox, QColorDialog, QComboBox, QDialog, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QKeySequenceEdit, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )  # fmt: skip
 
@@ -28,6 +28,19 @@ def builtin_exes() -> set[str]:
     import json
 
     return {g["exe"].lower() for g in json.loads(GAMES_JSON.read_text(encoding="utf-8"))}
+
+
+def usable_folder(folder: Path) -> bool:
+    """Can recordings be written there? Checked by actually writing, the only test that is right
+    for network drives, read-only media and protected folders alike."""
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / ".laqta-write-test"
+        probe.write_bytes(b"")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
 
 
 def set_game(cfg: dict, exe: str, **fields) -> None:
@@ -211,9 +224,32 @@ class SettingsWindow(QDialog):
         form.addRow(t("rec.cleanup_gb"), self.cleanup_gb)
         layout.addLayout(form)
         layout.addWidget(_label(t("rec.cleanup_hint"), "hint"))
-        layout.addWidget(_label(t("rec.folder", path=str(clips.ROOT)), "hint"))
+        self.save_folder = QLineEdit(self.cfg["save_folder"] or str(clips.DEFAULT_ROOT))
+        self.save_folder.setReadOnly(True)  # chosen with the folder dialog, so it always exists
+        browse, default = QPushButton(t("rec.browse")), QPushButton(t("rec.use_default"))
+        browse.clicked.connect(self._browse_folder)
+        default.clicked.connect(lambda: self.save_folder.setText(str(clips.DEFAULT_ROOT)))
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        row.addWidget(self.save_folder, 1)
+        row.addWidget(browse)
+        row.addWidget(default)
+        layout.addWidget(_label(t("rec.save_folder")))
+        layout.addLayout(row)
+        self.folder_note = _label(t("rec.save_hint"), "hint")
+        layout.addWidget(self.folder_note)
         layout.addStretch(1)
         return page
+
+    def _browse_folder(self) -> None:
+        chosen = QFileDialog.getExistingDirectory(self, t("rec.save_folder"), self.save_folder.text())
+        if not chosen:
+            return
+        folder = Path(chosen)
+        if not usable_folder(folder):
+            return self.folder_note.setText(t("rec.folder_bad", path=str(folder)))
+        self.save_folder.setText(str(folder))
+        self.folder_note.setText(t("rec.save_hint"))
 
     # -- Appearance ------------------------------------------------------------
 
@@ -424,5 +460,6 @@ class SettingsWindow(QDialog):
             exit_debounce_seconds=self.debounce.value(),
             cleanup_days=self.cleanup_days.value(),
             cleanup_gb=self.cleanup_gb.value(),
+            save_folder="" if Path(self.save_folder.text()) == clips.DEFAULT_ROOT else self.save_folder.text(),
         )
         self.accept()

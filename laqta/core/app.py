@@ -47,6 +47,7 @@ class Core(threading.Thread):
         super().__init__(name="laqta-core", daemon=True)
         self.inbox: queue.Queue[tuple] = queue.Queue()
         self.cfg = cfg
+        clips.set_root(cfg["save_folder"])
         self.on_state, self.notify, self.on_prompt = on_state, notify, on_prompt
         self.detector = Detector(load_games(cfg["games"], cfg["default_mode"]), asked=cfg["asked"])
         self.obs = Obs(4455, "", on_event=lambda name, data: self.inbox.put(("obs", name, data)))
@@ -162,6 +163,7 @@ class Core(threading.Thread):
             rec.obs_event(*args)
         elif kind == "config":
             self.cfg = cfg = args[0]
+            clips.set_root(cfg["save_folder"])  # applies to the next game; a running recording stays put
             self.detector.games = load_games(cfg["games"], cfg["default_mode"])
             self.detector.asked |= {exe.lower() for exe in cfg["asked"]}
             rec.pre, rec.post, rec.max_clip = cfg["pre_seconds"], cfg["post_seconds"], cfg["max_clip_seconds"]
