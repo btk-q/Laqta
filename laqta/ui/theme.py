@@ -106,6 +106,7 @@ QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, QDoubleSp
 QPushButton {{ background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 6px; padding: 7px 16px; }}
 QPushButton:hover {{ border-color: {c['accent']}; }}
 QPushButton:focus {{ border: 1px solid {c['accent']}; }}
+QPushButton:checked {{ background: {c['accent_dim']}; border-color: {c['accent']}; }}
 QPushButton:disabled {{ color: {c['muted']}; border-color: {c['panel']}; }}
 QPushButton#primary {{ background: {c['accent_fill']}; border-color: {c['accent_fill']}; color: {c['on_accent']}; font-weight: 600; }}
 QPushButton#primary:hover {{ background: {c['accent_hover']}; }}
@@ -120,6 +121,9 @@ QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {c['line']}
 QCheckBox::indicator:checked {{ background: {c['accent']}; border-color: {c['accent']}; }}
 QCheckBox::indicator:focus {{ border-color: {c['accent']}; }}
 
+QLabel#preview {{ background: #000000; border-radius: 6px; }}
+QProgressBar {{ background: {c['panel']}; border: none; border-radius: 4px; }}
+QProgressBar::chunk {{ background: {c['accent']}; border-radius: 4px; }}
 QScrollArea {{ border: none; background: {c['ink']}; }}
 QFrame#rule {{ background: {c['line']}; max-height: 1px; border: none; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; }}

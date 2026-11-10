@@ -10,7 +10,7 @@ from pathlib import Path
 from PySide6.QtCore import QFile, QObject, QRunnable, QSize, Qt, QThreadPool, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
+    QCheckBox, QComboBox, QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
     QListWidgetItem, QPushButton, QVBoxLayout, QWidget,
 )  # fmt: skip
 
@@ -97,52 +97,6 @@ class _Thumbnailer(QRunnable):
             self.signals.done.emit(str(self.path), str(thumb or ""))
         except RuntimeError:
             pass  # the window was closed while we worked
-
-
-class TrimDialog(QDialog):
-    def __init__(self, clip: Clip, parent: QWidget):
-        super().__init__(parent)
-        self.setWindowTitle(t("trim.title"))
-        self.setMinimumWidth(420)
-        length = clip.seconds or library.duration(clip.path) or 0.0
-        self.start, self.end = QDoubleSpinBox(), QDoubleSpinBox()
-        for box, value in ((self.start, 0.0), (self.end, length)):
-            box.setRange(0.0, max(length, 0.1))
-            box.setDecimals(1)
-            box.setSingleStep(1.0)
-            box.setValue(value)
-        form = QFormLayout()
-        form.setVerticalSpacing(12)
-        form.addRow(t("trim.start"), self.start)
-        form.addRow(t("trim.end"), self.end)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(22, 20, 22, 16)
-        layout.setSpacing(12)
-        layout.addLayout(form)
-        marks = [f"{clock(e['offset'])} {t('event.' + e['type'])}" for e in clip.events if e.get("offset", -1) >= 0]
-        if marks:
-            layout.addWidget(self._note(t("trim.events", events=", ".join(marks[:12]))))
-        layout.addWidget(self._note(t("trim.hint")))
-        save, cancel = QPushButton(t("trim.save")), QPushButton(t("button.cancel"))
-        save.setObjectName("primary")
-        save.clicked.connect(self.accept)
-        cancel.clicked.connect(self.reject)
-        self.start.valueChanged.connect(lambda: save.setEnabled(self.end.value() > self.start.value()))
-        self.end.valueChanged.connect(lambda: save.setEnabled(self.end.value() > self.start.value()))
-        save.setEnabled(length > 0)
-        row = QHBoxLayout()
-        row.setSpacing(10)
-        row.addStretch(1)
-        row.addWidget(cancel)
-        row.addWidget(save)
-        layout.addLayout(row)
-
-    @staticmethod
-    def _note(text: str) -> QLabel:
-        label = QLabel(text)
-        label.setObjectName("hint")
-        label.setWordWrap(True)
-        return label
 
 
 class LibraryWindow(QDialog):
@@ -347,9 +301,14 @@ class LibraryWindow(QDialog):
 
     def _trim(self) -> None:
         if clip := self.selected():
-            dialog = TrimDialog(clip, self)
-            if dialog.exec():
-                self._attempt(lambda: library.trim(clip.path, dialog.start.value(), dialog.end.value()), "library.trimmed")
+            from .editor import EditorDialog  # imported here: the library opens without it
+
+            dialog = EditorDialog(clip, self, self.root)
+            dialog.exec()
+            if dialog.finished_file is not None:
+                made = dialog.finished_file
+                self.reload(made if made.parent == clip.path.parent else clip.path)
+                self.status.setText(t("library.trimmed", name=made.name))
 
     def _export(self) -> None:
         if clip := self.selected():

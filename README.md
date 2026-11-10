@@ -70,7 +70,15 @@ Two hotkeys, both changeable in **Settings → General**:
   In Hybrid and Full match it adds a mark.
 
 **Clips window:** search by game, tag or event; filter by game, event, date and favourites;
-play, tag, trim to a copy, export as MP4, show in folder, or delete to the Recycle Bin.
+play, tag, export as MP4, show in folder, or delete to the Recycle Bin.
+
+**Trim and export** opens a filmstrip of the video with two handles and a marker for each
+event. Drag the handles (or use the arrow keys), click a marker to see that moment, or
+double-click it to select a clip around it. Then save a trimmed copy, or export as vertical
+9:16, as a Discord-sized file under 10 MB, or as 1080p 60 MP4, with a progress bar and
+Cancel. "Leave my microphone out" uses the game-sound track. The preview is a still frame,
+not playback.
+
 Favourites are never removed by automatic cleanup. Selecting a recording from a game with
 event detection shows its length, kills, deaths, assists and result.
 
@@ -130,8 +138,8 @@ worked for that game. You can also force a method per game in **Settings → Gam
 - **AMD and Intel encoders are unverified.** Laqta tries NVENC, AMF, Quick Sync, then x264,
   and uses the first that starts; only NVENC and x264 have been run.
 - **Battle.net and EA libraries** are not scanned.
-- **Trimming** uses start and end times, not a video scrubber, and cuts land on keyframes,
-  so a trimmed copy can start a moment early.
+- **The editor shows stills, not moving video.** A fast trim lands on keyframes and can start
+  up to two seconds early; tick "Cut on the exact frame" for a slower, exact copy.
 - **OBS crash recovery:** if OBS dies mid-game, Laqta relaunches it and starts a new file. To
   do that unattended it clears OBS's "unclean shutdown" marker, which also skips OBS's
   safe-mode offer on that launch.
