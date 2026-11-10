@@ -13,7 +13,7 @@ dependencies = ["obsws-python>=1.8", "psutil>=5.9", "PySide6-Essentials>=6.6"]
 dev = ["pytest>=8"]
 
 [tool.setuptools]
-packages = ["laqta", "laqta.core", "laqta.obs_controller", "laqta.game_detector", "laqta.storage", "laqta.ui"]
+packages = ["laqta", "laqta.core", "laqta.obs_controller", "laqta.game_detector", "laqta.storage", "laqta.ui", "laqta.plugins"]
 
 [tool.setuptools.package-data]
 "laqta.game_detector" = ["games.json"]

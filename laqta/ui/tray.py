@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import ctypes
 import os
+import signal
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
@@ -21,7 +22,8 @@ STATUS = {
     "wait_obs": "{game}: waiting for OBS",
     "exit_debounce": "{game}: closing",
 }
-ACTIVE = {"session": "{game}: recording", "events": "{game}: ready to clip"}
+ACTIVE = {"session": "{game}: recording", "hybrid": "{game}: recording", "events": "{game}: ready to clip",
+          "match": "{game}: waiting for a match"}
 
 
 class Bridge(QObject):
@@ -75,13 +77,16 @@ def run(cfg: dict) -> int:
 
     def on_state(s: dict) -> None:
         template = ACTIVE[s["mode"]] if s["state"] == "active" else STATUS[s["state"]]
+        if s["state"] == "active" and s["mode"] == "match" and s["recording"]:
+            template = "{game}: recording match"
         text = template.format(game=s["game"])
         if s["error"]:
             text += f" — {s['error']}"
         status.setText(text)
         tray.setToolTip(f"Laqta — {text}"[:127])  # Windows truncates tray tooltips
-        clip.setEnabled(s["state"] == "active" and s["mode"] == "events")
-        tray.setIcon(icons["rec" if s["state"] == "active" else "idle" if s["state"] == "idle" else "busy"])
+        live = s["state"] == "active" and (s["recording"] or s["mode"] == "events")
+        clip.setEnabled(live and s["mode"] != "session")
+        tray.setIcon(icons["rec" if live else "idle" if s["state"] == "idle" else "busy"])
 
     bridge.state.connect(on_state)
     bridge.toast.connect(lambda text: tray.showMessage("Laqta", text, icons["idle"], 4000))
@@ -91,6 +96,13 @@ def run(cfg: dict) -> int:
     tray.show()
     if not hotkey.registered:
         tray.showMessage("Laqta", f"Hotkey {cfg['hotkey']} is taken by another app. Change it in settings.")
+
+    # Ctrl+C in a terminal: Qt's loop never returns to Python on its own, so the handler
+    # would not run. A no-op timer gives the interpreter a turn twice a second.
+    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    heartbeat = QTimer()
+    heartbeat.timeout.connect(lambda: None)
+    heartbeat.start(500)
 
     core.start()
     code = app.exec()

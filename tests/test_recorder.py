@@ -81,7 +81,7 @@ def test_session_records_until_exit_debounce_expires(rig):
     assert rig.rec.state == "exit_debounce" and rig.obs.count("StopRecord") == 0
     rig.at(10)
     assert rig.rec.state == "idle"
-    assert rig.recordings == [(Path("C:/v/session.mkv"), SESSION)]
+    assert rig.recordings == [(Path("C:/v/session.mkv"), SESSION, [], 100.0)]
 
 
 def test_game_coming_back_cancels_the_stop(rig):
@@ -215,3 +215,71 @@ def test_next_deadline_tracks_the_soonest_thing(rig):
     assert rig.rec.next_deadline() == 105
     rig.at(5)
     assert rig.rec.next_deadline() == 107  # clip deadline
+
+
+HYBRID = {"exe": "game.exe", "name": "Game", "mode": "hybrid"}
+MATCH = {"exe": "game.exe", "name": "Game", "mode": "match"}
+
+
+def test_hybrid_records_the_session_and_marks_events(rig):
+    rig.rec.game_started(HYBRID)
+    rig.ev(30)
+    rig.ev(30.4)  # duplicate
+    rig.ev(90, "manual")
+    rig.rec.game_exited()
+    rig.at(120)
+    (path, game, marks, start), = rig.recordings
+    assert start == 100.0 and [(m.type, m.t - start) for m in marks] == [("kill", 30), ("manual", 90)]
+    assert rig.obs.count("SaveReplayBuffer") == 0
+
+
+def test_match_mode_records_only_between_match_start_and_end(rig):
+    rig.rec.game_started(MATCH)
+    assert rig.rec.state == "active" and rig.obs.count("StartRecord") == 0  # in the menu: nothing recorded
+    rig.ev(5)  # a kill outside a match is not marked anywhere
+
+    rig.at(10)
+    rig.ev(10, "match_start")
+    assert rig.obs.count("StartRecord") == 1
+    rig.ev(40)
+    rig.ev(60, "match_end")
+    rig.at(64)
+    assert rig.obs.count("StopRecord") == 0  # post-roll still running 
+    rig.at(65)
+    (path, game, marks, start), = rig.recordings
+    assert start == 110.0 and [m.type for m in marks] == ["match_start", "kill", "match_end"]
+
+    rig.ev(200, "match_start")  # second match -> second file
+    assert rig.obs.count("StartRecord") == 2
+    rig.rec.game_exited()
+    rig.at(300)
+    assert len(rig.recordings) == 2 and rig.rec.state == "idle"
+
+
+def test_match_restarting_inside_post_roll_keeps_one_file(rig):
+    rig.rec.game_started(MATCH)
+    rig.ev(0, "match_start")
+    rig.ev(50, "match_end")
+    rig.ev(52, "match_start")
+    rig.at(80)
+    assert rig.obs.count("StopRecord") == 0 and rig.obs.count("StartRecord") == 1
+
+
+def test_match_that_starts_while_obs_is_down_records_after_reconnect(rig):
+    rig.obs.down = True
+    rig.rec.game_started(MATCH)
+    rig.ev(1, "match_start")
+    rig.obs.down = False
+    rig.at(3)
+    assert rig.rec.recording
+
+
+def test_obs_crash_mid_match_starts_a_new_segment(rig):
+    rig.rec.game_started(MATCH)
+    rig.ev(0, "match_start")
+    rig.obs.down = True
+    rig.at(5)
+    rig.obs.down = False
+    rig.obs.active["GetRecordStatus"] = False
+    rig.at(8)
+    assert rig.obs.count("StartRecord") == 2 and rig.rec.recording

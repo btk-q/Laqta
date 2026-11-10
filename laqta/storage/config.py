@@ -6,6 +6,8 @@ import os
 import tomllib
 from pathlib import Path
 
+from ..core.recorder import MODES
+
 DIR = Path(os.environ.get("APPDATA", Path.home())) / "Laqta"
 PATH = DIR / "config.toml"
 
@@ -22,8 +24,10 @@ DEFAULTS = {
 TEMPLATE = """\
 # Laqta settings. Restart Laqta after editing.
 
-hotkey = "Ctrl+Alt+F9"        # "clip this" - works in events mode
+hotkey = "Ctrl+Alt+F9"        # "clip this": saves a clip in events mode, adds a mark in hybrid/match
 default_mode = "session"      # session = record while the game is open
+                              # hybrid  = session + mark events in a .json so clips can be cut later
+                              # match   = record each match separately (games with a plugin; others fall back to session)
                               # events  = keep a replay buffer, save a clip on each event/hotkey
 pre_seconds = 15              # clip starts this long before the first event
 post_seconds = 5              # ...and ends this long after the last one
@@ -49,11 +53,11 @@ def load(path: Path = PATH) -> dict:
         path.write_text(TEMPLATE, encoding="utf-8")
     with path.open("rb") as f:
         cfg = {**DEFAULTS, **tomllib.load(f)}
-    if cfg["default_mode"] not in ("session", "events"):
-        raise ValueError(f'default_mode must be "session" or "events", not {cfg["default_mode"]!r}')
+    if cfg["default_mode"] not in MODES:
+        raise ValueError(f'default_mode must be one of {", ".join(MODES)}, not {cfg["default_mode"]!r}')
     for game in cfg["games"]:
         if "exe" not in game:
             raise ValueError("every [[games]] entry needs an exe")
-        if game.get("mode", "session") not in ("session", "events"):
-            raise ValueError(f'{game["exe"]}: mode must be "session" or "events"')
+        if game.get("mode", "session") not in MODES:
+            raise ValueError(f'{game["exe"]}: mode must be one of {", ".join(MODES)}')
     return cfg

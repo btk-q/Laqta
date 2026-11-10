@@ -13,8 +13,9 @@ from typing import Callable
 from ..game_detector.detector import Detector, load_games
 from ..obs_controller import setup
 from ..obs_controller.client import Obs, ObsDown
+from ..plugins import PLUGINS
 from ..storage import clips
-from .events import GameEvent
+from .events import GameEvent, GamePlugin
 from .recorder import Recorder
 
 log = logging.getLogger(__name__)
@@ -35,13 +36,15 @@ class Core(threading.Thread):
             connect=self._connect,
             prepare=lambda game: setup.ensure_laqta(self.obs, clips.game_dir(game), self.recorder.replay_seconds),
             on_clip=self._on_clip,
-            on_recording=lambda path, game: self.notify(f"Recording saved: {path.name}"),
+            on_recording=self._on_recording,
             notify=notify,
             pre=cfg["pre_seconds"],
             post=cfg["post_seconds"],
             max_clip=cfg["max_clip_seconds"],
             exit_debounce=cfg["exit_debounce_seconds"],
         )
+        self.plugin: GamePlugin | None = None
+        self._plugin_game: dict | None = None  # game we already tried to start a plugin for
         self._obs_error: str | None = None
         self._last_state: dict | None = None
 
@@ -80,16 +83,52 @@ class Core(threading.Thread):
         clips.finish_clip(path, game, events, keep, pre)
         self.notify(f"Clip saved: {path.name}")
 
+    def _on_recording(self, path: Path, game: dict, marks: list[GameEvent], start: float) -> None:
+        if game["mode"] != "session":
+            clips.write_sidecar(path, game, marks, start)
+        self.notify(f"Recording saved: {path.name}")
+
     def _handle(self, kind: str, *args) -> None:
         rec = self.recorder
         if kind == "event":
-            if rec.state != "active" or rec.game["mode"] != "events":
-                if args[0].type == "manual":
-                    self.notify("Clip hotkey needs a game running in events mode")
-                return
-            rec.event(args[0])
+            ev = args[0]
+            if ev.type == "manual":
+                if rec.state != "active":
+                    return self.notify("Clip hotkey: no game is being recorded")
+                if rec.game["mode"] == "session" or not (rec.recording or rec.game["mode"] == "events"):
+                    return self.notify("Clip hotkey does nothing in this mode right now")
+                if rec.game["mode"] != "events":
+                    self.notify("Moment marked")
+            rec.event(ev)
         elif kind == "obs":
             rec.obs_event(*args)
+
+    def _start_game(self, game: dict) -> None:
+        if game["mode"] == "match" and game.get("plugin") not in PLUGINS:
+            game = {**game, "mode": "session"}  # nothing can tell us when a match starts
+        self.recorder.game_started(game)
+
+    def _sync_plugin(self) -> None:
+        """Run the game's plugin exactly while the recorder has that game."""
+        game = self.recorder.game
+        if game is None:
+            if self.plugin is not None:
+                self.plugin.stop()
+            self.plugin = self._plugin_game = None
+        elif self._plugin_game is not game:
+            self._plugin_game = game
+            cls = PLUGINS.get(game.get("plugin"))
+            if cls is None:
+                return
+            try:
+                plugin = cls()
+                if message := plugin.setup(game):
+                    self.notify(message)
+                plugin.start(lambda ev: self.inbox.put(("event", ev)), game)
+                self.plugin = plugin
+            except Exception as e:  # a broken plugin must not stop the recording itself
+                log.exception("plugin %s failed to start", cls.name)
+                self.notify(f"{game.get('name')}: event detection unavailable ({e})")
 
     def run(self) -> None:
         next_poll = 0.0
@@ -103,6 +142,7 @@ class Core(threading.Thread):
                 if msg is not None:
                     if msg[0] == "quit":
                         self.recorder.stop_now()
+                        self._sync_plugin()
                         self.obs.close()
                         return
                     self._handle(*msg)
@@ -110,10 +150,11 @@ class Core(threading.Thread):
                     next_poll = time.monotonic() + POLL
                     change = self.detector.poll()
                     if change and change[0] == "game_started":
-                        self.recorder.game_started(change[1])
+                        self._start_game(change[1])
                     elif change:
                         self.recorder.game_exited()
                 self.recorder.tick()
+                self._sync_plugin()
             except Exception:
                 log.exception("core loop error")  # never let one bad message kill recording
             self._publish()
@@ -124,6 +165,7 @@ class Core(threading.Thread):
             "state": rec.state,
             "game": (rec.game or {}).get("name"),
             "mode": (rec.game or {}).get("mode"),
+            "recording": rec.recording,
             "obs": self.obs.alive,
             "error": self._obs_error if rec.game else None,
         }

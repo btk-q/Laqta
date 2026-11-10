@@ -3,6 +3,8 @@ and every method must be called from the one core thread.
 
 Modes (game["mode"]):
   session  record from game start until exit
+  hybrid   like session, and remember when events happened so clips can be cut later
+  match    record from each match_start event to match_end (needs a plugin), with event marks
   events   keep OBS's replay buffer running; save a clip around each event
 """
 
@@ -20,12 +22,12 @@ from .events import GameEvent
 
 log = logging.getLogger(__name__)
 
+MODES = ("session", "hybrid", "match", "events")
 RETRY = 3.0  # seconds between attempts to get OBS back
 LIVENESS = 5.0  # how often to ping OBS while a game is active
 SAVE_TIMEOUT = 10.0  # how long OBS gets to report a saved replay
 DUPLICATE = 1.0  # same event type within this window is one event
-STATUS = {"session": "GetRecordStatus", "events": "GetReplayBufferStatus"}
-START = {"session": "StartRecord", "events": "StartReplayBuffer"}
+BOUNDARIES = ("match_start", "match_end")
 
 
 def _obs_guard(method):
@@ -50,7 +52,7 @@ class Recorder:
         connect: Callable[[], None],  # make `obs` usable (launch + connect); raises ObsDown
         prepare: Callable[[dict], None],  # point OBS at this game; raises ObsBusy
         on_clip: Callable[[Path, dict, list[GameEvent], float, float], None],  # path, game, events, seconds to keep, pre-roll
-        on_recording: Callable[[Path, dict], None],
+        on_recording: Callable[[Path, dict, list[GameEvent], float], None],  # path, game, marked events, clock at start
         notify: Callable[[str], None],
         clock: Callable[[], float] = time.monotonic,
         pre: float = 15.0,
@@ -65,16 +67,22 @@ class Recorder:
         self.exit_debounce, self.min_confidence = exit_debounce, min_confidence
 
         self.game: dict | None = None
-        self.ready = False  # OBS is recording/buffering for self.game
+        self.ready = False  # OBS is connected and set up for self.game
         self._interrupted = False  # we lost OBS mid-game; our output may still be running
         self._retry_at: float | None = None
         self._exit_at: float | None = None
         self._live_at = 0.0
+        self._last: dict[str, float] = {}
+        # events mode
         self._window: list[float] | None = None  # [first event time, save deadline]
         self._events: list[GameEvent] = []
-        self._last: dict[str, float] = {}
         self._pending: tuple[dict, list[GameEvent], float] | None = None  # save requested, not yet reported
         self._save_timeout: float | None = None
+        # recording modes
+        self._rec_start: float | None = None  # clock when the current recording started
+        self._marks: list[GameEvent] = []
+        self._in_match = False
+        self._stop_at: float | None = None  # match ended; stop after the post-roll
 
     @property
     def replay_seconds(self) -> int:
@@ -89,9 +97,13 @@ class Recorder:
             return "exit_debounce"
         return "active" if self.ready else "wait_obs"
 
+    @property
+    def recording(self) -> bool:
+        return self.ready and self._rec_start is not None
+
     def next_deadline(self) -> float | None:
         """When tick() next has something to do."""
-        times = [self._exit_at, self._save_timeout]
+        times = [self._exit_at, self._save_timeout, self._stop_at]
         if self.game is not None:
             times.append(self._live_at if self.ready else self._retry_at)
         if self._window:
@@ -113,22 +125,35 @@ class Recorder:
         if self.game is not None and self._exit_at is None:
             self._exit_at = self.clock() + self.exit_debounce
 
+    @_obs_guard
     def event(self, ev: GameEvent) -> None:
-        if not self.ready or self.game["mode"] != "events":
+        if self.game is None:
             return
-        if ev.type != "manual":
-            if ev.type in self.game.get("disabled_events", ()) or ev.confidence < self.min_confidence:
+        mode = self.game["mode"]
+        if ev.type in BOUNDARIES and mode == "match":
+            # Remembered even while OBS is down, so a reconnect knows whether to record.
+            self._in_match = ev.type == "match_start"
+            if not self.ready:
                 return
-        last = self._last.get(ev.type)
-        if last is not None and ev.t - last < DUPLICATE:
+            if self._in_match:
+                self._stop_at = None  # next match began inside the previous one's post-roll
+                if self._rec_start is None:
+                    self._start_record()
+            elif self._rec_start is not None:
+                self._stop_at = ev.t + self.post
+        if not self.ready or not self._accept(ev):
             return
-        self._last[ev.type] = ev.t
-        if self._window is None:
-            self._window, self._events = [ev.t, ev.t + self.post], [ev]
-        else:
-            # Merge: push the save back, but never past what the replay buffer still holds.
-            self._window[1] = min(ev.t + self.post, self._window[0] + self.max_clip)
-            self._events.append(ev)
+        if mode == "events":
+            if ev.type in BOUNDARIES:
+                return
+            if self._window is None:
+                self._window, self._events = [ev.t, ev.t + self.post], [ev]
+            else:
+                # Merge: push the save back, but never past what the replay buffer still holds.
+                self._window[1] = min(ev.t + self.post, self._window[0] + self.max_clip)
+                self._events.append(ev)
+        elif mode != "session" and self._rec_start is not None:
+            self._marks.append(ev)
 
     @_obs_guard
     def obs_event(self, name: str, data: dict) -> None:
@@ -158,29 +183,65 @@ class Recorder:
         else:
             if self._window and now >= self._window[1]:
                 self._save()
+            if self._stop_at is not None and now >= self._stop_at:
+                self._stop_record()
             if now >= self._live_at:
                 self._live_at = now + LIVENESS
                 self.obs.call("GetVersion")
 
+    @_obs_guard
+    def stop_now(self) -> None:
+        """Laqta is quitting: stop without waiting for the debounce."""
+        if self.game is not None:
+            self._exit_at = self.clock()
+            self.tick()
+
     # -- internals ------------------------------------------------------------
+
+    def _accept(self, ev: GameEvent) -> bool:
+        if ev.type != "manual":
+            if ev.type in self.game.get("disabled_events", ()) or ev.confidence < self.min_confidence:
+                return False
+        last = self._last.get(ev.type)
+        if last is not None and ev.t - last < DUPLICATE:
+            return False
+        self._last[ev.type] = ev.t
+        return True
 
     def _begin(self) -> None:
         mode = self.game["mode"]
+        buffered = mode == "events"
         self._retry_at = self.clock() + RETRY  # used if anything below fails
         try:
             self.connect()
-            running = self.obs.call(STATUS[mode])["outputActive"]
-            if not (running and self._interrupted):  # else: adopt our own output after a socket blip
-                if running and mode == "events":
-                    self.obs.call("StopReplayBuffer")  # stale buffer with the wrong settings
-                    return  # stopping is asynchronous; the retry starts it fresh
-                self.prepare(self.game)
-                self.obs.call(START[mode])
+            running = self.obs.call("GetReplayBufferStatus" if buffered else "GetRecordStatus")["outputActive"]
+            if running and self._interrupted and (buffered or self._rec_start is not None):
+                pass  # socket blip: our own output is still running, adopt it
+            elif running and buffered:
+                self.obs.call("StopReplayBuffer")  # stale buffer with the wrong settings
+                return  # stopping is asynchronous; the retry starts it fresh
+            else:
+                self._rec_start = self._stop_at = None
+                self.prepare(self.game)  # refuses (ObsBusy) if the user is recording
+                if buffered:
+                    self.obs.call("StartReplayBuffer")
+                elif mode != "match" or self._in_match:
+                    self._start_record()
         except ObsBusy as e:
             self.notify(str(e))
             return
         self.ready, self._interrupted = True, False
         self._live_at = self.clock() + LIVENESS
+
+    def _start_record(self) -> None:
+        self.obs.call("StartRecord")
+        self._rec_start, self._marks = self.clock(), []
+
+    def _stop_record(self) -> None:
+        start, marks = self._rec_start, self._marks
+        self._rec_start, self._marks, self._stop_at = None, [], None
+        path = Path(self.obs.call("StopRecord")["outputPath"])
+        self.on_recording(path, self.game, marks, start)
 
     def _save(self) -> None:
         first, deadline = self._window
@@ -191,26 +252,19 @@ class Recorder:
         self._save_timeout = self.clock() + SAVE_TIMEOUT
 
     def _finish(self) -> None:
-        game, was_ready = self.game, self.ready
         try:
-            if was_ready:
+            if self.ready:
                 if self._window:
                     self._save()  # flush a clip that was still waiting for its post-roll
-                if game["mode"] == "session":
-                    self.on_recording(Path(self.obs.call("StopRecord")["outputPath"]), game)
-                elif not self._pending:
+                if self._rec_start is not None:
+                    self._stop_record()
+                elif self.game["mode"] == "events" and not self._pending:
                     self.obs.call("StopReplayBuffer")
         finally:
-            self.game, self.ready, self._interrupted = None, False, False
-            self._exit_at = self._retry_at = self._window = None
+            self.game, self.ready, self._interrupted, self._in_match = None, False, False, False
+            self._exit_at = self._retry_at = self._window = self._stop_at = self._rec_start = None
+            self._marks = []
             self._last.clear()
-
-    @_obs_guard
-    def stop_now(self) -> None:
-        """Laqta is quitting: stop without waiting for the debounce."""
-        if self.game is not None:
-            self._exit_at = self.clock()
-            self.tick()
 
     def _down(self) -> None:
         if self._window or self._pending:

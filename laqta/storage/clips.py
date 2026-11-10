@@ -43,15 +43,22 @@ def finish_clip(path: Path, game: dict, events: list[GameEvent], keep: float, pr
             log.warning("trim failed, keeping full replay: %s", done.stderr.decode(errors="replace")[:300])
             tmp.unlink(missing_ok=True)
     first = events[0].t if events else 0.0
+    write_sidecar(path, game, events, start=first - pre, seconds=keep)
+    return path
+
+
+def write_sidecar(path: Path, game: dict, events: list[GameEvent], start: float, seconds: float | None = None) -> None:
+    """<video>.json next to the video: what it is and where in it each event happened.
+    `start` is the clock value at the video's first frame."""
     sidecar = {
         "game": game.get("name") or game["exe"],
         "exe": game["exe"],
+        "mode": game.get("mode"),
         "created": datetime.datetime.now().isoformat(timespec="seconds"),
-        "seconds": round(keep, 2),
+        "seconds": None if seconds is None else round(seconds, 2),
         "events": [
-            {"type": e.type, "source": e.source, "confidence": e.confidence, "offset": round(pre + e.t - first, 2)}
+            {"type": e.type, "source": e.source, "confidence": e.confidence, "offset": round(e.t - start, 2), **({"data": e.data} if e.data else {})}
             for e in events
         ],
     }
     path.with_suffix(".json").write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
-    return path
