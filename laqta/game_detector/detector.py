@@ -104,6 +104,32 @@ def foreground_fullscreen() -> tuple[int, str] | None:
     return pid.value, title.value
 
 
+def game_window(exe: str, running: dict[int, str] | None = None) -> tuple[int, int, int, int] | None:
+    """(left, top, right, bottom) of the largest visible window owned by `exe`, or None.
+    Asks the window manager only; the game process itself is never opened."""
+    running = processes() if running is None else running
+    pids = {pid for pid, name in running.items() if name.lower() == exe.lower()}
+    if not pids:
+        return None
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    best: list[tuple[int, tuple[int, int, int, int]]] = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def visit(window, _):
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(window, ctypes.byref(pid))
+        if pid.value in pids and user32.IsWindowVisible(window):
+            rect = wintypes.RECT()
+            if user32.GetWindowRect(window, ctypes.byref(rect)):
+                area = (rect.right - rect.left) * (rect.bottom - rect.top)
+                if area > 0:
+                    best.append((area, (rect.left, rect.top, rect.right, rect.bottom)))
+        return True
+
+    user32.EnumWindows(visit, 0)
+    return max(best)[1] if best else None
+
+
 # -- detector ------------------------------------------------------------------------
 
 

@@ -9,14 +9,14 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QColorDialog, QComboBox, QDialog, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QKeySequenceEdit, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
+    QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )  # fmt: skip
 
 from ..core.recorder import BOUNDARIES, MODES
 from ..game_detector import library_scan
 from ..game_detector.detector import GAMES_JSON, NOT_GAMES, load_games, processes
 from ..i18n import LANGUAGES, t
-from ..obs_controller import audio
+from ..obs_controller import audio, encoders
 from ..obs_controller.capture import KINDS
 from ..plugins import PLUGINS
 from ..storage import clips, config
@@ -131,7 +131,7 @@ class SettingsWindow(QDialog):
         self.cfg = copy.deepcopy(cfg)
         self.builtin = builtin_exes()
         self.setWindowTitle(t("settings.title"))
-        self.resize(820, 560)
+        self.resize(900, 660)
 
         self.rail = QListWidget()
         self.rail.setObjectName("rail")
@@ -140,7 +140,11 @@ class SettingsWindow(QDialog):
         for key, page in (("nav.general", self._general()), ("nav.games", self._games()), ("nav.recording", self._recording()),
                           ("nav.audio", self._audio()), ("nav.appearance", self._appearance())):
             self.rail.addItem(t(key))
-            self.pages.addWidget(page)
+            scroll = QScrollArea()  # pages outgrow a 768-pixel-high screen
+            scroll.setWidgetResizable(True)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            scroll.setWidget(page)
+            self.pages.addWidget(scroll)
         self.rail.currentRowChanged.connect(self.pages.setCurrentIndex)
         self.rail.setCurrentRow(0)
 
@@ -208,13 +212,21 @@ class SettingsWindow(QDialog):
         form.setVerticalSpacing(14)
         form.setHorizontalSpacing(20)
         self.quality = _combo([(t(f"quality.{q}"), q) for q in config.QUALITIES], self.cfg["quality"])
-        self.fps = _combo([(str(f), f) for f in (30, 60, 120)], self.cfg["fps"])
+        self.fps = _combo([(str(f), f) for f in config.FPS], self.cfg["fps"])
+        self.encoder = _combo(self._encoder_options(t("rec.encoder_auto"), "auto"), self.cfg["encoder"])
+        self.output_height = _combo(self._height_options(t("rec.output_native"), 0), self.cfg["output_height"])
+        self.bitrate = _spin(self.cfg["bitrate"], 0, 150000)
+        self.bitrate.setSingleStep(1000)
+        self.bitrate.setSpecialValueText(t("rec.bitrate_auto"))  # shown instead of 0
         self.pre = _spin(self.cfg["pre_seconds"], 0, 120)
         self.post = _spin(self.cfg["post_seconds"], 0, 60)
         self.max_clip = _spin(self.cfg["max_clip_seconds"], 10, 300)
         self.debounce = _spin(self.cfg["exit_debounce_seconds"], 0, 120)
         form.addRow(t("rec.quality"), self.quality)
         form.addRow(t("rec.fps"), self.fps)
+        form.addRow(t("rec.output"), self.output_height)
+        form.addRow(t("rec.encoder"), self.encoder)
+        form.addRow(t("rec.bitrate"), self.bitrate)
         form.addRow(t("rec.pre"), self.pre)
         form.addRow(t("rec.post"), self.post)
         form.addRow(t("rec.max_clip"), self.max_clip)
@@ -241,6 +253,14 @@ class SettingsWindow(QDialog):
         layout.addWidget(self.folder_note)
         layout.addStretch(1)
         return page
+
+    @staticmethod
+    def _encoder_options(first: str, first_value) -> list[tuple[str, object]]:
+        return [(first, first_value), *((encoders.NAMES[e], e) for e in encoders.ORDER)]
+
+    @staticmethod
+    def _height_options(first: str, first_value) -> list[tuple[str, object]]:
+        return [(first, first_value), *((t("rec.output_p", height=h), h) for h in config.HEIGHTS if h)]
 
     def _browse_folder(self) -> None:
         chosen = QFileDialog.getExistingDirectory(self, t("rec.save_folder"), self.save_folder.text())
@@ -330,7 +350,8 @@ class SettingsWindow(QDialog):
     def _games(self) -> QWidget:
         page, layout = self._page("nav.games")
         self.game_list = QListWidget()
-        self.game_list.setFixedWidth(230)
+        self.game_list.setFixedWidth(220)
+        self.game_list.setMinimumHeight(300)
         self.game_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.game_list.setTextElideMode(Qt.TextElideMode.ElideMiddle)
         self.game_list.currentItemChanged.connect(lambda *_: self._show_game())
@@ -415,6 +436,21 @@ class SettingsWindow(QDialog):
         game_audio.setToolTip(t("games.game_audio_hint"))
         game_audio.toggled.connect(lambda on: set_game(self.cfg, exe, game_audio_only=on or None))
         form.addRow("", game_audio)
+        same = t("games.as_global")
+        fps = _combo([(same, None), *((str(f), f) for f in config.FPS)], game.get("fps"))
+        height = _combo(self._height_options(same, None), game.get("output_height"))
+        encoder = _combo(self._encoder_options(same, None), game.get("encoder"))
+        bitrate = _spin(game.get("bitrate") or 0, 0, 150000)
+        bitrate.setSingleStep(1000)
+        bitrate.setSpecialValueText(same)
+        fps.currentIndexChanged.connect(lambda: set_game(self.cfg, exe, fps=fps.currentData()))
+        height.currentIndexChanged.connect(lambda: set_game(self.cfg, exe, output_height=height.currentData()))
+        encoder.currentIndexChanged.connect(lambda: set_game(self.cfg, exe, encoder=encoder.currentData()))
+        bitrate.valueChanged.connect(lambda value: set_game(self.cfg, exe, bitrate=value or None))
+        form.addRow(t("rec.fps"), fps)
+        form.addRow(t("rec.output"), height)
+        form.addRow(t("rec.encoder"), encoder)
+        form.addRow(t("rec.bitrate"), bitrate)
         wrap = QWidget()
         wrap.setObjectName("page")
         wrap.setLayout(form)
@@ -490,6 +526,9 @@ class SettingsWindow(QDialog):
             default_mode=self.default_mode.currentData(),
             quality=self.quality.currentData(),
             fps=self.fps.currentData(),
+            encoder=self.encoder.currentData(),
+            output_height=self.output_height.currentData(),
+            bitrate=self.bitrate.value(),
             pre_seconds=self.pre.value(),
             post_seconds=self.post.value(),
             max_clip_seconds=self.max_clip.value(),

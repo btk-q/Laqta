@@ -83,6 +83,13 @@ your microphone. Ordinary players use track 1.
   music off track 2 and out of the mix.
 - MP4 exports carry track 1 only.
 
+### Picture
+
+Laqta records the monitor the game is on, at that monitor's size, 60 fps. Change the output
+size, frame rate, encoder and bitrate in **Settings → Recording**, or per game in
+**Settings → Games**. If the encoder cannot keep up, Laqta tells you after the recording how
+many frames were skipped; lowering the output size is the usual cure.
+
 ### Games
 
 Ten games are built in. **Settings → Games → Find installed games** adds what it finds in
@@ -116,9 +123,6 @@ worked for that game. You can also force a method per game in **Settings → Gam
   for that game.
 - **AMD and Intel encoders are unverified.** Laqta tries NVENC, AMF, Quick Sync, then x264,
   and uses the first that starts; only NVENC and x264 have been run.
-- **The primary monitor is assumed.** A game on a second monitor records at the primary's size.
-- **Per-game resolution, bitrate and encoder** are not implemented; quality and frame rate
-  are global.
 - **Battle.net and EA libraries** are not scanned.
 - **Trimming** uses start and end times, not a video scrubber, and cuts land on keyframes,
   so a trimmed copy can start a moment early.

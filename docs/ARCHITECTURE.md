@@ -194,6 +194,8 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Game detection (process list) | Works | Live with League of Legends |
 | Full Session recording | Works | Real matches: 3440x1440, 60 fps, with sound |
 | Advanced output, encoder choice | Works for NVENC and x264 | Live on OBS 33; AMF and Quick Sync unverified |
+| Per-game video settings, second monitor | Works | Live on OBS 33: sizes, fps, bitrate, x264, portrait second monitor; not yet in a real game |
+| Skipped-frames report | Unit-tested | Counter read live; no overloaded recording to confirm the toast |
 | Microphone track, game-only audio | Works against ordinary apps | Live with test tones; not yet in a real game |
 | Events Only + clip hotkey | Works | Live with a stand-in process; not yet in a real game |
 | Hybrid and Full Match | Unit-tested | Not yet run in a real game |

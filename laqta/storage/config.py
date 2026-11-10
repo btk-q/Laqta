@@ -13,10 +13,13 @@ import tomli_w
 from ..core.recorder import MODES
 from ..i18n import LANGUAGES
 from ..obs_controller.capture import KINDS
+from ..obs_controller.encoders import ORDER as ENCODERS
 
 DIR = Path(os.environ.get("APPDATA", Path.home())) / "Laqta"
 PATH = DIR / "config.toml"
-QUALITIES = ("Stream", "Small", "HQ")  # OBS simple-output recording quality presets
+QUALITIES = ("Stream", "Small", "HQ")  # smaller files .. near lossless
+HEIGHTS = (0, 720, 1080, 1440, 2160)
+FPS = (30, 60, 120)
 
 DEFAULTS = {
     "language": "en",
@@ -28,6 +31,9 @@ DEFAULTS = {
     "exit_debounce_seconds": 10,
     "fps": 60,
     "quality": "Small",
+    "encoder": "auto",  # or one of obs_controller.encoders.ORDER
+    "output_height": 0,  # scale recordings down to this height; 0 = the monitor's own size
+    "bitrate": 0,  # kbit/s; 0 = constant quality from "quality"
     "mic_enabled": False,  # record the microphone on its own audio track
     "mic_device": "default",
     "mic_volume": 100,  # percent
@@ -48,7 +54,15 @@ def _check(cfg: dict) -> dict:
     need(cfg["language"] in LANGUAGES, f'language must be one of {", ".join(LANGUAGES)}')
     need(cfg["default_mode"] in MODES, f'default_mode must be one of {", ".join(MODES)}, not {cfg["default_mode"]!r}')
     need(cfg["quality"] in QUALITIES, f'quality must be one of {", ".join(QUALITIES)}')
-    need(cfg["fps"] in (30, 60, 120), "fps must be 30, 60 or 120")
+    def video(where: dict, label: str, optional: bool) -> None:
+        skip = (None,) if optional else ()
+        need(where.get("fps") in (*skip, *FPS), f"{label}fps must be 30, 60 or 120")
+        need(where.get("encoder") in (*skip, "auto", *ENCODERS), f"{label}encoder must be auto or one of {', '.join(ENCODERS)}")
+        need(where.get("output_height") in (*skip, *HEIGHTS), f"{label}output_height must be one of {HEIGHTS}")
+        need(where.get("bitrate") in skip or (isinstance(where.get("bitrate"), int) and 0 <= where["bitrate"] <= 150000),
+             f"{label}bitrate must be between 0 and 150000 kbit/s")
+
+    video(cfg, "", optional=False)
     need(isinstance(cfg["save_folder"], str) and (not cfg["save_folder"] or Path(cfg["save_folder"]).is_absolute()),
          "save_folder must be a full path such as D:\\Recordings, or empty for the default")
     need(isinstance(cfg["accent"], str) and re.fullmatch(r"#[0-9a-fA-F]{6}", cfg["accent"]) is not None, "accent must look like #8B5CF6")
@@ -61,6 +75,7 @@ def _check(cfg: dict) -> dict:
     for game in cfg["games"]:
         need("exe" in game, "every [[games]] entry needs an exe")
         need(game.get("mode", "session") in MODES, f'{game["exe"]}: mode must be one of {", ".join(MODES)}')
+        video(game, f'{game["exe"]}: ', optional=True)
         need(isinstance(game.get("game_audio_only", False), bool), f'{game["exe"]}: game_audio_only must be true or false')
         need(game.get("capture") in (None, *KINDS), f'{game["exe"]}: capture must be one of {", ".join(KINDS)}')
     return cfg

@@ -138,6 +138,10 @@ def ensure_laqta(
     mic: bool = False,
     store: Path | None = None,  # where the encoder that worked is remembered
     profile_dir: Path | None = None,
+    encoder: str | None = None,  # None = automatic
+    bitrate: int | None = None,  # kbit/s; None = constant quality
+    output_height: int = 0,  # 0 = the monitor's own size
+    window: tuple[int, int, int, int] | None = None,  # the game window's rectangle, if it has one yet
 ) -> str:
     """Idempotent: make sure the Laqta profile, scene collection, scene and sources exist and
     are current, in Advanced output mode with the replay buffer on. Returns the encoder in use."""
@@ -154,30 +158,32 @@ def ensure_laqta(
         _switch(obs, "SetCurrentProfile", profileName=NAME)
     other = next((p for p in [previous, *profiles["profiles"]] if p != NAME), None)
 
-    known = _remembered(store).get("encoder")
-    candidates = [known] if known in encoders.ORDER else list(encoders.ORDER)
-    for encoder in candidates:
-        _configure(obs, other, profile_dir, encoder, quality, replay_seconds, mic)
-        if encoder == known or _encoder_works(obs):
-            break
-        log.warning("encoder %s did not start, trying the next one", encoder)
-    else:
-        raise ObsError("ensure_laqta", 0, "no video encoder could be started in OBS")
-    if store and encoder != known:
-        store.parent.mkdir(parents=True, exist_ok=True)
-        store.write_text(json.dumps({**_remembered(store), "encoder": encoder}), encoding="utf-8")
-
-    # Record at the monitor's own size: a new profile defaults to a 1920x1080 canvas scaled to
-    # 720p30, which letterboxes and blurs an ultrawide game.
-    # ponytail: uses the primary monitor; follow the game's monitor when someone plays on another.
-    monitors = obs.call("GetMonitorList")["monitors"]
-    primary = next((m for m in monitors if (m["monitorPositionX"], m["monitorPositionY"]) == (0, 0)), monitors[0])
-    width, height = min(primary["monitorWidth"], 4096), min(primary["monitorHeight"], 4096)  # OBS's limit
-    full = {"baseWidth": width, "baseHeight": height, "outputWidth": width, "outputHeight": height,
+    # Canvas first: OBS refuses to change it while an output (even the encoder probe) is active.
+    monitor = pick_monitor(obs.call("GetMonitorList")["monitors"], window)
+    width, height = min(monitor["monitorWidth"], 4096), min(monitor["monitorHeight"], 4096)  # OBS's limit
+    out_width, out_height = scaled(width, height, output_height)
+    full = {"baseWidth": width, "baseHeight": height, "outputWidth": out_width, "outputHeight": out_height,
             "fpsNumerator": fps, "fpsDenominator": 1}
     video = obs.call("GetVideoSettings")
     if any(video[k] != v for k, v in full.items()):
         obs.call("SetVideoSettings", **full)
+
+    known = _remembered(store).get("encoder")
+    verified = {known} if known in encoders.ORDER else set()
+    wanted = encoder if encoder in encoders.ORDER else None
+    # A chosen encoder is tried first; if it will not start we still record, with the next one.
+    candidates = [wanted, *verified, *encoders.ORDER] if wanted else [*verified] or list(encoders.ORDER)
+    for encoder in dict.fromkeys(candidates):
+        _configure(obs, other, profile_dir, encoder, quality, replay_seconds, mic, bitrate)
+        if encoder in verified or _encoder_works(obs):
+            break
+        log.warning("encoder %s did not start, trying the next one", encoder)
+    else:
+        raise ObsError("ensure_laqta", 0, "no video encoder could be started in OBS")
+    if store and encoder not in verified and not wanted:
+        store.parent.mkdir(parents=True, exist_ok=True)
+        store.write_text(json.dumps({**_remembered(store), "encoder": encoder}), encoding="utf-8")
+
     obs.call("SetRecordDirectory", recordDirectory=str(record_dir))
 
     collections = obs.call("GetSceneCollectionList")
@@ -194,7 +200,27 @@ def ensure_laqta(
     return encoder
 
 
-def _configure(obs: Obs, other: str | None, profile_dir: Path, encoder: str, quality: str, replay_seconds: int, mic: bool) -> None:
+def pick_monitor(monitors: list[dict], window: tuple[int, int, int, int] | None) -> dict:
+    """The monitor the game window is on (by its centre); the primary one if there is no window yet."""
+    if window is not None:
+        x, y = (window[0] + window[2]) // 2, (window[1] + window[3]) // 2
+        for m in monitors:
+            if m["monitorPositionX"] <= x < m["monitorPositionX"] + m["monitorWidth"] and \
+                    m["monitorPositionY"] <= y < m["monitorPositionY"] + m["monitorHeight"]:
+                return m
+    return next((m for m in monitors if (m["monitorPositionX"], m["monitorPositionY"]) == (0, 0)), monitors[0])
+
+
+def scaled(width: int, height: int, output_height: int) -> tuple[int, int]:
+    """Output size for a canvas: the canvas itself, or scaled down to `output_height` keeping
+    the shape, with even numbers (encoders require them). Never scales up."""
+    if not output_height or output_height >= height:
+        return width, height
+    return max(2, round(width * output_height / height / 2) * 2), max(2, output_height // 2 * 2)
+
+
+def _configure(obs: Obs, other: str | None, profile_dir: Path, encoder: str, quality: str, replay_seconds: int, mic: bool,
+               bitrate: int | None = None) -> None:
     """Put the Laqta profile into the wanted state and reload it if anything had to change.
 
     Advanced output mode, because Simple mode records one audio track and offers no real
@@ -213,7 +239,7 @@ def _configure(obs: Obs, other: str | None, profile_dir: Path, encoder: str, qua
         ("AdvOut", "RecRBTime"): str(replay_seconds),
     }
     encoder_file = profile_dir / "recordEncoder.json"
-    encoder_json = json.dumps(encoders.settings(encoder, quality), sort_keys=True)
+    encoder_json = json.dumps(encoders.settings(encoder, quality, bitrate), sort_keys=True)
     for _ in range(5):
         changed = False
         for (category, name), value in wanted.items():

@@ -11,11 +11,12 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from ..game_detector.detector import Detector, load_games
+from ..game_detector.detector import Detector, game_window, load_games
 from ..i18n import t
 from ..obs_controller import setup
 from ..obs_controller.audio import Audio
 from ..obs_controller.capture import Capture
+from ..obs_controller import encoders
 from ..obs_controller.client import Obs, ObsDown, ObsError
 from ..plugins import PLUGINS
 from ..storage import clips, config, library
@@ -26,6 +27,23 @@ log = logging.getLogger(__name__)
 
 POLL = 2.0  # seconds between process scans
 CAPTURE_CHECK = 4.0  # seconds between looks at the picture until it is confirmed not black
+
+
+def resolve_video(cfg: dict, game: dict) -> dict:
+    """This game's video settings: its own where set, otherwise the global ones."""
+    def pick(key: str):
+        own = game.get(key)
+        return cfg[key] if own in (None, "", "auto") or (key != "output_height" and own == 0) else own
+
+    encoder = pick("encoder")
+    return {"fps": pick("fps"), "output_height": pick("output_height"), "bitrate": pick("bitrate") or None,
+            "encoder": None if encoder == "auto" else encoder, "quality": cfg["quality"]}
+
+
+def skipped_percent(before: int, after: int, seconds: float, fps: int) -> float:
+    """Share of a recording's frames the encoder could not keep up with."""
+    frames = max(1.0, seconds * fps)
+    return max(0.0, min(100.0, 100.0 * (after - before) / frames))
 
 
 def with_usable_mode(game: dict) -> dict:
@@ -66,6 +84,7 @@ class Core(threading.Thread):
         )
         self.capture = Capture(self.obs, setup.NAME, config.DIR / "capture.json", notify)
         self.audio = Audio(self.obs)
+        self._fps, self._skipped = 60, 0
         self._capture_check_at: float | None = None
         self.plugin: GamePlugin | None = None
         self._plugin_game: dict | None = None  # game we already tried to start a plugin for
@@ -106,12 +125,23 @@ class Core(threading.Thread):
         self._obs_error = None
 
     def _prepare(self, game: dict) -> None:
-        cfg = self.cfg
-        setup.ensure_laqta(
-            self.obs, clips.game_dir(game), self.recorder.replay_seconds, cfg["fps"], cfg["quality"],
-            mic=cfg["mic_enabled"], store=config.DIR / "obs.json",
+        cfg, video = self.cfg, resolve_video(self.cfg, game)
+        window = None
+        for _ in range(12):  # a game's window can open a moment after its process: wait up to 3 s
+            window = game_window(game["exe"])
+            if window:
+                break
+            time.sleep(0.25)
+        used = setup.ensure_laqta(
+            self.obs, clips.game_dir(game), self.recorder.replay_seconds, video["fps"], video["quality"],
+            mic=cfg["mic_enabled"], store=config.DIR / "obs.json", encoder=video["encoder"],
+            bitrate=video["bitrate"], output_height=video["output_height"], window=window,
         )
-        self.capture.start(game)
+        if video["encoder"] and used != video["encoder"]:
+            self.notify(t("toast.encoder_fallback", wanted=encoders.NAMES[video["encoder"]], used=encoders.NAMES[used]))
+        self._fps = video["fps"]
+        self._skipped = self._skipped_frames()
+        self.capture.start(game, setup.pick_monitor(self.obs.call("GetMonitorList")["monitors"], window))
         self.audio.start(game, cfg["mic_enabled"], cfg["mic_device"], cfg["mic_volume"])
         self._capture_check_at = time.monotonic() + CAPTURE_CHECK
 
@@ -148,7 +178,22 @@ class Core(threading.Thread):
         except OSError:
             log.exception("could not write event marks for %s", path)
         self.notify(t("toast.recording_saved", name=path.name))
+        self._report_skipped(time.monotonic() - start)
         self._cleanup()
+
+    def _skipped_frames(self) -> int:
+        try:
+            return int(self.obs.call("GetStats").get("outputSkippedFrames", 0))
+        except (ObsDown, ObsError):
+            return self._skipped
+
+    def _report_skipped(self, seconds: float) -> None:
+        """Tell the user when the encoder could not keep up: the recording will stutter."""
+        before, self._skipped = self._skipped, self._skipped_frames()
+        percent = skipped_percent(before, self._skipped, seconds, self._fps)
+        log.info("recording skipped %.1f%% of frames (encoder lag)", percent)
+        if percent >= 2.0:
+            self.notify(t("toast.skipped", percent=f"{percent:.0f}"))
 
     def _cleanup(self) -> None:
         try:

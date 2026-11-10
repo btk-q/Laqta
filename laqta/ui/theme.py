@@ -120,6 +120,7 @@ QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {c['line']}
 QCheckBox::indicator:checked {{ background: {c['accent']}; border-color: {c['accent']}; }}
 QCheckBox::indicator:focus {{ border-color: {c['accent']}; }}
 
+QScrollArea {{ border: none; background: {c['ink']}; }}
 QFrame#rule {{ background: {c['line']}; max-height: 1px; border: none; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; }}
 QScrollBar::handle:vertical {{ background: {c['line']}; border-radius: 5px; min-height: 24px; }}

@@ -72,6 +72,7 @@ class Capture:
         self.obs, self.scene, self.store, self.notify = obs, scene, store, notify
         self.game: dict | None = None
         self.kind = KINDS[0]
+        self.monitor: dict | None = None
         self._applied = False
         self._blank = 0
 
@@ -81,9 +82,10 @@ class Capture:
         except (OSError, ValueError):
             return {}
 
-    def start(self, game: dict) -> None:
-        """Point OBS at this game. Call check() a few seconds later."""
-        self.game, self._blank = game, 0
+    def start(self, game: dict, monitor: dict | None = None) -> None:
+        """Point OBS at this game. Call check() a few seconds later.
+        `monitor` is the one the game is on (from OBS's monitor list), for Display Capture."""
+        self.game, self._blank, self.monitor = game, 0, monitor
         kind = game.get("capture") or self._remembered().get(game["exe"].lower())
         self.kind = kind if kind in KINDS else KINDS[0]
         self._applied = self._apply()
@@ -92,12 +94,13 @@ class Capture:
         settings: dict = {}
         if self.kind == "monitor_capture":
             monitors = self.obs.call("GetInputPropertiesListPropertyItems", inputName=source(self.kind), propertyName="monitor_id")
-            ids = [m["itemValue"] for m in monitors["propertyItems"] if m["itemValue"] != "DUMMY"]
-            if not ids:
+            items = [m for m in monitors["propertyItems"] if m["itemValue"] != "DUMMY"]
+            if not items:
                 return False
-            # ponytail: first monitor OBS lists; pick the one holding the game window when
-            # someone plays on a secondary display.
-            settings = {"monitor_id": ids[0]}
+            # OBS names each entry "<model>: <w>x<h> @ <x>,<y> ...": match the game's monitor by position.
+            at = f"@ {self.monitor['monitorPositionX']},{self.monitor['monitorPositionY']}" if self.monitor else None
+            chosen = next((m for m in items if at and at in str(m.get("itemName", ""))), items[0])
+            settings = {"monitor_id": chosen["itemValue"]}
         else:
             window = find_window(self.obs, self.game["exe"])
             if window is None:
