@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "laqta"
+dynamic = ["version"]
+description = "Free, local-only game recorder that drives OBS"
+requires-python = ">=3.11"
+dependencies = ["obsws-python>=1.8", "psutil>=5.9"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools]
+packages = ["laqta", "laqta.obs_controller"]
+
+[tool.setuptools.dynamic]
+version = { attr = "laqta.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
