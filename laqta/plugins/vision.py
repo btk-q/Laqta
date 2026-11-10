@@ -1,4 +1,4 @@
-﻿"""Shared machinery for games with no local API: look at small regions of the screen a few
+"""Shared machinery for games with no local API: look at small regions of the screen a few
 times a second and match HUD icons against templates.
 
 Only the screen is read (like a screenshot tool); nothing touches the game process.
