@@ -28,6 +28,9 @@ DEFAULTS = {
     "exit_debounce_seconds": 10,
     "fps": 60,
     "quality": "Small",
+    "mic_enabled": False,  # record the microphone on its own audio track
+    "mic_device": "default",
+    "mic_volume": 100,  # percent
     "save_folder": "",  # where recordings go; "" = Videos\\Laqta
     "cleanup_days": 0,  # delete recordings older than this; 0 = never
     "cleanup_gb": 0,  # keep the recordings folder under this size; 0 = no limit
@@ -53,9 +56,12 @@ def _check(cfg: dict) -> dict:
         need(isinstance(cfg[key], (int, float)) and 0 <= cfg[key] <= 100000, f"{key} must be 0 or more")
     for key in ("pre_seconds", "post_seconds", "max_clip_seconds", "exit_debounce_seconds"):
         need(isinstance(cfg[key], (int, float)) and 0 <= cfg[key] <= 600, f"{key} must be between 0 and 600")
+    need(isinstance(cfg["mic_enabled"], bool) and isinstance(cfg["mic_device"], str), "mic_enabled must be true or false")
+    need(isinstance(cfg["mic_volume"], int) and 0 <= cfg["mic_volume"] <= 200, "mic_volume must be between 0 and 200")
     for game in cfg["games"]:
         need("exe" in game, "every [[games]] entry needs an exe")
         need(game.get("mode", "session") in MODES, f'{game["exe"]}: mode must be one of {", ".join(MODES)}')
+        need(isinstance(game.get("game_audio_only", False), bool), f'{game["exe"]}: game_audio_only must be true or false')
         need(game.get("capture") in (None, *KINDS), f'{game["exe"]}: capture must be one of {", ".join(KINDS)}')
     return cfg
 

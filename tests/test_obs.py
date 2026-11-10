@@ -85,8 +85,9 @@ def test_ws_settings(tmp_path: Path):
 class FakeObs:
     """Minimal in-memory OBS for ensure_laqta."""
 
-    def __init__(self, recording=False, lose_first_sets=0):
+    def __init__(self, recording=False, lose_first_sets=0, encoders=("obs_nvenc_h264_tex", "obs_x264")):
         self.calls = []
+        self.encoders, self.loaded_encoder, self.replay_active, self.muted = set(encoders), None, False, {}
         self.recording = recording
         self.lose = lose_first_sets  # real OBS drops parameters set while a new profile settles
         self.loaded_rb = False  # was RecRB true when the Laqta profile was last loaded?
@@ -114,7 +115,8 @@ class FakeObs:
             case "SetCurrentProfile":
                 self.profile = d["profileName"]
                 if self.profile == setup.NAME:
-                    self.loaded_rb = self.params.get(("SimpleOutput", "RecRB")) == "true"
+                    self.loaded_rb = self.params.get(("AdvOut", "RecRB")) == "true"
+                    self.loaded_encoder = self.params.get(("AdvOut", "RecEncoder"))
             case "GetProfileParameter":
                 return {"parameterValue": self.params.get((d["parameterCategory"], d["parameterName"]))}
             case "SetProfileParameter":
@@ -126,7 +128,13 @@ class FakeObs:
             case "GetReplayBufferStatus":
                 if not self.loaded_rb:
                     raise ObsError(request, 604, "Replay buffer is not available.")
-                return {"outputActive": False}
+                return {"outputActive": self.replay_active}
+            case "StartReplayBuffer":
+                self.replay_active = self.loaded_encoder in self.encoders  # the request succeeds either way
+            case "StopReplayBuffer":
+                self.replay_active = False
+            case "SetInputMute":
+                self.muted[d["inputName"]] = d["inputMuted"]
             case "GetVideoSettings":
                 return dict(self.video)
             case "SetVideoSettings":
@@ -162,35 +170,75 @@ class FakeObs:
         return {}
 
 
+def ensure(fake, tmp_path, **kw):
+    return setup.ensure_laqta(fake, tmp_path / "out", profile_dir=tmp_path / "profile", **kw)
+
+
 def test_ensure_laqta_creates_everything_once(tmp_path):
     fake = FakeObs()
-    setup.ensure_laqta(fake, tmp_path / "out")
+    assert ensure(fake, tmp_path) == "obs_nvenc_h264_tex"
     assert (fake.profile, fake.collection) == (setup.NAME, setup.NAME)
-    assert fake.params[("SimpleOutput", "RecRB")] == "true"
-    assert fake.scenes == [setup.NAME] and fake.inputs == ["Laqta game_capture", "Laqta window_capture", "Laqta monitor_capture", "Laqta desktop audio"]
+    assert fake.params[("Output", "Mode")] == "Advanced" and fake.params[("AdvOut", "RecRB")] == "true"
+    assert fake.params[("AdvOut", "RecTracks")] == "3"  # mix + game; no microphone track
+    assert fake.scenes == [setup.NAME]
+    assert fake.inputs == ["Laqta game_capture", "Laqta window_capture", "Laqta monitor_capture",
+                           "Laqta desktop audio", "Laqta game audio", "Laqta microphone"]
+    assert fake.muted == {"Laqta game audio": True, "Laqta microphone": True}  # only desktop audio is live at first
     assert fake.loaded_rb and fake.record_dir == str(tmp_path / "out")
     assert (fake.video["baseWidth"], fake.video["outputHeight"], fake.video["fpsNumerator"]) == (3440, 1440, 60)  # primary monitor
     assert fake.transforms[1]["boundsWidth"] == 3440
     assert (fake.transforms[1]["positionX"], fake.transforms[1]["positionY"]) == (0, 0)
+    encoder = json.loads((tmp_path / "profile" / "recordEncoder.json").read_text())
+    assert encoder["rate_control"] == "CQP" and encoder["lookahead"] is False
 
     # OBS re-centres items when the canvas changes shape; the next setup must put them back.
     fake.transforms[1]["positionX"] = 440.0
-    setup.ensure_laqta(fake, tmp_path / "out")
+    ensure(fake, tmp_path)
     assert fake.transforms[1]["positionX"] == 0
 
     fake.calls.clear()
-    setup.ensure_laqta(fake, tmp_path / "out")  # second run changes nothing
+    ensure(fake, tmp_path)  # second run changes nothing
     assert not {"CreateProfile", "SetProfileParameter", "SetCurrentProfile", "SetVideoSettings", "CreateScene", "CreateInput", "SetSceneItemTransform"} & set(fake.calls)
 
 
 def test_ensure_laqta_survives_obs_dropping_settings_on_a_new_profile(tmp_path):
     fake = FakeObs(lose_first_sets=4)  # what OBS 33 did on first run
-    setup.ensure_laqta(fake, tmp_path / "out")
-    assert fake.params[("SimpleOutput", "RecRB")] == "true" and fake.loaded_rb
+    ensure(fake, tmp_path)
+    assert fake.params[("AdvOut", "RecRB")] == "true" and fake.loaded_rb
 
 
 def test_ensure_laqta_refuses_to_take_over_a_live_recording(tmp_path):
     fake = FakeObs(recording=True)
     with pytest.raises(setup.ObsBusy):
-        setup.ensure_laqta(fake, tmp_path / "out")
+        ensure(fake, tmp_path)
     assert fake.profile == "Untitled"
+
+
+def test_encoder_falls_back_until_one_starts_and_is_remembered(tmp_path):
+    store = tmp_path / "obs.json"
+    fake = FakeObs(encoders={"obs_x264"})  # no GPU encoder on this machine
+    assert ensure(fake, tmp_path, store=store) == "obs_x264"
+    assert fake.params[("AdvOut", "RecEncoder")] == "obs_x264"
+    assert json.loads(store.read_text())["encoder"] == "obs_x264"
+    assert json.loads((tmp_path / "profile" / "recordEncoder.json").read_text())["rate_control"] == "CRF"
+    assert not fake.replay_active  # the probe cleans up after itself
+
+    fake.calls.clear()
+    assert ensure(fake, tmp_path, store=store) == "obs_x264"  # remembered: no probing, no reloads
+    assert "StartReplayBuffer" not in fake.calls and "SetCurrentProfile" not in fake.calls
+
+
+def test_no_working_encoder_is_an_error_not_a_silent_recording(tmp_path):
+    with pytest.raises(ObsError):
+        ensure(FakeObs(encoders=set()), tmp_path)
+
+
+def test_microphone_adds_a_third_track_and_quality_changes_reload_the_encoder(tmp_path):
+    fake = FakeObs()
+    ensure(fake, tmp_path, mic=True, quality="HQ")
+    assert fake.params[("AdvOut", "RecTracks")] == "7"
+    assert json.loads((tmp_path / "profile" / "recordEncoder.json").read_text())["cqp"] == 18
+    fake.calls.clear()
+    ensure(fake, tmp_path, mic=True, quality="Stream")
+    assert "SetCurrentProfile" in fake.calls  # OBS only reads encoder settings when the profile loads
+    assert json.loads((tmp_path / "profile" / "recordEncoder.json").read_text())["cqp"] == 28

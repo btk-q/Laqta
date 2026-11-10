@@ -16,6 +16,7 @@ from ..core.recorder import BOUNDARIES, MODES
 from ..game_detector import library_scan
 from ..game_detector.detector import GAMES_JSON, NOT_GAMES, load_games, processes
 from ..i18n import LANGUAGES, t
+from ..obs_controller import audio
 from ..obs_controller.capture import KINDS
 from ..plugins import PLUGINS
 from ..storage import clips, config
@@ -137,7 +138,7 @@ class SettingsWindow(QDialog):
         self.rail.setFixedWidth(170)
         self.pages = QStackedWidget()
         for key, page in (("nav.general", self._general()), ("nav.games", self._games()), ("nav.recording", self._recording()),
-                          ("nav.appearance", self._appearance())):
+                          ("nav.audio", self._audio()), ("nav.appearance", self._appearance())):
             self.rail.addItem(t(key))
             self.pages.addWidget(page)
         self.rail.currentRowChanged.connect(self.pages.setCurrentIndex)
@@ -250,6 +251,36 @@ class SettingsWindow(QDialog):
             return self.folder_note.setText(t("rec.folder_bad", path=str(folder)))
         self.save_folder.setText(str(folder))
         self.folder_note.setText(t("rec.save_hint"))
+
+    # -- Audio -----------------------------------------------------------------
+
+    def _audio(self) -> QWidget:
+        page, layout = self._page("nav.audio")
+        self.mic_enabled = QCheckBox(t("audio.mic"))
+        self.mic_enabled.setChecked(self.cfg["mic_enabled"])
+        devices = [(t("audio.mic_default"), "default"), *((name, device) for device, name in audio.microphones())]
+        if self.cfg["mic_device"] not in [d for _, d in devices]:
+            devices.append((self.cfg["mic_device"], self.cfg["mic_device"]))  # unplugged right now: keep the choice
+        self.mic_device = _combo(devices, self.cfg["mic_device"])
+        self.mic_volume = _spin(self.cfg["mic_volume"], 0, 200)
+        form = QFormLayout()
+        form.setVerticalSpacing(14)
+        form.setHorizontalSpacing(20)
+        form.addRow(t("audio.mic_device"), self.mic_device)
+        form.addRow(t("audio.mic_volume"), self.mic_volume)
+        layout.addWidget(self.mic_enabled)
+        layout.addWidget(_label(t("audio.privacy"), "hint"))
+        layout.addLayout(form)
+        layout.addWidget(_label(t("audio.tracks"), "hint"))
+        layout.addStretch(1)
+
+        def sync() -> None:
+            self.mic_device.setEnabled(self.mic_enabled.isChecked())
+            self.mic_volume.setEnabled(self.mic_enabled.isChecked())
+
+        self.mic_enabled.toggled.connect(sync)
+        sync()
+        return page
 
     # -- Appearance ------------------------------------------------------------
 
@@ -379,6 +410,11 @@ class SettingsWindow(QDialog):
         form.addRow(t("games.mode"), mode)
         form.addRow("", mode_help)
         form.addRow(t("games.capture"), capture)
+        game_audio = QCheckBox(t("games.game_audio"))
+        game_audio.setChecked(bool(game.get("game_audio_only")))
+        game_audio.setToolTip(t("games.game_audio_hint"))
+        game_audio.toggled.connect(lambda on: set_game(self.cfg, exe, game_audio_only=on or None))
+        form.addRow("", game_audio)
         wrap = QWidget()
         wrap.setObjectName("page")
         wrap.setLayout(form)
@@ -460,6 +496,9 @@ class SettingsWindow(QDialog):
             exit_debounce_seconds=self.debounce.value(),
             cleanup_days=self.cleanup_days.value(),
             cleanup_gb=self.cleanup_gb.value(),
+            mic_enabled=self.mic_enabled.isChecked(),
+            mic_device=self.mic_device.currentData(),
+            mic_volume=self.mic_volume.value(),
             save_folder="" if Path(self.save_folder.text()) == clips.DEFAULT_ROOT else self.save_folder.text(),
         )
         self.accept()

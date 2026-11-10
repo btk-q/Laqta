@@ -14,6 +14,7 @@ from typing import Callable
 from ..game_detector.detector import Detector, load_games
 from ..i18n import t
 from ..obs_controller import setup
+from ..obs_controller.audio import Audio
 from ..obs_controller.capture import Capture
 from ..obs_controller.client import Obs, ObsDown, ObsError
 from ..plugins import PLUGINS
@@ -64,6 +65,7 @@ class Core(threading.Thread):
             exit_debounce=cfg["exit_debounce_seconds"],
         )
         self.capture = Capture(self.obs, setup.NAME, config.DIR / "capture.json", notify)
+        self.audio = Audio(self.obs)
         self._capture_check_at: float | None = None
         self.plugin: GamePlugin | None = None
         self._plugin_game: dict | None = None  # game we already tried to start a plugin for
@@ -104,12 +106,18 @@ class Core(threading.Thread):
         self._obs_error = None
 
     def _prepare(self, game: dict) -> None:
-        setup.ensure_laqta(self.obs, clips.game_dir(game), self.recorder.replay_seconds, self.cfg["fps"], self.cfg["quality"])
+        cfg = self.cfg
+        setup.ensure_laqta(
+            self.obs, clips.game_dir(game), self.recorder.replay_seconds, cfg["fps"], cfg["quality"],
+            mic=cfg["mic_enabled"], store=config.DIR / "obs.json",
+        )
         self.capture.start(game)
+        self.audio.start(game, cfg["mic_enabled"], cfg["mic_device"], cfg["mic_volume"])
         self._capture_check_at = time.monotonic() + CAPTURE_CHECK
 
     def _check_capture(self) -> None:
-        """A few seconds into a game, make sure OBS is not recording a black screen."""
+        """A few seconds into a game, make sure OBS is not recording a black screen, and aim
+        game-only audio at the game once its window exists."""
         if self._capture_check_at is None or time.monotonic() < self._capture_check_at:
             return
         if self.recorder.state != "active":
@@ -117,6 +125,7 @@ class Core(threading.Thread):
             return
         try:
             more = self.capture.check()
+            more = self.audio.check() or more
         except (ObsDown, ObsError) as e:
             log.warning("capture check failed: %s", e)
             more = True

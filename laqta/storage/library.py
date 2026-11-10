@@ -138,7 +138,7 @@ def trim(path: Path, start: float, end: float) -> Path:
     if not 0 <= start < end:
         raise ValueError("The end must be after the start.")
     target = path.with_name(f"{path.stem} trim {int(start)}-{int(end)}{path.suffix}")
-    done = _run("-y", "-v", "error", "-ss", f"{start:.2f}", "-to", f"{end:.2f}", "-i", str(path), "-c", "copy", str(target))
+    done = _run("-y", "-v", "error", "-ss", f"{start:.2f}", "-to", f"{end:.2f}", "-i", str(path), "-map", "0", "-c", "copy", str(target))
     _check(done, target, "trim")
     try:  # carry over the event marks that fall inside the cut
         meta = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
@@ -157,7 +157,8 @@ def export(path: Path, root: Path | None = None) -> Path:
     folder = (root or clips.ROOT) / EXPORTS
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / f"{path.parents[1].name} {path.stem}.mp4"
-    done = _run("-y", "-v", "error", "-i", str(path), "-c", "copy", "-movflags", "+faststart", str(target), timeout=600)
+    # Track 1 is the full mix; phones and chat apps play only the first track anyway.
+    done = _run("-y", "-v", "error", "-i", str(path), "-map", "0:v:0", "-map", "0:a:0?", "-c", "copy", "-movflags", "+faststart", str(target), timeout=600)
     return _check(done, target, "export")
 
 

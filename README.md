@@ -72,6 +72,17 @@ in folder, or delete to the Recycle Bin.
 toggles, quality and frame rate, clip timing, automatic cleanup by age or folder size, and
 the interface colour. Settings are stored in `%APPDATA%\Laqta\config.toml`.
 
+### Sound
+
+Recordings carry separate audio tracks: **1** is everything you hear, **2** is the game, **3** is
+your microphone. Ordinary players use track 1.
+
+- **Microphone** is off by default. Turn it on, pick the device and set its volume in
+  **Settings → Audio**.
+- **Game sound only** is a per-game option in **Settings → Games**. It keeps voice chat and
+  music off track 2 and out of the mix.
+- MP4 exports carry track 1 only.
+
 ### Games
 
 Ten games are built in. **Settings → Games → Find installed games** adds what it finds in
@@ -100,8 +111,11 @@ worked for that game. You can also force a method per game in **Settings → Gam
 
 - **Vision plugins are not confirmed safe by any publisher.** They only read the screen, and
   no bans are known, but no publisher has stated that this is permitted.
-- **Desktop audio is recorded as a whole:** game, voice chat and music. Game-only audio and
-  microphone recording are not implemented.
+- **Game-only audio is unverified in real games.** It works against ordinary apps; whether
+  anti-cheat titles allow it is not yet known. If a recording comes out silent, turn it off
+  for that game.
+- **AMD and Intel encoders are unverified.** Laqta tries NVENC, AMF, Quick Sync, then x264,
+  and uses the first that starts; only NVENC and x264 have been run.
 - **The primary monitor is assumed.** A game on a second monitor records at the primary's size.
 - **Per-game resolution, bitrate and encoder** are not implemented; quality and frame rate
   are global.

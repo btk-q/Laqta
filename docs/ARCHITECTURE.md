@@ -185,11 +185,16 @@ OBS WebSocket server must be enabled once by the user (it is currently off on th
 
 ## 9. Where things stand
 
+Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 work follows
+[PLAN-v2.md](PLAN-v2.md).
+
 | Area | State | How it was checked |
 |---|---|---|
 | OBS control, reconnect, crash relaunch | Works | Live on OBS 33.0.1, including killing OBS |
 | Game detection (process list) | Works | Live with League of Legends |
 | Full Session recording | Works | Real matches: 3440x1440, 60 fps, with sound |
+| Advanced output, encoder choice | Works for NVENC and x264 | Live on OBS 33; AMF and Quick Sync unverified |
+| Microphone track, game-only audio | Works against ordinary apps | Live with test tones; not yet in a real game |
 | Events Only + clip hotkey | Works | Live with a stand-in process; not yet in a real game |
 | Hybrid and Full Match | Unit-tested | Not yet run in a real game |
 | Capture fallback (black picture) | Works for Game -> Window | Live on the League client; Display Capture untested |

@@ -41,7 +41,7 @@ def finish_clip(path: Path, game: dict, events: list[GameEvent], keep: float, pr
         # Stream copy: instant and lossless, but the cut lands on the keyframe before the
         # mark, so a clip can start a few seconds early.
         done = subprocess.run(
-            [ffmpeg, "-y", "-v", "error", "-sseof", f"-{keep:.2f}", "-i", str(path), "-c", "copy", str(tmp)],
+            [ffmpeg, "-y", "-v", "error", "-sseof", f"-{keep:.2f}", "-i", str(path), "-map", "0", "-c", "copy", str(tmp)],  # -map 0: keep every audio track
             capture_output=True,
             timeout=60,  # raises TimeoutExpired; the caller keeps the untrimmed replay
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
