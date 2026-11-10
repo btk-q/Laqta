@@ -117,7 +117,9 @@ def main(argv: list[str] | None = None) -> int:
 
     config.DIR.mkdir(parents=True, exist_ok=True)
     log_file = logging.handlers.RotatingFileHandler(config.DIR / "laqta.log", maxBytes=1_000_000, backupCount=2, encoding="utf-8")
-    logging.basicConfig(level=logging.INFO, format=fmt, handlers=[log_file, logging.StreamHandler()])
+    # The packaged app has no console: sys.stderr is None there.
+    handlers = [log_file, *([logging.StreamHandler()] if sys.stderr else [])]
+    logging.basicConfig(level=logging.INFO, format=fmt, handlers=handlers)
     try:
         cfg = config.load()
     except (ValueError, OSError) as e:  # tomllib.TOMLDecodeError is a ValueError

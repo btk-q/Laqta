@@ -35,6 +35,7 @@ def finish_clip(path: Path, game: dict, events: list[GameEvent], keep: float, pr
         done = subprocess.run(
             [ffmpeg, "-y", "-v", "error", "-sseof", f"-{keep:.2f}", "-i", str(path), "-c", "copy", str(tmp)],
             capture_output=True,
+            timeout=60,  # raises TimeoutExpired; the caller keeps the untrimmed replay
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         if done.returncode == 0 and tmp.exists() and tmp.stat().st_size > 0:

@@ -202,6 +202,8 @@ class Cs2Plugin(GamePlugin):
         dump = os.environ.get("LAQTA_GSI_DUMP")  # path: append every raw payload, for making test fixtures
 
         class Handler(BaseHTTPRequestHandler):
+            timeout = 5  # seconds a client may stall; the server handles one request at a time
+
             def do_POST(self):
                 try:
                     length = int(self.headers.get("Content-Length", 0))
@@ -220,8 +222,11 @@ class Cs2Plugin(GamePlugin):
                     payload.pop("auth", None)
                     with open(dump, "a", encoding="utf-8") as f:
                         f.write(json.dumps(payload) + "\n")
-                for event in tracker.update(payload, time.monotonic()):
-                    emit(event)
+                try:
+                    for event in tracker.update(payload, time.monotonic()):
+                        emit(event)
+                except (AttributeError, TypeError, ValueError):
+                    log.warning("ignored a GSI payload with an unexpected shape")
 
             def log_message(self, *args):
                 pass

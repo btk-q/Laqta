@@ -3,6 +3,7 @@ OBS events, plugins) reaches it through `inbox`."""
 
 from __future__ import annotations
 
+import copy
 import logging
 import queue
 import threading
@@ -24,6 +25,15 @@ log = logging.getLogger(__name__)
 
 POLL = 2.0  # seconds between process scans
 CAPTURE_CHECK = 4.0  # seconds between looks at the picture until it is confirmed not black
+
+
+def with_usable_mode(game: dict) -> dict:
+    """Full Match needs a plugin that reports match starts; without one nothing would ever be
+    recorded, so fall back to recording the whole session."""
+    plugin = PLUGINS.get(game.get("plugin"))
+    if game["mode"] == "match" and (plugin is None or "match_start" not in plugin.event_types):
+        return {**game, "mode": "session"}
+    return game
 
 
 class Core(threading.Thread):
@@ -69,7 +79,7 @@ class Core(threading.Thread):
 
     def apply(self, cfg: dict) -> None:
         """New settings from the UI. Takes effect for the next game (timings: the next clip)."""
-        self.inbox.put(("config", cfg))
+        self.inbox.put(("config", copy.deepcopy(cfg)))
 
     # Core thread ---------------------------------------------------------------
 
@@ -114,13 +124,19 @@ class Core(threading.Thread):
     def _on_clip(self, path: Path, game: dict, events: list[GameEvent], keep: float, pre: float) -> None:
         # ponytail: trims on the core thread (stream copy, well under a second); move to a
         # worker if clips ever get long enough to delay the next save.
-        clips.finish_clip(path, game, events, keep, pre)
+        try:
+            clips.finish_clip(path, game, events, keep, pre)
+        except Exception:
+            log.exception("could not trim or describe %s; the full replay is kept", path)
         self.notify(t("toast.clip_saved", name=path.name))
         self._cleanup()
 
     def _on_recording(self, path: Path, game: dict, marks: list[GameEvent], start: float) -> None:
-        if game["mode"] != "session":
-            clips.write_sidecar(path, game, marks, start)
+        try:
+            if game["mode"] != "session":
+                clips.write_sidecar(path, game, marks, start)
+        except OSError:
+            log.exception("could not write event marks for %s", path)
         self.notify(t("toast.recording_saved", name=path.name))
         self._cleanup()
 
@@ -152,9 +168,7 @@ class Core(threading.Thread):
             rec.exit_debounce = cfg["exit_debounce_seconds"]
 
     def _start_game(self, game: dict) -> None:
-        if game["mode"] == "match" and game.get("plugin") not in PLUGINS:
-            game = {**game, "mode": "session"}  # nothing can tell us when a match starts
-        self.recorder.game_started(game)
+        self.recorder.game_started(with_usable_mode(game))
 
     def _sync_plugin(self) -> None:
         """Run the game's plugin exactly while the recorder has that game."""

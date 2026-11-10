@@ -1,6 +1,7 @@
 # Laqta (لقطة) — architecture and milestone plan
 
-Status: **draft, awaiting approval**. No code exists yet.
+Status: **built through M8** (see "Where things stand" at the end). Sections 1–7 are the
+original plan; where the build differs, the last section says so.
 Date: 2026-11-10. Target: Windows 10/11, Python 3.12, OBS 30.2+ (32.2.2 installed here).
 
 Laqta is a free, local-only game recorder: it notices a game starting, drives OBS over
@@ -173,7 +174,7 @@ Until M6, modes and toggles are edited in the TOML file.
 | Game | Method | Risks / limits |
 |---|---|---|
 | CS2 | GSI (game POSTs JSON to localhost) | Only the local player's data; kills come from counter deltas, so two kills in one 0.1 s window can merge; clutch is a guess (no teammate data); must gate on own SteamID or spectated kills get counted. Field names **[verify, M3]** against live payloads. Needs a cfg file written into the game folder. |
-| LoL | Live Client Data API, port 2999 | `GameEnd` event not in Riot's sample file **[verify, M4]**; name format in kill events may or may not include the `#tag`; API is up only once in game. No key needed; wide distribution may fall under Riot's product registration. |
+| LoL | Live Client Data API, port 2999 | Verified against a real match's event list: `GameEnd` (`Result`), `FirstBlood` (`Recipient`), `Multikill`, `Ace`, and names without the `#tag`. If the game process exits before a poll sees `GameEnd`, the match still ends but without a win/lose. No key needed; wide distribution may fall under Riot's product registration. Game Capture worked in window mode. |
 | Valorant | Vision (killfeed) | No official statement that passive screen reading is permitted — no known bans, but not confirmed safe. Game Capture may be black under Vanguard. HUD details are from memory; colour-blind modes and patches break templates. **Needs real screenshots from you.** |
 | Dota 2 | GSI | Same mechanism as CS2; needs the `-gamestateintegration` launch option; Valve notes a possible framerate cost. Not in this plan's milestones. |
 | Rocket League | Official Stats API (TCP 49123) | Exists since the April 2026 EAC update; payload schema undocumented and whether it works in online matches is unconfirmed. Later plugin. |
@@ -181,3 +182,37 @@ Until M6, modes and toggles are edited in the TOML file.
 
 General: clips trimmed with stream copy can start up to ~2 s early (keyframes). The
 OBS WebSocket server must be enabled once by the user (it is currently off on this machine).
+
+## 9. Where things stand
+
+| Area | State | How it was checked |
+|---|---|---|
+| OBS control, reconnect, crash relaunch | Works | Live on OBS 33.0.1, including killing OBS |
+| Game detection (process list) | Works | Live with League of Legends |
+| Full Session recording | Works | Real matches: 3440x1440, 60 fps, with sound |
+| Events Only + clip hotkey | Works | Live with a stand-in process; not yet in a real game |
+| Hybrid and Full Match | Unit-tested | Not yet run in a real game |
+| Capture fallback (black picture) | Works for Game -> Window | Live on the League client; Display Capture untested |
+| League of Legends events | Works | Replay of a real match's event list |
+| CS2 events | Unit-tested | Hand-built payloads only; no real match yet |
+| Valorant events | Not working | Framework only; no template images |
+| Settings, Arabic/RTL, colours | Works | Rendered and driven by script; not clicked through by hand |
+| Clip library | Works | Driven by script on test videos |
+| Library scan | Steam, Epic, GOG | Steam checked on a real library; Epic and GOG from fixtures |
+| Unknown-fullscreen prompt | Unit-tested | Has not fired for real |
+| Packaged exe | Builds, imports cleanly | Not run as the only instance |
+
+Differences from the plan above:
+
+- **Capture** aims at the game's own window and falls back on a black picture; the
+  "any fullscreen app" mode in the plan recorded 19 minutes of black in League.
+- **Canvas** follows the primary monitor's size, and a desktop-audio source is added: a new
+  OBS scene collection has neither.
+- **Process detection** uses a Toolhelp snapshot instead of psutil, so no process is opened.
+- **`i18n.py`** lives at the package root, not under `ui/`, because the core emits toasts.
+- **Clip library data** is in `storage/library.py`; `storage/clips.py` only files new clips.
+- **Unknown-app prompt** is a clickable toast rather than a dialog, so it cannot take focus
+  from a fullscreen game.
+- **Not built:** audio cue detection, Battle.net/EA scan, per-game resolution/bitrate/encoder,
+  OBS chapter markers (recordings are MKV), Dota 2 and Rocket League plugins, an installer
+  (the build produces a zip).

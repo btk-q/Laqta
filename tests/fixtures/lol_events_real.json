@@ -1,0 +1,1301 @@
+{
+ "Events": [
+  {
+   "EventID": 0,
+   "EventName": "GameStart",
+   "EventTime": 0.06734929978847504
+  },
+  {
+   "EventID": 1,
+   "EventName": "MinionsSpawning",
+   "EventTime": 50.063880920410156
+  },
+  {
+   "Assisters": [
+    "Player3",
+    "Player4",
+    "Player5"
+   ],
+   "EventID": 2,
+   "EventName": "ChampionKill",
+   "EventTime": 123.19169616699219,
+   "KillerName": "Player1",
+   "VictimName": "Player2"
+  },
+  {
+   "EventID": 3,
+   "EventName": "FirstBlood",
+   "EventTime": 123.19169616699219,
+   "Recipient": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player3",
+    "Player4"
+   ],
+   "EventID": 4,
+   "EventName": "ChampionKill",
+   "EventTime": 134.2302703857422,
+   "KillerName": "Player1",
+   "VictimName": "Player6"
+  },
+  {
+   "Assisters": [
+    "Player7"
+   ],
+   "EventID": 5,
+   "EventName": "ChampionKill",
+   "EventTime": 134.2302703857422,
+   "KillerName": "Player1",
+   "VictimName": "Player8"
+  },
+  {
+   "EventID": 6,
+   "EventName": "Multikill",
+   "EventTime": 134.2302703857422,
+   "KillStreak": 2,
+   "KillerName": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player10"
+   ],
+   "EventID": 7,
+   "EventName": "ChampionKill",
+   "EventTime": 139.62403869628906,
+   "KillerName": "Player9",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player6"
+   ],
+   "EventID": 8,
+   "EventName": "ChampionKill",
+   "EventTime": 144.77804565429688,
+   "KillerName": "Player2",
+   "VictimName": "Player5"
+  },
+  {
+   "Assisters": [
+    "Player1"
+   ],
+   "EventID": 9,
+   "EventName": "ChampionKill",
+   "EventTime": 181.21389770507812,
+   "KillerName": "Player3",
+   "VictimName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player3",
+    "Player5"
+   ],
+   "EventID": 10,
+   "EventName": "ChampionKill",
+   "EventTime": 185.7296600341797,
+   "KillerName": "Player4",
+   "VictimName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player1",
+    "Player4",
+    "Player5"
+   ],
+   "EventID": 11,
+   "EventName": "ChampionKill",
+   "EventTime": 187.86422729492188,
+   "KillerName": "Player3",
+   "VictimName": "Player6"
+  },
+  {
+   "EventID": 12,
+   "EventName": "Multikill",
+   "EventTime": 187.86422729492188,
+   "KillStreak": 2,
+   "KillerName": "Player3"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player3",
+    "Player4",
+    "Player5"
+   ],
+   "EventID": 13,
+   "EventName": "ChampionKill",
+   "EventTime": 208.50340270996094,
+   "KillerName": "Player1",
+   "VictimName": "Player8"
+  },
+  {
+   "Assisters": [
+    "Player9"
+   ],
+   "EventID": 14,
+   "EventName": "ChampionKill",
+   "EventTime": 214.6207275390625,
+   "KillerName": "Player2",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 15,
+   "EventName": "ChampionKill",
+   "EventTime": 216.859130859375,
+   "KillerName": "Player6",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player1",
+    "Player4",
+    "Player5"
+   ],
+   "EventID": 16,
+   "EventName": "ChampionKill",
+   "EventTime": 218.63230895996094,
+   "KillerName": "Player7",
+   "VictimName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player8",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 17,
+   "EventName": "ChampionKill",
+   "EventTime": 222.40484619140625,
+   "KillerName": "Player10",
+   "VictimName": "Player5"
+  },
+  {
+   "Assisters": [
+    "Player9"
+   ],
+   "EventID": 18,
+   "EventName": "ChampionKill",
+   "EventTime": 230.35580444335938,
+   "KillerName": "Player10",
+   "VictimName": "Player3"
+  },
+  {
+   "EventID": 19,
+   "EventName": "Multikill",
+   "EventTime": 230.35580444335938,
+   "KillStreak": 2,
+   "KillerName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player3",
+    "Player5"
+   ],
+   "EventID": 20,
+   "EventName": "ChampionKill",
+   "EventTime": 237.94363403320312,
+   "KillerName": "Player4",
+   "VictimName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player5"
+   ],
+   "EventID": 21,
+   "EventName": "ChampionKill",
+   "EventTime": 261.46533203125,
+   "KillerName": "Player1",
+   "VictimName": "Player6"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player10"
+   ],
+   "EventID": 22,
+   "EventName": "ChampionKill",
+   "EventTime": 269.0146484375,
+   "KillerName": "Player2",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player6"
+   ],
+   "EventID": 23,
+   "EventName": "ChampionKill",
+   "EventTime": 284.34381103515625,
+   "KillerName": "Player10",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 24,
+   "EventName": "ChampionKill",
+   "EventTime": 298.6746520996094,
+   "KillerName": "Player6",
+   "VictimName": "Player5"
+  },
+  {
+   "Assisters": [
+    "Player5"
+   ],
+   "EventID": 25,
+   "EventName": "ChampionKill",
+   "EventTime": 298.9700622558594,
+   "KillerName": "Player3",
+   "VictimName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player5"
+   ],
+   "EventID": 26,
+   "EventName": "ChampionKill",
+   "EventTime": 306.30633544921875,
+   "KillerName": "Player3",
+   "VictimName": "Player2"
+  },
+  {
+   "EventID": 27,
+   "EventName": "Multikill",
+   "EventTime": 306.30633544921875,
+   "KillStreak": 2,
+   "KillerName": "Player3"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player3",
+    "Player5"
+   ],
+   "EventID": 28,
+   "EventName": "ChampionKill",
+   "EventTime": 311.955322265625,
+   "KillerName": "Player4",
+   "VictimName": "Player6"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 29,
+   "EventName": "ChampionKill",
+   "EventTime": 315.9976501464844,
+   "KillerName": "Player6",
+   "VictimName": "Player7"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player9"
+   ],
+   "EventID": 30,
+   "EventName": "ChampionKill",
+   "EventTime": 319.3642578125,
+   "KillerName": "Player8",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player4"
+   ],
+   "EventID": 31,
+   "EventName": "ChampionKill",
+   "EventTime": 319.9336242675781,
+   "KillerName": "Player3",
+   "VictimName": "Player8"
+  },
+  {
+   "Assisters": [],
+   "EventID": 32,
+   "EventName": "ChampionKill",
+   "EventTime": 327.48480224609375,
+   "KillerName": "Player10",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player3"
+   ],
+   "EventID": 33,
+   "EventName": "ChampionKill",
+   "EventTime": 339.9434814453125,
+   "KillerName": "Player5",
+   "VictimName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 34,
+   "EventName": "ChampionKill",
+   "EventTime": 342.5855712890625,
+   "KillerName": "Player6",
+   "VictimName": "Player3"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9"
+   ],
+   "EventID": 35,
+   "EventName": "ChampionKill",
+   "EventTime": 346.0935974121094,
+   "KillerName": "Player2",
+   "VictimName": "Player5"
+  },
+  {
+   "Assisters": [
+    "Player3",
+    "Player5"
+   ],
+   "EventID": 36,
+   "EventName": "ChampionKill",
+   "EventTime": 347.72845458984375,
+   "KillerName": "Player4",
+   "VictimName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 37,
+   "EventName": "ChampionKill",
+   "EventTime": 367.90447998046875,
+   "KillerName": "Player6",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player3"
+   ],
+   "EventID": 38,
+   "EventName": "ChampionKill",
+   "EventTime": 388.52203369140625,
+   "KillerName": "Player5",
+   "VictimName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player3",
+    "Player5"
+   ],
+   "EventID": 39,
+   "EventName": "ChampionKill",
+   "EventTime": 388.7291564941406,
+   "KillerName": "Player1",
+   "VictimName": "Player6"
+  },
+  {
+   "Assisters": [
+    "Player10"
+   ],
+   "EventID": 40,
+   "EventName": "ChampionKill",
+   "EventTime": 392.9789733886719,
+   "KillerName": "Player6",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [],
+   "EventID": 41,
+   "EventName": "TurretKilled",
+   "EventTime": 402.3248596191406,
+   "KillerName": "Player3",
+   "TurretKilled": "Turret_TChaos_L1_P3_671196429_0"
+  },
+  {
+   "EventID": 42,
+   "EventName": "FirstBrick",
+   "EventTime": 402.3248596191406,
+   "KillerName": "Player3"
+  },
+  {
+   "Assisters": [],
+   "EventID": 43,
+   "EventName": "ChampionKill",
+   "EventTime": 457.0074462890625,
+   "KillerName": "Player3",
+   "VictimName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 44,
+   "EventName": "ChampionKill",
+   "EventTime": 464.2806701660156,
+   "KillerName": "Player6",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player3",
+    "Player4",
+    "Player5"
+   ],
+   "EventID": 45,
+   "EventName": "ChampionKill",
+   "EventTime": 466.09124755859375,
+   "KillerName": "Player1",
+   "VictimName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player1",
+    "Player5"
+   ],
+   "EventID": 46,
+   "EventName": "ChampionKill",
+   "EventTime": 474.6162109375,
+   "KillerName": "Player3",
+   "VictimName": "Player8"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player1",
+    "Player3"
+   ],
+   "EventID": 47,
+   "EventName": "ChampionKill",
+   "EventTime": 480.1731872558594,
+   "KillerName": "Player4",
+   "VictimName": "Player6"
+  },
+  {
+   "Assisters": [
+    "Player6"
+   ],
+   "EventID": 48,
+   "EventName": "ChampionKill",
+   "EventTime": 489.4497375488281,
+   "KillerName": "Player10",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 49,
+   "EventName": "ChampionKill",
+   "EventTime": 497.3259582519531,
+   "KillerName": "Player10",
+   "VictimName": "Player7"
+  },
+  {
+   "EventID": 50,
+   "EventName": "Multikill",
+   "EventTime": 497.3259582519531,
+   "KillStreak": 2,
+   "KillerName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9"
+   ],
+   "EventID": 51,
+   "EventName": "ChampionKill",
+   "EventTime": 498.954345703125,
+   "KillerName": "Player2",
+   "VictimName": "Player5"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player1",
+    "Player5"
+   ],
+   "EventID": 52,
+   "EventName": "ChampionKill",
+   "EventTime": 503.42822265625,
+   "KillerName": "Player3",
+   "VictimName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9"
+   ],
+   "EventID": 53,
+   "EventName": "ChampionKill",
+   "EventTime": 508.5604248046875,
+   "KillerName": "Player2",
+   "VictimName": "Player3"
+  },
+  {
+   "EventID": 54,
+   "EventName": "Multikill",
+   "EventTime": 508.5604248046875,
+   "KillStreak": 2,
+   "KillerName": "Player2"
+  },
+  {
+   "Assisters": [],
+   "EventID": 55,
+   "EventName": "ChampionKill",
+   "EventTime": 512.9378662109375,
+   "KillerName": "Player1",
+   "VictimName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 56,
+   "EventName": "ChampionKill",
+   "EventTime": 514.9183959960938,
+   "KillerName": "Player8",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player5"
+   ],
+   "EventID": 57,
+   "EventName": "ChampionKill",
+   "EventTime": 538.6842041015625,
+   "KillerName": "Player4",
+   "VictimName": "Player8"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player5"
+   ],
+   "EventID": 58,
+   "EventName": "ChampionKill",
+   "EventTime": 540.8947143554688,
+   "KillerName": "Player4",
+   "VictimName": "Player9"
+  },
+  {
+   "EventID": 59,
+   "EventName": "Multikill",
+   "EventTime": 540.8947143554688,
+   "KillStreak": 2,
+   "KillerName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player5"
+   ],
+   "EventID": 60,
+   "EventName": "ChampionKill",
+   "EventTime": 546.64208984375,
+   "KillerName": "Player4",
+   "VictimName": "Player6"
+  },
+  {
+   "EventID": 61,
+   "EventName": "Multikill",
+   "EventTime": 546.64208984375,
+   "KillStreak": 3,
+   "KillerName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 62,
+   "EventName": "ChampionKill",
+   "EventTime": 551.489990234375,
+   "KillerName": "Player2",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 63,
+   "EventName": "ChampionKill",
+   "EventTime": 554.0597534179688,
+   "KillerName": "Player2",
+   "VictimName": "Player5"
+  },
+  {
+   "EventID": 64,
+   "EventName": "Multikill",
+   "EventTime": 554.0597534179688,
+   "KillStreak": 2,
+   "KillerName": "Player2"
+  },
+  {
+   "Assisters": [],
+   "EventID": 65,
+   "EventName": "ChampionKill",
+   "EventTime": 554.9058837890625,
+   "KillerName": "Player2",
+   "VictimName": "Player7"
+  },
+  {
+   "EventID": 66,
+   "EventName": "Multikill",
+   "EventTime": 554.9058837890625,
+   "KillStreak": 3,
+   "KillerName": "Player2"
+  },
+  {
+   "Assisters": [],
+   "EventID": 67,
+   "EventName": "ChampionKill",
+   "EventTime": 556.2636108398438,
+   "KillerName": "Player2",
+   "VictimName": "Player3"
+  },
+  {
+   "EventID": 68,
+   "EventName": "Multikill",
+   "EventTime": 556.2636108398438,
+   "KillStreak": 4,
+   "KillerName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player2"
+   ],
+   "EventID": 69,
+   "EventName": "TurretKilled",
+   "EventTime": 582.5850219726562,
+   "KillerName": "Player10",
+   "TurretKilled": "Turret_TOrder_L1_P3_2250400266_0"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player2"
+   ],
+   "EventID": 70,
+   "EventName": "ChampionKill",
+   "EventTime": 587.8701782226562,
+   "KillerName": "Player8",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player4",
+    "Player5"
+   ],
+   "EventID": 71,
+   "EventName": "ChampionKill",
+   "EventTime": 591.9398803710938,
+   "KillerName": "Player7",
+   "VictimName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player8",
+    "Player2"
+   ],
+   "EventID": 72,
+   "EventName": "ChampionKill",
+   "EventTime": 601.5613403320312,
+   "KillerName": "Player10",
+   "VictimName": "Player5"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player10",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 73,
+   "EventName": "ChampionKill",
+   "EventTime": 603.5317993164062,
+   "KillerName": "Player6",
+   "VictimName": "Player7"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player10",
+    "Player9"
+   ],
+   "EventID": 74,
+   "EventName": "ChampionKill",
+   "EventTime": 613.92431640625,
+   "KillerName": "Player6",
+   "VictimName": "Player3"
+  },
+  {
+   "Assisters": [
+    "Player3",
+    "Player5"
+   ],
+   "EventID": 75,
+   "EventName": "ChampionKill",
+   "EventTime": 619.6007080078125,
+   "KillerName": "Player4",
+   "VictimName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player3"
+   ],
+   "EventID": 76,
+   "EventName": "ChampionKill",
+   "EventTime": 622.8057250976562,
+   "KillerName": "Player4",
+   "VictimName": "Player9"
+  },
+  {
+   "EventID": 77,
+   "EventName": "Multikill",
+   "EventTime": 622.8057250976562,
+   "KillStreak": 2,
+   "KillerName": "Player4"
+  },
+  {
+   "Assisters": [],
+   "EventID": 78,
+   "EventName": "ChampionKill",
+   "EventTime": 628.0527954101562,
+   "KillerName": "Player4",
+   "VictimName": "Player6"
+  },
+  {
+   "EventID": 79,
+   "EventName": "Multikill",
+   "EventTime": 628.0527954101562,
+   "KillStreak": 3,
+   "KillerName": "Player4"
+  },
+  {
+   "Assisters": [],
+   "EventID": 80,
+   "EventName": "ChampionKill",
+   "EventTime": 637.7124633789062,
+   "KillerName": "Player2",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [],
+   "EventID": 81,
+   "EventName": "ChampionKill",
+   "EventTime": 638.6404418945312,
+   "KillerName": "Turret_TOrder_L1_P5_1477396591_0",
+   "VictimName": "Player8"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player1"
+   ],
+   "EventID": 82,
+   "EventName": "ChampionKill",
+   "EventTime": 652.3438110351562,
+   "KillerName": "Player4",
+   "VictimName": "Player2"
+  },
+  {
+   "Assisters": [],
+   "EventID": 83,
+   "EventName": "ChampionKill",
+   "EventTime": 682.2508544921875,
+   "KillerName": "Player8",
+   "VictimName": "Player7"
+  },
+  {
+   "Assisters": [
+    "Player9"
+   ],
+   "EventID": 84,
+   "EventName": "ChampionKill",
+   "EventTime": 686.8505859375,
+   "KillerName": "Player10",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player3",
+    "Player4"
+   ],
+   "EventID": 85,
+   "EventName": "ChampionKill",
+   "EventTime": 687.8519897460938,
+   "KillerName": "Player5",
+   "VictimName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player10",
+    "Player9"
+   ],
+   "EventID": 86,
+   "EventName": "ChampionKill",
+   "EventTime": 691.0947265625,
+   "KillerName": "Player6",
+   "VictimName": "Player5"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 87,
+   "EventName": "ChampionKill",
+   "EventTime": 702.482666015625,
+   "KillerName": "Player6",
+   "VictimName": "Player3"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 88,
+   "EventName": "TurretKilled",
+   "EventTime": 713.7081298828125,
+   "KillerName": "Player6",
+   "TurretKilled": "Turret_TOrder_L1_P2_2032291219_0"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 89,
+   "EventName": "ChampionKill",
+   "EventTime": 720.223876953125,
+   "KillerName": "Player6",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player1"
+   ],
+   "EventID": 90,
+   "EventName": "ChampionKill",
+   "EventTime": 731.0928955078125,
+   "KillerName": "Player4",
+   "VictimName": "Player8"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player9"
+   ],
+   "EventID": 91,
+   "EventName": "ChampionKill",
+   "EventTime": 734.0620727539062,
+   "KillerName": "Player2",
+   "VictimName": "Player5"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player1",
+    "Player5"
+   ],
+   "EventID": 92,
+   "EventName": "ChampionKill",
+   "EventTime": 735.8656005859375,
+   "KillerName": "Player4",
+   "VictimName": "Player6"
+  },
+  {
+   "EventID": 93,
+   "EventName": "Multikill",
+   "EventTime": 735.8656005859375,
+   "KillStreak": 2,
+   "KillerName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player1"
+   ],
+   "EventID": 94,
+   "EventName": "ChampionKill",
+   "EventTime": 736.1795654296875,
+   "KillerName": "Player4",
+   "VictimName": "Player9"
+  },
+  {
+   "EventID": 95,
+   "EventName": "Multikill",
+   "EventTime": 736.1795654296875,
+   "KillStreak": 3,
+   "KillerName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player9"
+   ],
+   "EventID": 96,
+   "EventName": "ChampionKill",
+   "EventTime": 736.8990478515625,
+   "KillerName": "Player2",
+   "VictimName": "Player7"
+  },
+  {
+   "EventID": 97,
+   "EventName": "Multikill",
+   "EventTime": 736.8990478515625,
+   "KillStreak": 2,
+   "KillerName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player7",
+    "Player5"
+   ],
+   "EventID": 98,
+   "EventName": "ChampionKill",
+   "EventTime": 738.54541015625,
+   "KillerName": "Player4",
+   "VictimName": "Player2"
+  },
+  {
+   "EventID": 99,
+   "EventName": "Multikill",
+   "EventTime": 738.54541015625,
+   "KillStreak": 4,
+   "KillerName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 100,
+   "EventName": "ChampionKill",
+   "EventTime": 738.54541015625,
+   "KillerName": "Player2",
+   "VictimName": "Player4"
+  },
+  {
+   "EventID": 101,
+   "EventName": "Multikill",
+   "EventTime": 738.54541015625,
+   "KillStreak": 3,
+   "KillerName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player1"
+   ],
+   "EventID": 102,
+   "EventName": "ChampionKill",
+   "EventTime": 768.32373046875,
+   "KillerName": "Player3",
+   "VictimName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 103,
+   "EventName": "ChampionKill",
+   "EventTime": 803.8592529296875,
+   "KillerName": "Player6",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player9"
+   ],
+   "EventID": 104,
+   "EventName": "ChampionKill",
+   "EventTime": 812.6141967773438,
+   "KillerName": "Player2",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player3",
+    "Player4",
+    "Player5"
+   ],
+   "EventID": 105,
+   "EventName": "ChampionKill",
+   "EventTime": 812.7487182617188,
+   "KillerName": "Player7",
+   "VictimName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 106,
+   "EventName": "ChampionKill",
+   "EventTime": 814.4091186523438,
+   "KillerName": "Player6",
+   "VictimName": "Player7"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 107,
+   "EventName": "ChampionKill",
+   "EventTime": 817.9446411132812,
+   "KillerName": "Player10",
+   "VictimName": "Player3"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player8",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 108,
+   "EventName": "ChampionKill",
+   "EventTime": 825.5826416015625,
+   "KillerName": "Player10",
+   "VictimName": "Player5"
+  },
+  {
+   "EventID": 109,
+   "EventName": "Multikill",
+   "EventTime": 825.5826416015625,
+   "KillStreak": 2,
+   "KillerName": "Player10"
+  },
+  {
+   "Acer": "Player10",
+   "AcingTeam": "CHAOS",
+   "EventID": 110,
+   "EventName": "Ace",
+   "EventTime": 825.5826416015625
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9"
+   ],
+   "EventID": 111,
+   "EventName": "InhibKilled",
+   "EventTime": 830.1516723632812,
+   "InhibKilled": "Inhib_TOrder_L1_P1_196971597_0",
+   "KillerName": "Player8"
+  },
+  {
+   "Assisters": [],
+   "EventID": 112,
+   "EventName": "ChampionKill",
+   "EventTime": 856.504638671875,
+   "KillerName": "Player4",
+   "VictimName": "Player6"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 113,
+   "EventName": "ChampionKill",
+   "EventTime": 856.60693359375,
+   "KillerName": "Player10",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9"
+   ],
+   "EventID": 114,
+   "EventName": "ChampionKill",
+   "EventTime": 857.8763427734375,
+   "KillerName": "Player8",
+   "VictimName": "Player1"
+  },
+  {
+   "Assisters": [
+    "Player6",
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 115,
+   "EventName": "ChampionKill",
+   "EventTime": 862.7286987304688,
+   "KillerName": "Player10",
+   "VictimName": "Player3"
+  },
+  {
+   "EventID": 116,
+   "EventName": "Multikill",
+   "EventTime": 862.7286987304688,
+   "KillStreak": 2,
+   "KillerName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 117,
+   "EventName": "ChampionKill",
+   "EventTime": 865.1038818359375,
+   "KillerName": "Player10",
+   "VictimName": "Player7"
+  },
+  {
+   "EventID": 118,
+   "EventName": "Multikill",
+   "EventTime": 865.1038818359375,
+   "KillStreak": 3,
+   "KillerName": "Player10"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 119,
+   "EventName": "ChampionKill",
+   "EventTime": 884.6358032226562,
+   "KillerName": "Player8",
+   "VictimName": "Player5"
+  },
+  {
+   "Acer": "Player8",
+   "AcingTeam": "CHAOS",
+   "EventID": 120,
+   "EventName": "Ace",
+   "EventTime": 884.6358032226562
+  },
+  {
+   "Assisters": [
+    "Player9"
+   ],
+   "EventID": 121,
+   "EventName": "TurretKilled",
+   "EventTime": 885.8353271484375,
+   "KillerName": "Player10",
+   "TurretKilled": "Turret_TOrder_L1_P5_1477396591_0"
+  },
+  {
+   "Assisters": [
+    "Player10",
+    "Player9"
+   ],
+   "EventID": 122,
+   "EventName": "TurretKilled",
+   "EventTime": 895.3687133789062,
+   "KillerName": "Player8",
+   "TurretKilled": "Turret_TOrder_L1_P4_2267177885_0"
+  },
+  {
+   "Assisters": [
+    "Player9"
+   ],
+   "EventID": 123,
+   "EventName": "ChampionKill",
+   "EventTime": 904.2503051757812,
+   "KillerName": "Player2",
+   "VictimName": "Player4"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player10",
+    "Player9"
+   ],
+   "EventID": 124,
+   "EventName": "ChampionKill",
+   "EventTime": 906.5892944335938,
+   "KillerName": "Player2",
+   "VictimName": "Player1"
+  },
+  {
+   "EventID": 125,
+   "EventName": "Multikill",
+   "EventTime": 906.5892944335938,
+   "KillStreak": 2,
+   "KillerName": "Player2"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9",
+    "Player2"
+   ],
+   "EventID": 126,
+   "EventName": "ChampionKill",
+   "EventTime": 907.8737182617188,
+   "KillerName": "Player10",
+   "VictimName": "Player7"
+  },
+  {
+   "Assisters": [
+    "Player8",
+    "Player9"
+   ],
+   "EventID": 127,
+   "EventName": "ChampionKill",
+   "EventTime": 910.3112182617188,
+   "KillerName": "Player2",
+   "VictimName": "Player3"
+  },
+  {
+   "EventID": 128,
+   "EventName": "Multikill",
+   "EventTime": 910.3112182617188,
+   "KillStreak": 3,
+   "KillerName": "Player2"
+  },
+  {
+   "Acer": "Player2",
+   "AcingTeam": "CHAOS",
+   "EventID": 129,
+   "EventName": "Ace",
+   "EventTime": 910.3112182617188
+  }
+ ]
+}
