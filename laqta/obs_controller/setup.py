@@ -13,13 +13,18 @@ from pathlib import Path
 
 import psutil
 
-from .client import Obs, ObsDown
+from .client import Obs, ObsDown, ObsError
 
 log = logging.getLogger(__name__)
 
 NAME = "Laqta"  # profile, scene collection and scene name
 CAPTURE = "Laqta Capture"
-WS_CONFIG = Path(os.environ.get("APPDATA", "")) / "obs-studio/plugin_config/obs-websocket/config.json"
+OBS_DATA = Path(os.environ.get("APPDATA", "")) / "obs-studio"
+WS_CONFIG = OBS_DATA / "plugin_config/obs-websocket/config.json"
+# OBS 33.0.1 crashed once in its browser component when profiles were switched back to back,
+# so every profile / scene-collection change is followed by a pause, and we avoid switching
+# at all in the normal case by launching OBS straight into the Laqta profile.
+SETTLE = 1.5
 
 
 class ObsBusy(Exception):
@@ -52,7 +57,10 @@ def launch_obs() -> None:
     if exe is None:
         raise ObsDown("OBS Studio is not installed")
     # OBS only finds its data files when started from its own folder.
-    subprocess.Popen([str(exe), "--minimize-to-tray", "--disable-shutdown-check"], cwd=exe.parent)
+    args = [str(exe), "--minimize-to-tray", "--disable-shutdown-check"]
+    if (OBS_DATA / "basic/profiles" / NAME).is_dir() and (OBS_DATA / "basic/scenes" / f"{NAME}.json").is_file():
+        args += ["--profile", NAME, "--collection", NAME]
+    subprocess.Popen(args, cwd=exe.parent)
 
 
 def connect(obs: Obs, wait: float = 40.0) -> None:
@@ -72,6 +80,19 @@ def connect(obs: Obs, wait: float = 40.0) -> None:
             time.sleep(1.0)
 
 
+def _replay_available(obs: Obs) -> bool:
+    try:
+        obs.call("GetReplayBufferStatus")
+        return True
+    except ObsError:
+        return False
+
+
+def _switch(obs: Obs, request: str, **data) -> None:
+    obs.call(request, **data)
+    time.sleep(SETTLE)
+
+
 def ensure_laqta(obs: Obs, record_dir: Path, replay_seconds: int = 30) -> None:
     """Idempotent: make sure the Laqta profile, scene collection, scene and capture source exist
     and are current, with the replay buffer enabled."""
@@ -82,35 +103,48 @@ def ensure_laqta(obs: Obs, record_dir: Path, replay_seconds: int = 30) -> None:
     profiles = obs.call("GetProfileList")
     previous = profiles["currentProfileName"]
     if NAME not in profiles["profiles"]:
-        obs.call("CreateProfile", profileName=NAME)
+        _switch(obs, "CreateProfile", profileName=NAME)
     elif previous != NAME:
-        obs.call("SetCurrentProfile", profileName=NAME)
+        _switch(obs, "SetCurrentProfile", profileName=NAME)
 
     wanted = {
         ("Output", "Mode"): "Simple",
-        ("SimpleOutput", "FilePath"): str(record_dir),
         ("SimpleOutput", "RecFormat2"): "mkv",  # stays playable if OBS or the PC dies
+        ("SimpleOutput", "RecQuality"): "Small",  # "High quality, medium file size"; default reuses stream settings
         ("SimpleOutput", "RecRB"): "true",
         ("SimpleOutput", "RecRBTime"): str(replay_seconds),
     }
-    changed = False
-    for (category, name), value in wanted.items():
-        current = obs.call("GetProfileParameter", parameterCategory=category, parameterName=name)
-        if current.get("parameterValue") != value:
-            obs.call("SetProfileParameter", parameterCategory=category, parameterName=name, parameterValue=value)
-            changed = True
-    if changed:
-        # OBS builds its outputs (incl. the replay buffer) when a profile loads, so reload ours.
-        other = next((p for p in [previous, *profiles["profiles"]] if p != NAME), None)
-        if other:
-            obs.call("SetCurrentProfile", profileName=other)
-            obs.call("SetCurrentProfile", profileName=NAME)
+    other = next((p for p in [previous, *profiles["profiles"]] if p != NAME), None)
+    # Verified on OBS 33: parameters set right after CreateProfile can be overwritten while the
+    # new profile settles, and the replay buffer only exists once the profile is *loaded* with
+    # RecRB=true. So: set, reload the profile, and check again until it sticks.
+    for _ in range(5):
+        changed = False
+        for (category, name), value in wanted.items():
+            current = obs.call("GetProfileParameter", parameterCategory=category, parameterName=name)
+            if current.get("parameterValue") != value:
+                obs.call("SetProfileParameter", parameterCategory=category, parameterName=name, parameterValue=value)
+                changed = True
+        if not changed and _replay_available(obs):
+            break
+        if other is None:
+            raise ObsError("ensure_laqta", 0, "restart OBS once to finish setting up the Laqta profile")
+        _switch(obs, "SetCurrentProfile", profileName=other)
+        _switch(obs, "SetCurrentProfile", profileName=NAME)
+    else:
+        raise ObsError("ensure_laqta", 0, "OBS did not keep the Laqta profile settings")
+
+    video = obs.call("GetVideoSettings")
+    full = {"outputWidth": video["baseWidth"], "outputHeight": video["baseHeight"], "fpsNumerator": 60, "fpsDenominator": 1}
+    if any(video[k] != v for k, v in full.items()):  # new profiles default to 720p30
+        obs.call("SetVideoSettings", **full)
+    obs.call("SetRecordDirectory", recordDirectory=str(record_dir))
 
     collections = obs.call("GetSceneCollectionList")
     if NAME not in collections["sceneCollections"]:
-        obs.call("CreateSceneCollection", sceneCollectionName=NAME)
+        _switch(obs, "CreateSceneCollection", sceneCollectionName=NAME)
     elif collections["currentSceneCollectionName"] != NAME:
-        obs.call("SetCurrentSceneCollection", sceneCollectionName=NAME)
+        _switch(obs, "SetCurrentSceneCollection", sceneCollectionName=NAME)
 
     if NAME not in [s["sceneName"] for s in obs.call("GetSceneList")["scenes"]]:
         obs.call("CreateScene", sceneName=NAME)

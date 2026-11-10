@@ -8,6 +8,11 @@ from laqta.obs_controller import client, setup
 from laqta.obs_controller.client import Obs, ObsDown, ObsError
 
 
+@pytest.fixture(autouse=True)
+def no_sleep(monkeypatch):
+    monkeypatch.setattr(setup.time, "sleep", lambda s: None)
+
+
 class FakeWs:
     def close(self):
         pass
@@ -80,9 +85,14 @@ def test_ws_settings(tmp_path: Path):
 class FakeObs:
     """Minimal in-memory OBS for ensure_laqta."""
 
-    def __init__(self, recording=False):
+    def __init__(self, recording=False, lose_first_sets=0):
         self.calls = []
         self.recording = recording
+        self.lose = lose_first_sets  # real OBS drops parameters set while a new profile settles
+        self.loaded_rb = False  # was RecRB true when the Laqta profile was last loaded?
+        self.video = {"baseWidth": 1920, "baseHeight": 1080, "outputWidth": 1280, "outputHeight": 720,
+                      "fpsNumerator": 30, "fpsDenominator": 1}
+        self.record_dir = None
         self.profiles, self.profile = ["Untitled"], "Untitled"
         self.params = {}
         self.collections, self.collection = ["Untitled"], "Untitled"
@@ -102,11 +112,26 @@ class FakeObs:
                 self.profile = d["profileName"]
             case "SetCurrentProfile":
                 self.profile = d["profileName"]
+                if self.profile == setup.NAME:
+                    self.loaded_rb = self.params.get(("SimpleOutput", "RecRB")) == "true"
             case "GetProfileParameter":
                 return {"parameterValue": self.params.get((d["parameterCategory"], d["parameterName"]))}
             case "SetProfileParameter":
                 assert self.profile == setup.NAME, "must never edit the user's own profile"
-                self.params[(d["parameterCategory"], d["parameterName"])] = d["parameterValue"]
+                if self.lose > 0:
+                    self.lose -= 1
+                else:
+                    self.params[(d["parameterCategory"], d["parameterName"])] = d["parameterValue"]
+            case "GetReplayBufferStatus":
+                if not self.loaded_rb:
+                    raise ObsError(request, 604, "Replay buffer is not available.")
+                return {"outputActive": False}
+            case "GetVideoSettings":
+                return dict(self.video)
+            case "SetVideoSettings":
+                self.video.update(d)
+            case "SetRecordDirectory":
+                self.record_dir = d["recordDirectory"]
             case "GetSceneCollectionList":
                 return {"currentSceneCollectionName": self.collection, "sceneCollections": list(self.collections)}
             case "CreateSceneCollection" | "SetCurrentSceneCollection":
@@ -131,10 +156,18 @@ def test_ensure_laqta_creates_everything_once(tmp_path):
     assert (fake.profile, fake.collection) == (setup.NAME, setup.NAME)
     assert fake.params[("SimpleOutput", "RecRB")] == "true"
     assert fake.scenes == [setup.NAME] and fake.inputs == [setup.CAPTURE]
+    assert fake.loaded_rb and fake.record_dir == str(tmp_path / "out")
+    assert (fake.video["outputHeight"], fake.video["fpsNumerator"]) == (1080, 60)
 
     fake.calls.clear()
     setup.ensure_laqta(fake, tmp_path / "out")  # second run changes nothing
-    assert not {"CreateProfile", "SetProfileParameter", "SetCurrentProfile", "CreateScene", "CreateInput"} & set(fake.calls)
+    assert not {"CreateProfile", "SetProfileParameter", "SetCurrentProfile", "SetVideoSettings", "CreateScene", "CreateInput"} & set(fake.calls)
+
+
+def test_ensure_laqta_survives_obs_dropping_settings_on_a_new_profile(tmp_path):
+    fake = FakeObs(lose_first_sets=4)  # what OBS 33 did on first run
+    setup.ensure_laqta(fake, tmp_path / "out")
+    assert fake.params[("SimpleOutput", "RecRB")] == "true" and fake.loaded_rb
 
 
 def test_ensure_laqta_refuses_to_take_over_a_live_recording(tmp_path):

@@ -118,8 +118,19 @@ Laqta creates and uses its own OBS **profile** and **scene collection**, and lea
 existing ones (`LOL`, `Untitled`, …) untouched. It refuses to take over if OBS is already
 streaming or recording.
 
-The replay buffer only exists if it was enabled when OBS built its outputs, which is why a
-dedicated profile with `SimpleOutput/RecRB=true` is needed **[verify, M1]**.
+Verified live on OBS 33.0.1 / obs-websocket 5.7.6 (M1):
+
+- The replay buffer only exists once the profile has been *loaded* with `SimpleOutput/RecRB=true`.
+  Setting the parameter is not enough; the profile must be reloaded (switch away and back).
+- Parameters set immediately after `CreateProfile` can be silently overwritten while the new
+  profile settles, so setup re-reads and repeats until they stick.
+- `SetRecordDirectory` takes effect for both the next recording and the replay buffer.
+- OBS crashed once (in its bundled browser component) when profiles were switched back to back.
+  Setup now pauses 1.5 s after every profile or collection change, and Laqta launches OBS with
+  `--profile Laqta --collection Laqta` so normal use involves no switching at all.
+- After a kill, OBS relaunches and Laqta reconnects. Whether OBS's "unclean shutdown" prompt
+  can block that unattended is **[verify]**: the log shows the prompt path ran despite
+  `--disable-shutdown-check`.
 
 Capture: Game Capture (`any_fullscreen`, `anti_cheat_hook` on) first. If frames stay black
 after a few seconds, fall back to Window Capture (WGC), then Display Capture **[verify, M1/M5]**.
