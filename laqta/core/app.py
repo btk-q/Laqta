@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..game_detector.detector import Detector, load_games
+from ..i18n import t
 from ..obs_controller import setup
 from ..obs_controller.capture import Capture
 from ..obs_controller.client import Obs, ObsDown, ObsError
@@ -23,15 +24,21 @@ log = logging.getLogger(__name__)
 
 POLL = 2.0  # seconds between process scans
 CAPTURE_CHECK = 4.0  # seconds between looks at the picture until it is confirmed not black
-ENABLE_WS = "Turn on OBS: Tools > WebSocket Server Settings > Enable WebSocket server"
 
 
 class Core(threading.Thread):
-    def __init__(self, cfg: dict, on_state: Callable[[dict], None], notify: Callable[[str], None]):
+    def __init__(
+        self,
+        cfg: dict,
+        on_state: Callable[[dict], None],
+        notify: Callable[[str], None],
+        on_prompt: Callable[[dict], None] = lambda app: None,  # an unknown fullscreen app appeared
+    ):
         super().__init__(name="laqta-core", daemon=True)
         self.inbox: queue.Queue[tuple] = queue.Queue()
-        self.on_state, self.notify = on_state, notify
-        self.detector = Detector(load_games(cfg["games"], cfg["default_mode"]))
+        self.cfg = cfg
+        self.on_state, self.notify, self.on_prompt = on_state, notify, on_prompt
+        self.detector = Detector(load_games(cfg["games"], cfg["default_mode"]), asked=cfg["asked"])
         self.obs = Obs(4455, "", on_event=lambda name, data: self.inbox.put(("obs", name, data)))
         self.recorder = Recorder(
             self.obs,
@@ -60,6 +67,10 @@ class Core(threading.Thread):
     def quit(self) -> None:
         self.inbox.put(("quit",))
 
+    def apply(self, cfg: dict) -> None:
+        """New settings from the UI. Takes effect for the next game (timings: the next clip)."""
+        self.inbox.put(("config", cfg))
+
     # Core thread ---------------------------------------------------------------
 
     def _connect(self) -> None:
@@ -69,9 +80,9 @@ class Core(threading.Thread):
             try:
                 port, password, enabled = setup.ws_settings()
             except (OSError, ValueError) as e:
-                raise ObsDown("Start OBS once, then: " + ENABLE_WS) from e
+                raise ObsDown(t("toast.obs_first_run")) from e
             if not enabled:
-                raise ObsDown(ENABLE_WS)
+                raise ObsDown(t("toast.enable_ws"))
             self.obs._conn.update(port=port, password=password)
             setup.connect(self.obs, wait=0)  # one attempt; the recorder retries every few seconds
         except ObsDown as e:
@@ -82,7 +93,7 @@ class Core(threading.Thread):
         self._obs_error = None
 
     def _prepare(self, game: dict) -> None:
-        setup.ensure_laqta(self.obs, clips.game_dir(game), self.recorder.replay_seconds)
+        setup.ensure_laqta(self.obs, clips.game_dir(game), self.recorder.replay_seconds, self.cfg["fps"], self.cfg["quality"])
         self.capture.start(game)
         self._capture_check_at = time.monotonic() + CAPTURE_CHECK
 
@@ -104,12 +115,12 @@ class Core(threading.Thread):
         # ponytail: trims on the core thread (stream copy, well under a second); move to a
         # worker if clips ever get long enough to delay the next save.
         clips.finish_clip(path, game, events, keep, pre)
-        self.notify(f"Clip saved: {path.name}")
+        self.notify(t("toast.clip_saved", name=path.name))
 
     def _on_recording(self, path: Path, game: dict, marks: list[GameEvent], start: float) -> None:
         if game["mode"] != "session":
             clips.write_sidecar(path, game, marks, start)
-        self.notify(f"Recording saved: {path.name}")
+        self.notify(t("toast.recording_saved", name=path.name))
 
     def _handle(self, kind: str, *args) -> None:
         rec = self.recorder
@@ -117,14 +128,20 @@ class Core(threading.Thread):
             ev = args[0]
             if ev.type == "manual":
                 if rec.state != "active":
-                    return self.notify("Clip hotkey: no game is being recorded")
+                    return self.notify(t("toast.no_game"))
                 if rec.game["mode"] == "session" or not (rec.recording or rec.game["mode"] == "events"):
-                    return self.notify("Clip hotkey does nothing in this mode right now")
+                    return self.notify(t("toast.hotkey_idle"))
                 if rec.game["mode"] != "events":
-                    self.notify("Moment marked")
+                    self.notify(t("toast.marked"))
             rec.event(ev)
         elif kind == "obs":
             rec.obs_event(*args)
+        elif kind == "config":
+            self.cfg = cfg = args[0]
+            self.detector.games = load_games(cfg["games"], cfg["default_mode"])
+            self.detector.asked |= {exe.lower() for exe in cfg["asked"]}
+            rec.pre, rec.post, rec.max_clip = cfg["pre_seconds"], cfg["post_seconds"], cfg["max_clip_seconds"]
+            rec.exit_debounce = cfg["exit_debounce_seconds"]
 
     def _start_game(self, game: dict) -> None:
         if game["mode"] == "match" and game.get("plugin") not in PLUGINS:
@@ -151,7 +168,7 @@ class Core(threading.Thread):
                 self.plugin = plugin
             except Exception as e:  # a broken plugin must not stop the recording itself
                 log.exception("plugin %s failed to start", cls.name)
-                self.notify(f"{game.get('name')}: event detection unavailable ({e})")
+                self.notify(t("toast.plugin_failed", game=game.get("name"), error=e))
 
     def run(self) -> None:
         next_poll = 0.0
@@ -174,8 +191,10 @@ class Core(threading.Thread):
                     change = self.detector.poll()
                     if change and change[0] == "game_started":
                         self._start_game(change[1])
-                    elif change:
+                    elif change and change[0] == "game_exited":
                         self.recorder.game_exited()
+                    elif change:
+                        self.on_prompt(change[1])
                 self.recorder.tick()
                 self._check_capture()
                 self._sync_plugin()

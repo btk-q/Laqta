@@ -1,4 +1,5 @@
-"""User settings: one hand-editable TOML file in %APPDATA%/Laqta."""
+"""User settings: one TOML file in %APPDATA%/Laqta, edited by the settings window
+(or by hand; unknown keys are kept)."""
 
 from __future__ import annotations
 
@@ -6,58 +7,59 @@ import os
 import tomllib
 from pathlib import Path
 
+import tomli_w
+
 from ..core.recorder import MODES
+from ..i18n import LANGUAGES
+from ..obs_controller.capture import KINDS
 
 DIR = Path(os.environ.get("APPDATA", Path.home())) / "Laqta"
 PATH = DIR / "config.toml"
+QUALITIES = ("Stream", "Small", "HQ")  # OBS simple-output recording quality presets
 
 DEFAULTS = {
+    "language": "en",
     "hotkey": "Ctrl+Alt+F9",
     "default_mode": "session",
     "pre_seconds": 15,
     "post_seconds": 5,
     "max_clip_seconds": 60,
     "exit_debounce_seconds": 10,
-    "games": [],
+    "fps": 60,
+    "quality": "Small",
+    "asked": [],  # fullscreen apps we already asked "is this a game?" about
+    "games": [],  # user games and overrides of built-in ones, matched by exe
 }
 
-TEMPLATE = """\
-# Laqta settings. Restart Laqta after editing.
 
-hotkey = "Ctrl+Alt+F9"        # "clip this": saves a clip in events mode, adds a mark in hybrid/match
-default_mode = "session"      # session = record while the game is open
-                              # hybrid  = session + mark events in a .json so clips can be cut later
-                              # match   = record each match separately (games with a plugin; others fall back to session)
-                              # events  = keep a replay buffer, save a clip on each event/hotkey
-pre_seconds = 15              # clip starts this long before the first event
-post_seconds = 5              # ...and ends this long after the last one
-max_clip_seconds = 60
-exit_debounce_seconds = 10    # wait this long after the game closes before stopping
+def _check(cfg: dict) -> dict:
+    def need(ok: bool, message: str) -> None:
+        if not ok:
+            raise ValueError(message)
 
-# Add your own games, or override a built-in one (matched by exe name):
-# [[games]]
-# exe = "MyGame.exe"
-# name = "My Game"
-# mode = "events"
-#
-# Hide a built-in game:
-# [[games]]
-# exe = "dota2.exe"
-# remove = true
-"""
+    need(cfg["language"] in LANGUAGES, f'language must be one of {", ".join(LANGUAGES)}')
+    need(cfg["default_mode"] in MODES, f'default_mode must be one of {", ".join(MODES)}, not {cfg["default_mode"]!r}')
+    need(cfg["quality"] in QUALITIES, f'quality must be one of {", ".join(QUALITIES)}')
+    need(cfg["fps"] in (30, 60, 120), "fps must be 30, 60 or 120")
+    for key in ("pre_seconds", "post_seconds", "max_clip_seconds", "exit_debounce_seconds"):
+        need(isinstance(cfg[key], (int, float)) and 0 <= cfg[key] <= 600, f"{key} must be between 0 and 600")
+    for game in cfg["games"]:
+        need("exe" in game, "every [[games]] entry needs an exe")
+        need(game.get("mode", "session") in MODES, f'{game["exe"]}: mode must be one of {", ".join(MODES)}')
+        need(game.get("capture") in (None, *KINDS), f'{game["exe"]}: capture must be one of {", ".join(KINDS)}')
+    return cfg
 
 
 def load(path: Path = PATH) -> dict:
     if not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(TEMPLATE, encoding="utf-8")
+        save(dict(DEFAULTS), path)
     with path.open("rb") as f:
-        cfg = {**DEFAULTS, **tomllib.load(f)}
-    if cfg["default_mode"] not in MODES:
-        raise ValueError(f'default_mode must be one of {", ".join(MODES)}, not {cfg["default_mode"]!r}')
-    for game in cfg["games"]:
-        if "exe" not in game:
-            raise ValueError("every [[games]] entry needs an exe")
-        if game.get("mode", "session") not in MODES:
-            raise ValueError(f'{game["exe"]}: mode must be one of {", ".join(MODES)}')
-    return cfg
+        return _check({**DEFAULTS, **tomllib.load(f)})
+
+
+def save(cfg: dict, path: Path = PATH) -> None:
+    _check({**DEFAULTS, **cfg})
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_bytes(tomli_w.dumps(cfg).encode("utf-8"))
+    os.replace(tmp, path)  # never leave a half-written settings file

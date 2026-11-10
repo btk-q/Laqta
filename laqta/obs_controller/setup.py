@@ -100,7 +100,7 @@ def _switch(obs: Obs, request: str, **data) -> None:
     time.sleep(SETTLE)
 
 
-def ensure_laqta(obs: Obs, record_dir: Path, replay_seconds: int = 30) -> None:
+def ensure_laqta(obs: Obs, record_dir: Path, replay_seconds: int = 30, fps: int = 60, quality: str = "Small") -> None:
     """Idempotent: make sure the Laqta profile, scene collection, scene and capture source exist
     and are current, with the replay buffer enabled."""
     if obs.call("GetRecordStatus")["outputActive"] or obs.call("GetStreamStatus")["outputActive"]:
@@ -117,7 +117,7 @@ def ensure_laqta(obs: Obs, record_dir: Path, replay_seconds: int = 30) -> None:
     wanted = {
         ("Output", "Mode"): "Simple",
         ("SimpleOutput", "RecFormat2"): "mkv",  # stays playable if OBS or the PC dies
-        ("SimpleOutput", "RecQuality"): "Small",  # "High quality, medium file size"; default reuses stream settings
+        ("SimpleOutput", "RecQuality"): quality,  # the profile default reuses stream settings
         ("SimpleOutput", "RecRB"): "true",
         ("SimpleOutput", "RecRBTime"): str(replay_seconds),
     }
@@ -148,7 +148,7 @@ def ensure_laqta(obs: Obs, record_dir: Path, replay_seconds: int = 30) -> None:
     primary = next((m for m in monitors if (m["monitorPositionX"], m["monitorPositionY"]) == (0, 0)), monitors[0])
     width, height = min(primary["monitorWidth"], 4096), min(primary["monitorHeight"], 4096)  # OBS's limit
     full = {"baseWidth": width, "baseHeight": height, "outputWidth": width, "outputHeight": height,
-            "fpsNumerator": 60, "fpsDenominator": 1}
+            "fpsNumerator": fps, "fpsDenominator": 1}
     video = obs.call("GetVideoSettings")
     if any(video[k] != v for k, v in full.items()):
         obs.call("SetVideoSettings", **full)

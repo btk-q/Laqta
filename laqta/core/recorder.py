@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
+from ..i18n import t
 from ..obs_controller.client import ObsDown, ObsError
 from ..obs_controller.setup import ObsBusy
 from .events import GameEvent
@@ -170,7 +171,7 @@ class Recorder:
         now = self.clock()
         if self._save_timeout is not None and now >= self._save_timeout:
             self._pending = self._save_timeout = None
-            self.notify("OBS did not save the clip")
+            self.notify(t("toast.clip_timeout"))
             if self.game is None:
                 self.obs.call("StopReplayBuffer")
         if self.game is None:
@@ -268,7 +269,7 @@ class Recorder:
 
     def _down(self) -> None:
         if self._window or self._pending:
-            self.notify("Clip lost: OBS went away")
+            self.notify(t("toast.clip_lost"))
         self._window = self._pending = self._save_timeout = None
         if self.game is not None:
             self._interrupted = self._interrupted or self.ready

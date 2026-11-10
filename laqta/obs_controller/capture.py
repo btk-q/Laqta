@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 from typing import Callable
 
+from ..i18n import t
 from .client import Obs, ObsError
 
 log = logging.getLogger(__name__)
@@ -129,7 +130,7 @@ class Capture:
         if self._blank < BLANK_CHECKS:
             return True
         if self.kind == KINDS[-1]:
-            self.notify(f"{self.game.get('name')}: the recording is black and no capture method worked")
+            self.notify(t("toast.black", game=self.game.get("name")))
             return False
         self.kind, self._blank = KINDS[KINDS.index(self.kind) + 1], 0
         log.warning("black picture, switching %s to %s", self.game["exe"], self.kind)
