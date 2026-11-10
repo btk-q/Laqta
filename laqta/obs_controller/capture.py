@@ -19,6 +19,7 @@ from .client import Obs, ObsError
 log = logging.getLogger(__name__)
 
 KINDS = ("game_capture", "window_capture", "monitor_capture")
+AUDIO = "Laqta desktop audio"
 BLANK_CHECKS = 2  # consecutive black screenshots before stepping down
 MATCH_EXE = 2  # OBS window "priority": match by executable
 
@@ -28,23 +29,25 @@ def source(kind: str) -> str:
 
 
 def ensure_inputs(obs: Obs, scene: str) -> None:
-    """One (disabled) input per capture kind, scaled to fill the canvas."""
+    """One (disabled) input per capture kind, scaled to fill the canvas, plus desktop audio.
+    A new scene collection has no audio source at all, so without this recordings are silent."""
     existing = {i["inputName"] for i in obs.call("GetInputList")["inputs"]}
     video = obs.call("GetVideoSettings")
+    fill = {"boundsType": "OBS_BOUNDS_SCALE_INNER", "boundsWidth": video["baseWidth"], "boundsHeight": video["baseHeight"]}
     for kind in KINDS:
         if source(kind) in existing:
-            continue
-        item = obs.call("CreateInput", sceneName=scene, inputName=source(kind), inputKind=kind, sceneItemEnabled=False)
-        obs.call(
-            "SetSceneItemTransform",
-            sceneName=scene,
-            sceneItemId=item["sceneItemId"],
-            sceneItemTransform={
-                "boundsType": "OBS_BOUNDS_SCALE_INNER",
-                "boundsWidth": video["baseWidth"],
-                "boundsHeight": video["baseHeight"],
-            },
-        )
+            item = obs.call("GetSceneItemId", sceneName=scene, sourceName=source(kind))["sceneItemId"]
+            current = obs.call("GetSceneItemTransform", sceneName=scene, sceneItemId=item)["sceneItemTransform"]
+            if all(current.get(k) == v for k, v in fill.items()):
+                continue  # canvas size unchanged
+        else:
+            item = obs.call("CreateInput", sceneName=scene, inputName=source(kind), inputKind=kind, sceneItemEnabled=False)["sceneItemId"]
+        obs.call("SetSceneItemTransform", sceneName=scene, sceneItemId=item, sceneItemTransform=fill)
+    if AUDIO not in existing:
+        # ponytail: everything the default output device plays (game, voice chat, music).
+        # Per-game audio (wasapi_process_output_capture) and microphone are settings for M6.
+        obs.call("CreateInput", sceneName=scene, inputName=AUDIO, inputKind="wasapi_output_capture",
+                 inputSettings={"device_id": "default"})
 
 
 def find_window(obs: Obs, exe: str) -> str | None:

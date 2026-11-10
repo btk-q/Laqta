@@ -93,6 +93,7 @@ class FakeObs:
         self.video = {"baseWidth": 1920, "baseHeight": 1080, "outputWidth": 1280, "outputHeight": 720,
                       "fpsNumerator": 30, "fpsDenominator": 1}
         self.record_dir = None
+        self.transforms = {}
         self.profiles, self.profile = ["Untitled"], "Untitled"
         self.params = {}
         self.collections, self.collection = ["Untitled"], "Untitled"
@@ -146,9 +147,18 @@ class FakeObs:
             case "GetInputList":
                 return {"inputs": [{"inputName": i} for i in self.inputs]}
             case "CreateInput":
-                assert d["sceneItemEnabled"] is False
                 self.inputs.append(d["inputName"])
                 return {"sceneItemId": len(self.inputs)}
+            case "GetMonitorList":
+                return {"monitors": [
+                    {"monitorWidth": 1080, "monitorHeight": 1920, "monitorPositionX": -1080, "monitorPositionY": -480},
+                    {"monitorWidth": 3440, "monitorHeight": 1440, "monitorPositionX": 0, "monitorPositionY": 0}]}
+            case "GetSceneItemId":
+                return {"sceneItemId": self.inputs.index(d["sourceName"]) + 1}
+            case "GetSceneItemTransform":
+                return {"sceneItemTransform": self.transforms.get(d["sceneItemId"], {})}
+            case "SetSceneItemTransform":
+                self.transforms[d["sceneItemId"]] = d["sceneItemTransform"]
         return {}
 
 
@@ -157,13 +167,14 @@ def test_ensure_laqta_creates_everything_once(tmp_path):
     setup.ensure_laqta(fake, tmp_path / "out")
     assert (fake.profile, fake.collection) == (setup.NAME, setup.NAME)
     assert fake.params[("SimpleOutput", "RecRB")] == "true"
-    assert fake.scenes == [setup.NAME] and fake.inputs == ["Laqta game_capture", "Laqta window_capture", "Laqta monitor_capture"]
+    assert fake.scenes == [setup.NAME] and fake.inputs == ["Laqta game_capture", "Laqta window_capture", "Laqta monitor_capture", "Laqta desktop audio"]
     assert fake.loaded_rb and fake.record_dir == str(tmp_path / "out")
-    assert (fake.video["outputHeight"], fake.video["fpsNumerator"]) == (1080, 60)
+    assert (fake.video["baseWidth"], fake.video["outputHeight"], fake.video["fpsNumerator"]) == (3440, 1440, 60)  # primary monitor
+    assert fake.transforms[1]["boundsWidth"] == 3440
 
     fake.calls.clear()
     setup.ensure_laqta(fake, tmp_path / "out")  # second run changes nothing
-    assert not {"CreateProfile", "SetProfileParameter", "SetCurrentProfile", "SetVideoSettings", "CreateScene", "CreateInput"} & set(fake.calls)
+    assert not {"CreateProfile", "SetProfileParameter", "SetCurrentProfile", "SetVideoSettings", "CreateScene", "CreateInput", "SetSceneItemTransform"} & set(fake.calls)
 
 
 def test_ensure_laqta_survives_obs_dropping_settings_on_a_new_profile(tmp_path):

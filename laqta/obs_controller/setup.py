@@ -141,9 +141,16 @@ def ensure_laqta(obs: Obs, record_dir: Path, replay_seconds: int = 30) -> None:
     else:
         raise ObsError("ensure_laqta", 0, "OBS did not keep the Laqta profile settings")
 
+    # Record at the monitor's own size: a new profile defaults to a 1920x1080 canvas scaled to
+    # 720p30, which letterboxes and blurs an ultrawide game.
+    # ponytail: uses the primary monitor; follow the game's monitor when someone plays on another.
+    monitors = obs.call("GetMonitorList")["monitors"]
+    primary = next((m for m in monitors if (m["monitorPositionX"], m["monitorPositionY"]) == (0, 0)), monitors[0])
+    width, height = min(primary["monitorWidth"], 4096), min(primary["monitorHeight"], 4096)  # OBS's limit
+    full = {"baseWidth": width, "baseHeight": height, "outputWidth": width, "outputHeight": height,
+            "fpsNumerator": 60, "fpsDenominator": 1}
     video = obs.call("GetVideoSettings")
-    full = {"outputWidth": video["baseWidth"], "outputHeight": video["baseHeight"], "fpsNumerator": 60, "fpsDenominator": 1}
-    if any(video[k] != v for k, v in full.items()):  # new profiles default to 720p30
+    if any(video[k] != v for k, v in full.items()):
         obs.call("SetVideoSettings", **full)
     obs.call("SetRecordDirectory", recordDirectory=str(record_dir))
 
