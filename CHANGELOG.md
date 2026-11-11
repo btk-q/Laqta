@@ -2,6 +2,12 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## 0.3.1
+
+### Fixed
+- The command-line updater (`Laqta.exe update`) stopped with an error when the patch notes
+  contained a character the console could not show. The update window was not affected.
+
 ## 0.3.0
 
 **Laqta now updates itself.** When a new version is out, Laqta shows these notes at start and

@@ -217,6 +217,9 @@ def main(argv: list[str] | None = None) -> int:
     diag = sub.add_parser("diagnose", help="check that everything Laqta needs is in place and save a diagnostic zip")
     diag.add_argument("--out", help="where to write the zip (default: the current folder)")
     args = parser.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):  # a console that cannot show a character must not crash a command
+        if stream is not None and hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     fmt = "%(asctime)s %(levelname)s %(name)s %(message)s"
     if args.command == "obs-check":
         logging.basicConfig(level=logging.INFO, format=fmt)
