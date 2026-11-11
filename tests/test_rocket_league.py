@@ -185,3 +185,9 @@ def test_a_rocket_league_recording_is_summarised_in_goals_not_kills(tmp_path):
     events = [{"type": x, "offset": 1.0} for x in ("match_start", "goal", "goal", "assist", "save", "win", "match_end")]
     clip = Clip(Path("a.mkv"), "Rocket League", 0.0, 1, "recording", events, 330.0, [], False)
     assert summary(clip)["goals"] == 2 and "Goals 2, assists 1, saves 1" in summary_text(clip) and "Victory" in summary_text(clip)
+
+
+def test_a_short_typed_name_does_not_match_inside_another_players_id():
+    """Review finding: the name "a" or "steam" matched every player whose id contained it."""
+    for name in ("a", "steam", "epic", "0", "7656"):
+        assert run(Tracker(name=name), STATE, goal(ME), goal(MATE), goal(RIVAL)) == [["match_start"], [], [], []], name

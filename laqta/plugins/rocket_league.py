@@ -79,9 +79,11 @@ class Tracker:
         self.in_match = self.ended = False
 
     def _is_me(self, player: dict) -> bool:
+        parts = str(player.get("PrimaryId", "")).split("|")  # "Steam|7656...|0"
         if self.name:  # a name typed by the user wins: it also covers Epic accounts
-            return str(player.get("Name", "")).strip().casefold() == self.name or self.name in str(player.get("PrimaryId", "")).casefold()
-        return any(part in self.ids for part in str(player.get("PrimaryId", "")).split("|"))
+            # Whole name or whole id only: a short name must not match inside someone else's id.
+            return self.name in (str(player.get("Name", "")).strip().casefold(), *(part.casefold() for part in parts[1:2]))  # the account id, not the platform or split-screen slot
+        return any(part in self.ids for part in parts)
 
     def _mine(self, who) -> bool:
         """Goal and stat messages name a player by name and team only."""

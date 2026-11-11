@@ -82,3 +82,17 @@ def test_a_recording_that_survived_an_obs_blip_is_still_stopped_when_the_disk_is
     assert rig.rec.recording and rig.obs.count("StopRecord") == 0
     rig.at(16)
     assert rig.obs.count("StopRecord") == 1 and len(rig.recordings) == 1 and rig.rec.state == "low_disk"
+
+
+def test_the_replay_buffer_is_not_left_running_after_a_low_disk_stop_with_a_clip_in_flight():
+    """Review finding: the buffer stayed on (to finish the save), then nothing ever stopped it."""
+    rig = rig_with(50, mode="events")
+    rig.ev(4)
+    rig.free = 1 * GB
+    rig.at(6)  # low disk: the open clip is saved first, so the buffer must outlive this moment
+    assert rig.obs.count("SaveReplayBuffer") == 1 and rig.obs.count("StopReplayBuffer") == 0
+    rig.rec.obs_event("ReplayBufferSaved", {"savedReplayPath": "C:/v/Replay.mkv"})
+    assert rig.obs.count("StopReplayBuffer") == 1 and len(rig.clips) == 1
+    rig.rec.game_exited()
+    rig.at(20)
+    assert rig.rec.state == "idle" and rig.obs.active["GetReplayBufferStatus"] is False

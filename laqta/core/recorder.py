@@ -169,7 +169,7 @@ class Recorder:
         if name == "ReplayBufferSaved" and self._pending:
             (game, events, keep, pre), self._pending, self._save_timeout = self._pending, None, None
             self.on_clip(Path(data["savedReplayPath"]), game, events, keep, pre)
-            if self.game is None:
+            if self.game is None or self._low_disk:  # the buffer was only kept running for this save
                 self.obs.call("StopReplayBuffer")
         elif name == "ExitStarted":
             self._down()
@@ -180,7 +180,7 @@ class Recorder:
         if self._save_timeout is not None and now >= self._save_timeout:
             self._pending = self._save_timeout = None
             self.notify(t("toast.clip_timeout"))
-            if self.game is None:
+            if self.game is None or self._low_disk:
                 self.obs.call("StopReplayBuffer")
         if self.game is None:
             return
