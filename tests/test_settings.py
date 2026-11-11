@@ -60,3 +60,17 @@ def test_every_string_exists_in_every_language_with_the_same_placeholders():
         assert len(row) == len(i18n.LANGUAGES) and all(row), key
         assert len({tuple(sorted(re.findall(r"{(\w+)}", text))) for text in row}) == 1, key
     assert i18n.t("no.such.key") == "no.such.key"
+
+
+def test_add_a_game_offers_installed_games_then_running_programs_without_known_ones_or_system_programs():
+    from laqta.ui.settings import addable_games
+
+    installed = [{"exe": "Hades2.exe", "name": "Hades II"}, {"exe": "cs2.exe", "name": "Counter-Strike 2"}]
+    running = ["Hades2.exe", "MyIndieGame.exe", "explorer.exe", "CS2.EXE", "notes.txt", "MyIndieGame.exe"]
+    offered = addable_games({"cs2.exe"}, installed, running)
+    assert offered == [{"exe": "Hades2.exe", "name": "Hades II", "where": "installed"},
+                       {"exe": "MyIndieGame.exe", "name": "MyIndieGame", "where": "running"}]
+
+
+def test_deadlock_is_a_built_in_game():
+    assert "deadlock.exe" in builtin_exes()

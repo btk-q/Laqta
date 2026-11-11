@@ -146,6 +146,17 @@ Everything here is off until you turn it on, in **Settings → Sharing**.
   removed and your user folder is written as `%USERPROFILE%`; no recordings go in, but the
   names of games Laqta recorded do. Nothing is sent anywhere.
 
+### Adding a game
+
+**Settings → Games → Add a game…** opens a searchable list of the games installed on this PC
+(from your Steam, Epic and GOG libraries) and the programs running right now. Select one or
+more and add them; "Browse for a program…" covers anything else. The list is built from your
+own PC; nothing is looked up online. Deadlock is in the built-in list (recording and hotkeys;
+it has no event detection, because the game offers no official data feed).
+
+Each game's page shows the recording mode as three choices and, for games with event
+detection, one tile per event with its symbol: switch off the ones you do not want marked.
+
 ### Sound
 
 Recordings carry separate audio tracks: **1** is everything you hear, **2** is the game, **3** is

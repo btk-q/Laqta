@@ -5,10 +5,10 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeySequence
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QIcon, QKeySequence
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QColorDialog, QComboBox, QDialog, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QKeySequenceEdit, QLabel, QLineEdit,
+    QApplication, QButtonGroup, QCheckBox, QGridLayout, QColorDialog, QComboBox, QDialog, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QKeySequenceEdit, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )  # fmt: skip
 
@@ -22,7 +22,7 @@ from ..obs_controller.capture import KINDS
 from ..plugins import PLUGINS
 from ..storage import autostart, clips, config
 from ..storage.clips import usable_folder
-from . import theme
+from . import icons, theme
 
 # -- config edits (no Qt: unit-tested) ------------------------------------------------
 
@@ -79,39 +79,116 @@ def _spin(value: int, low: int, high: int) -> QSpinBox:
     return spin
 
 
-class PickRunningApp(QDialog):
+def addable_games(known: set[str], installed: list[dict], running: list[str]) -> list[dict]:
+    """What the "Add a game" window offers: installed games first, then other programs running
+    right now, without anything already in the list or anything that is clearly not a game."""
+    offered: dict[str, dict] = {}
+    for game in installed:
+        key = game["exe"].lower()
+        if key not in known and key not in offered:
+            offered[key] = {"exe": game["exe"], "name": game["name"], "where": "installed"}
+    for exe in sorted(set(running), key=str.lower):
+        key = exe.lower()
+        if key.endswith(".exe") and key not in known and key not in offered and key not in NOT_GAMES:
+            offered[key] = {"exe": exe, "name": Path(exe).stem, "where": "running"}
+    return list(offered.values())
+
+
+class AddGameDialog(QDialog):
+    """Search the games installed on this PC (Steam, Epic, GOG) and the programs running now,
+    and add any of them. Nothing is looked up online: the list is this PC's own."""
+
     def __init__(self, parent: QWidget, known: set[str]):
         super().__init__(parent)
-        self.setWindowTitle(t("games.pick_title"))
-        self.resize(380, 460)
+        self.setWindowTitle(t("games.add_title"))
+        self.resize(460, 560)
         layout = QVBoxLayout(self)
-        layout.addWidget(_label(t("games.pick_hint"), "hint"))
+        layout.setContentsMargins(20, 18, 20, 16)
+        layout.setSpacing(10)
         self.filter = QLineEdit()
+        self.filter.setPlaceholderText(t("games.search"))
         self.filter.setClearButtonEnabled(True)
         self.list = QListWidget()
-        names = sorted({n for n in processes().values() if n.lower() not in known | NOT_GAMES and n.lower().endswith(".exe")}, key=str.lower)
-        self.list.addItems(names)
+        self.list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.setCursor(Qt.CursorShape.WaitCursor)
+        try:  # ponytail: scanned on the UI thread, about a second; a worker thread if big libraries stall it
+            installed = library_scan.scan(known)
+        finally:
+            self.unsetCursor()
+        section = None
+        for game in addable_games(known, installed, list(processes().values())):
+            if game["where"] != section:
+                section = game["where"]
+                head = QListWidgetItem(t(f"games.{section}"))
+                head.setFlags(Qt.ItemFlag.NoItemFlags)  # a heading, not a choice
+                bold = head.font()
+                bold.setBold(True)
+                head.setFont(bold)
+                self.list.addItem(head)
+            item = QListWidgetItem(game["name"] if game["where"] == "running" else f"{game['name']}   ({game['exe']})")
+            item.setData(Qt.ItemDataRole.UserRole, game)
+            self.list.addItem(item)
+        self.note = _label(t("games.add_hint") if self.list.count() else t("games.add_none"), "hint")
         self.filter.textChanged.connect(self._apply_filter)
         self.list.itemDoubleClicked.connect(lambda _: self.accept())
-        add, cancel = QPushButton(t("button.add")), QPushButton(t("button.cancel"))
+        browse, add, cancel = QPushButton(t("games.browse")), QPushButton(t("button.add")), QPushButton(t("button.cancel"))
         add.setObjectName("primary")
+        add.setDefault(True)
         add.clicked.connect(self.accept)
         cancel.clicked.connect(self.reject)
+        browse.clicked.connect(self._browse)
+        self.browsed: dict | None = None
         buttons = QHBoxLayout()
+        buttons.setSpacing(10)
+        buttons.addWidget(browse)
         buttons.addStretch(1)
         buttons.addWidget(cancel)
         buttons.addWidget(add)
         layout.addWidget(self.filter)
         layout.addWidget(self.list, 1)
+        layout.addWidget(self.note)
         layout.addLayout(buttons)
+        self.filter.setFocus()
 
     def _apply_filter(self, text: str) -> None:
+        text = text.strip().lower()
         for i in range(self.list.count()):
-            self.list.item(i).setHidden(text.lower() not in self.list.item(i).text().lower())
+            item = self.list.item(i)
+            game = item.data(Qt.ItemDataRole.UserRole)
+            # Headings stay while searching is off; a search shows matches only.
+            item.setHidden(bool(text) and (game is None or text not in f"{game['name']} {game['exe']}".lower()))
 
-    def chosen(self) -> str | None:
-        item = self.list.currentItem()
-        return item.text() if item and not item.isHidden() else None
+    def _browse(self) -> None:
+        chosen, _ = QFileDialog.getOpenFileName(self, t("games.browse"), "", "Programs (*.exe)")
+        if chosen:
+            self.browsed = {"exe": Path(chosen).name, "name": Path(chosen).stem}
+            self.accept()
+
+    def chosen(self) -> list[dict]:
+        if self.browsed:
+            return [self.browsed]
+        return [item.data(Qt.ItemDataRole.UserRole) for item in self.list.selectedItems() if not item.isHidden() and item.data(Qt.ItemDataRole.UserRole)]
+
+
+class Tile(QPushButton):
+    """A choice shown as a block with a title and a line of explanation; checked = chosen."""
+
+    def __init__(self, title: str, hint: str = ""):
+        super().__init__()
+        self.setObjectName("tile")
+        self.setCheckable(True)
+        self.setAccessibleName(title)
+        self.setAccessibleDescription(hint)
+        inside = QVBoxLayout(self)
+        inside.setContentsMargins(12, 9, 12, 9)
+        inside.setSpacing(2)
+        for text, name in ((title, "tileTitle"), (hint, "tileHint")):
+            if text:
+                label = _label(text, name)
+                label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+                inside.addWidget(label)
+        inside.addStretch(1)
+        self.setMinimumHeight(78 if hint else 40)
 
 
 class SettingsWindow(QDialog):
@@ -125,7 +202,8 @@ class SettingsWindow(QDialog):
 
         self.rail = QListWidget()
         self.rail.setObjectName("rail")
-        self.rail.setFixedWidth(170)
+        self.rail.setFixedWidth(196)
+        self.rail.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.pages = QStackedWidget()
         for key, page in (("nav.general", self._general()), ("nav.games", self._games()), ("nav.recording", self._recording()),
                           ("nav.audio", self._audio()), ("nav.appearance", self._appearance()), ("nav.sharing", self._sharing()), ("nav.health", self._health())):
@@ -490,14 +568,13 @@ class SettingsWindow(QDialog):
         self.game_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.game_list.setTextElideMode(Qt.TextElideMode.ElideMiddle)
         self.game_list.currentItemChanged.connect(lambda *_: self._show_game())
-        scan, add = QPushButton(t("games.scan")), QPushButton(t("games.add"))
-        scan.clicked.connect(self._scan)
-        add.clicked.connect(self._add_running)
+        add = QPushButton(t("games.add_title"))
+        add.setObjectName("primary")
+        add.clicked.connect(self._add_game)
         self.scan_result = _label("", "hint")
         left = QVBoxLayout()
+        left.addWidget(add)  # above the list: below it, it fell off the bottom of a short window
         left.addWidget(self.game_list, 1)
-        left.addWidget(scan)
-        left.addWidget(add)
         left.addWidget(self.scan_result)
 
         self.detail = QVBoxLayout()
@@ -550,21 +627,26 @@ class SettingsWindow(QDialog):
         self.detail.addWidget(_label(game.get("name") or exe, "gameName"))
         self.detail.addWidget(_label(exe, "muted"))
 
-        mode = _combo([(t(f"mode.{m}"), m) for m in MODES], game["mode"])
-        mode_help = _label(t(f"mode.{game['mode']}.help"), "hint")
+        tiles = QGridLayout()
+        tiles.setSpacing(8)
+        group = QButtonGroup(self.detail)
+        for i, m in enumerate(("session", "match", "events")):
+            tile = Tile(t(f"mode.{m}"), t(f"mode.{m}.help"))
+            tile.setChecked(m == ("session" if game["mode"] == "hybrid" else game["mode"]))  # hybrid is session under an old name
+            tile.clicked.connect(lambda _=False, chosen=m: set_game(self.cfg, exe, mode=chosen))
+            group.addButton(tile)
+            tiles.addWidget(tile, i, 0)  # full width: the explanations need the room
+        modes = QWidget()
+        modes.setObjectName("page")
+        modes.setLayout(tiles)
+        self.detail.addWidget(_label(t("games.mode"), "muted"))
+        self.detail.addWidget(modes)
         capture = _combo([(t("capture.auto"), None)] + [(t(f"capture.{k}"), k) for k in KINDS], game.get("capture"))
 
-        def on_mode() -> None:
-            set_game(self.cfg, exe, mode=mode.currentData())
-            mode_help.setText(t(f"mode.{mode.currentData()}.help"))
-
-        mode.currentIndexChanged.connect(on_mode)
         capture.currentIndexChanged.connect(lambda: set_game(self.cfg, exe, capture=capture.currentData()))
         form = QFormLayout()
         form.setVerticalSpacing(10)
         form.setHorizontalSpacing(16)
-        form.addRow(t("games.mode"), mode)
-        form.addRow("", mode_help)
         form.addRow(t("games.capture"), capture)
         game_audio = QCheckBox(t("games.game_audio"))
         game_audio.setChecked(bool(game.get("game_audio_only")))
@@ -612,23 +694,24 @@ class SettingsWindow(QDialog):
                 self.detail.addWidget(_label(t("games.player_hint"), "hint"))
             self.detail.addWidget(_label(t("games.events"), "muted"))
             disabled = set(game.get("disabled_events", ()))
-            boxes: dict[str, QCheckBox] = {}
+            boxes: dict[str, QPushButton] = {}
 
             def on_toggle() -> None:
                 set_game(self.cfg, exe, disabled_events=[e for e, b in boxes.items() if not b.isChecked()])
 
-            grid = QHBoxLayout()
-            columns = [QVBoxLayout(), QVBoxLayout()]
+            grid = QGridLayout()
+            grid.setSpacing(8)
             events = [e for e in plugin.event_types if e not in BOUNDARIES]
             for i, event in enumerate(events):
-                box = QCheckBox(t(f"event.{event}"))
+                box = QPushButton(t(f"event.{event}"))
+                box.setObjectName("tile")
+                box.setCheckable(True)
+                box.setIcon(QIcon(icons.pixmap(event, 18)))
+                box.setIconSize(QSize(18, 18))
                 box.setChecked(event not in disabled)
                 box.toggled.connect(on_toggle)
                 boxes[event] = box
-                columns[i * 2 // max(1, len(events))].addWidget(box)
-            for column in columns:
-                column.addStretch(1)
-                grid.addLayout(column)
+                grid.addWidget(box, i // 2, i % 2)
             holder = QWidget()
             holder.setObjectName("page")
             holder.setLayout(grid)
@@ -645,24 +728,13 @@ class SettingsWindow(QDialog):
         bottom.setLayout(row)
         self.detail.addWidget(bottom)
 
-    def _scan(self) -> None:
-        # ponytail: runs on the UI thread (about a second here); move to a worker thread if
-        # big libraries on slow disks make the window stall.
-        self.setCursor(Qt.CursorShape.WaitCursor)
-        try:
-            found = library_scan.scan(set(self._effective()))
-        finally:
-            self.unsetCursor()
-        for game in found:
-            set_game(self.cfg, game["exe"], name=game["name"])
-        self.scan_result.setText(t("games.scan_done", count=len(found)))
-        self._fill_games(found[0]["exe"] if found else None)
-
-    def _add_running(self) -> None:
-        dialog = PickRunningApp(self, set(self._effective()))
-        if dialog.exec() and (exe := dialog.chosen()):
-            set_game(self.cfg, exe, name=Path(exe).stem)
-            self._fill_games(exe)
+    def _add_game(self) -> None:
+        dialog = AddGameDialog(self, set(self._effective()))
+        if dialog.exec() and (games := dialog.chosen()):
+            for game in games:
+                set_game(self.cfg, game["exe"], name=game["name"])
+            self.scan_result.setText(t("games.added", count=len(games)))
+            self._fill_games(games[0]["exe"])
 
     # -- Save ------------------------------------------------------------------
 

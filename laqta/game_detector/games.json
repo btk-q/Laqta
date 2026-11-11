@@ -3,6 +3,7 @@
   {"exe": "League of Legends.exe", "name": "League of Legends", "plugin": "lol"},
   {"exe": "VALORANT-Win64-Shipping.exe", "name": "Valorant", "plugin": "valorant"},
   {"exe": "dota2.exe", "name": "Dota 2"},
+  {"exe": "deadlock.exe", "name": "Deadlock"},
   {"exe": "RocketLeague.exe", "name": "Rocket League", "plugin": "rocket_league"},
   {"exe": "r5apex.exe", "name": "Apex Legends"},
   {"exe": "r5apex_dx12.exe", "name": "Apex Legends"},

@@ -144,6 +144,10 @@ QLabel#badge_bad {{ color: {STATUS['bad']}; }}
 QLabel#checkTitle {{ font-weight: 600; }}
 QLabel#toast {{ background: {c['panel']}; border: 1px solid {c['accent']}; padding: 12px 16px; font-size: 14px; }}
 QTextBrowser {{ background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 6px; padding: 8px; }}
+QPushButton#tile {{ text-align: left; padding: 9px 12px; }}
+QPushButton#tile:checked {{ background: {c['accent_dim']}; border: 1px solid {c['accent']}; }}
+QLabel#tileTitle {{ font-weight: 600; font-size: 14px; background: transparent; }}
+QLabel#tileHint {{ color: {c['muted']}; font-size: 12px; background: transparent; }}
 QLabel#preview {{ background: #000000; border-radius: 6px; }}
 QStackedWidget#detail QLabel#preview {{ background: transparent; }}
 QProgressBar {{ background: {c['panel']}; border: none; border-radius: 4px; }}

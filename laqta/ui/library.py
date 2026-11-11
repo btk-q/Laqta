@@ -196,7 +196,13 @@ class Card(QStyledItemDelegate):
         painter.setFont(sub)
         painter.setPen(QColor(c["muted"]))
         line.translate(0, 20)
-        about = when_text(clip.when) if clip.kind == "clip" or not clip.size else f"{when_text(clip.when)}   {size_text(clip.size)}"
+        stats = library.summary(clip)
+        if stats and (stats["kills"] or stats["deaths"] or stats["assists"]) and "goals" not in stats:
+            about = f"{when_text(clip.when)}   {t('card.kda', kills=stats['kills'], deaths=stats['deaths'], assists=stats['assists'])}"
+        elif clip.kind == "clip" or not clip.size:
+            about = when_text(clip.when)
+        else:
+            about = f"{when_text(clip.when)}   {size_text(clip.size)}"
         painter.drawText(line, lead | Qt.AlignmentFlag.AlignVCenter, about)
 
         # what happened, as small tags from the leading edge
@@ -533,7 +539,9 @@ class LibraryWindow(QDialog):
                 shown, total = shown + 1, total + clip.size
             elif item.isSelected():
                 item.setSelected(False)
-        self.count.setText(t("library.count", count=shown, size=size_text(total)) if shown else "")
+        free = clips.free_bytes(self.root)
+        room = t("library.free", free=f"{free / 1024**3:.0f}") if free is not None else ""
+        self.count.setText("     ".join(filter(None, (t("library.count", count=shown, size=size_text(total)) if shown else "", room))))
         self.grid.setVisible(shown > 0)
         self.empty.setVisible(shown == 0)
         self.empty.setText(t("library.no_match" if self.clips else "library.empty"))
