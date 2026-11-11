@@ -156,15 +156,17 @@ def thumbnail(path: Path, cache: Path) -> Path | None:
         stat = path.stat()
     except OSError:
         return None
-    key = hashlib.sha1(f"{path}|{stat.st_size}|{stat.st_mtime_ns}".encode()).hexdigest()[:20]
+    key = hashlib.sha1(f"v2|{path}|{stat.st_size}|{stat.st_mtime_ns}".encode()).hexdigest()[:20]
     target = cache / f"{key}.jpg"
     if target.exists():
         return target
     cache.mkdir(parents=True, exist_ok=True)
     try:
-        # 2 s in: past the fade most games open with, still inside the shortest clip.
-        for seek in (["-ss", "2"], []):
-            _run("-y", "-v", "error", *seek, "-i", str(path), "-frames:v", "1", "-vf", "scale=480:-2", str(target), timeout=30)
+        # A recording opens on a loading screen, often black, so look 30 s in first (a short clip
+        # has nothing there and falls through to 2 s, then the start). `thumbnail` picks the most
+        # typical of the next 30 frames, which skips a black or flashing one.
+        for seek in (["-ss", "30"], ["-ss", "2"], []):
+            _run("-y", "-v", "error", *seek, "-i", str(path), "-frames:v", "1", "-vf", "thumbnail=30,scale=480:-2", str(target), timeout=30)
             if target.exists() and target.stat().st_size > 0:
                 return target
     except (OSError, subprocess.TimeoutExpired):

@@ -133,6 +133,7 @@ STRINGS: dict[str, tuple[str, str]] = {
     "menu.update": ("Check for updates", "ابحث عن تحديثات"),
     "share.update": ("Check for a new version when Laqta starts", "ابحث عن إصدار جديد عند تشغيل لقطة"),
     "share.update_hint": ("On by default. This contacts GitHub: one anonymous request asking for the latest version number, and the download if you accept an update. Nothing about you or your PC is sent. Turn it off and Laqta never goes online by itself; you can still check from the tray menu.", "مفعّل افتراضيًا. هذا يتصل بـ GitHub: طلب واحد مجهول يسأل عن رقم أحدث إصدار، ثم التنزيل إذا قبلت التحديث. لا يُرسَل أي شيء عنك أو عن حاسوبك. أوقفه فلا يتصل لقطة بالإنترنت من تلقاء نفسه أبدًا؛ ويبقى الفحص متاحًا من قائمة الأيقونة."),
+    "library.pick": ("Select a video to play it, cut it or share it.", "اختر فيديو لتشغيله أو قصّه أو مشاركته."),
     "library.settings": ("Settings", "الإعدادات"),
     "library.tray_hint": ("Closing this window keeps Laqta running next to the clock, ready to record. Right-click its icon there to quit.", "إغلاق هذه النافذة يُبقي لقطة يعمل بجانب الساعة جاهزًا للتسجيل. انقر بالزر الأيمن على أيقونته هناك للخروج."),
     # sharing

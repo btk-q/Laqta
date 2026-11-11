@@ -82,17 +82,27 @@ def qss(accent: str = DEFAULT_ACCENT) -> str:
 QDialog, QWidget#page, QStackedWidget {{ background: {c['ink']}; }}
 QLabel#heading {{ font-size: 20px; font-weight: 600; padding-bottom: 6px; }}
 QLabel#hint, QLabel#muted {{ color: {c['muted']}; }}
-QLabel#gameName {{ font-size: 16px; font-weight: 600; }}
+QLabel#gameName {{ font-size: 17px; font-weight: 600; }}
+QWidget#header {{ background: {c['panel']}; border-bottom: 1px solid {c['line']}; }}
+QWidget#footer {{ background: {c['panel']}; border-top: 1px solid {c['line']}; }}
+QWidget#header QLabel, QWidget#footer QLabel, QWidget#pill QLabel {{ background: transparent; }}
+QLabel#brand {{ font-size: 20px; font-weight: 700; }}
+QWidget#pill {{ background: {c['ink']}; border: 1px solid {c['line']}; border-radius: 16px; }}
+QLabel#state {{ font-size: 13px; }}
+QStackedWidget#detail, QStackedWidget#detail > QWidget, QWidget#detailBody, QStackedWidget#detail QScrollArea {{ background: {c['panel']}; }}
+QWidget#detailBody QLabel {{ background: transparent; }}
+QStackedWidget#detail {{ border-left: 1px solid {c['line']}; }}
+QStackedWidget#detail QPushButton {{ background: {c['ink']}; }}
+QStackedWidget#detail QPushButton#primary {{ background: {c['accent_fill']}; }}
+QLabel#empty {{ color: {c['muted']}; font-size: 15px; background: transparent; }}
 
 QListWidget {{ background: {c['panel']}; border: none; outline: 0; padding: 6px; }}
 QListWidget#rail {{ padding: 14px 8px; font-size: 14px; }}
 QListWidget::item {{ padding: 8px 12px; border-radius: 6px; margin: 1px 0; }}
 QListWidget::item:hover {{ background: {c['line']}; }}
 QListWidget::item:selected {{ background: {c['accent_dim']}; color: {c['text']}; }}
-QListWidget#grid {{ background: {c['ink']}; padding: 8px 14px; }}
-QListWidget#grid::item {{ padding: 8px 6px; border-radius: 8px; margin: 0; }}
-QListWidget#grid::item:hover {{ background: {c['panel']}; }}
-QListWidget#grid::item:selected {{ background: {c['accent_dim']}; }}
+QListWidget#grid {{ background: {c['ink']}; padding: 8px 12px; }}
+QListWidget#grid::item, QListWidget#grid::item:hover, QListWidget#grid::item:selected {{ background: transparent; padding: 0; margin: 0; }}
 
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QKeySequenceEdit {{
     background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 6px; padding: 6px 10px; min-height: 20px;
@@ -104,7 +114,7 @@ QComboBox::down-arrow {{ image: url({CHEVRON}); width: 10px; height: 6px; }}
 QComboBox QAbstractItemView {{ background: {c['panel']}; border: 1px solid {c['line']}; selection-background-color: {c['accent_dim']}; outline: 0; }}
 QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0; border: none; }}
 
-QPushButton {{ background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 6px; padding: 7px 16px; }}
+QPushButton {{ background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 8px; padding: 8px 16px; }}
 QPushButton:hover {{ border-color: {c['accent']}; }}
 QPushButton:focus {{ border: 1px solid {c['accent']}; }}
 QPushButton:checked {{ background: {c['accent_dim']}; border-color: {c['accent']}; }}
@@ -112,7 +122,12 @@ QPushButton:disabled {{ color: {c['muted']}; border-color: {c['panel']}; }}
 QPushButton#primary {{ background: {c['accent_fill']}; border-color: {c['accent_fill']}; color: {c['on_accent']}; font-weight: 600; }}
 QPushButton#primary:hover {{ background: {c['accent_hover']}; }}
 QPushButton#primary:disabled {{ background: {c['line']}; border-color: {c['line']}; color: {c['muted']}; }}
+QPushButton#danger {{ color: {c['muted']}; }}
 QPushButton#danger:hover {{ border-color: {c['rec']}; color: {c['rec']}; }}
+QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
+QScrollBar::handle:vertical {{ background: {c['line']}; border-radius: 4px; min-height: 30px; }}
+QScrollBar::handle:vertical:hover {{ background: {c['muted']}; }}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical, QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ height: 0; background: transparent; }}
 QPushButton#swatch {{ min-width: 30px; max-width: 30px; min-height: 30px; max-height: 30px; border-radius: 16px; padding: 0;
     border: 2px solid {c['ink']}; }}
 QPushButton#swatch:checked {{ border: 2px solid {c['text']}; }}
@@ -130,6 +145,7 @@ QLabel#checkTitle {{ font-weight: 600; }}
 QLabel#toast {{ background: {c['panel']}; border: 1px solid {c['accent']}; padding: 12px 16px; font-size: 14px; }}
 QTextBrowser {{ background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 6px; padding: 8px; }}
 QLabel#preview {{ background: #000000; border-radius: 6px; }}
+QStackedWidget#detail QLabel#preview {{ background: transparent; }}
 QProgressBar {{ background: {c['panel']}; border: none; border-radius: 4px; }}
 QProgressBar::chunk {{ background: {c['accent']}; border-radius: 4px; }}
 QProgressDialog {{ background: {c['ink']}; }}

@@ -143,7 +143,10 @@ class TrayApp:
         live = s["state"] == "active" and (s["recording"] or s["mode"] == "events")
         self.clip.setEnabled(live)
         self.replay.setEnabled(live)
-        self.tray.setIcon(self.icons["rec" if live else "idle" if s["state"] == "idle" else "busy"])
+        kind = "rec" if live else "idle" if s["state"] == "idle" else "busy"
+        self.tray.setIcon(self.icons[kind])
+        if self.library is not None:
+            self.library.set_state(text, kind)
         self._offer_update()
 
     def toast(self, text: str) -> None:
@@ -191,6 +194,7 @@ class TrayApp:
             return self.library.activateWindow()
         self.library = window = LibraryWindow(webhook=self.cfg["discord_webhook"], on_settings=self.open_settings)
         window.finished.connect(lambda _: self._library_closed(window))
+        self._on_state(self.state)  # so the new window shows what is happening right now
         window.show()
 
     def _library_closed(self, window: LibraryWindow) -> None:

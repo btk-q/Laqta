@@ -11,6 +11,8 @@ around kills and other events.
 
 ![Settings, Games page](docs/screenshots/settings-games-en.png)
 
+![The Laqta window: your clips, what happened in each, and what Laqta is doing right now](docs/screenshots/main.png)
+
 ## What you need
 
 - Windows 10 or 11

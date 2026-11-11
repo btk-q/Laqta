@@ -7,15 +7,15 @@ import os
 import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import QFile, QMimeData, QObject, QRunnable, QSize, Qt, QThreadPool, QUrl, Signal
-from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
+from PySide6.QtCore import QFile, QMimeData, QObject, QPointF, QRectF, QRunnable, QSize, Qt, QThreadPool, QUrl, Signal
+from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QProgressDialog,
     QCheckBox, QComboBox, QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
-    QListWidgetItem, QMessageBox, QPushButton, QVBoxLayout, QWidget,
+    QFrame, QGridLayout, QListWidgetItem, QScrollArea, QMessageBox, QPushButton, QStackedWidget, QStyle, QStyledItemDelegate, QVBoxLayout, QWidget,
 )  # fmt: skip
 
-from ..i18n import t
+from ..i18n import is_rtl, t
 from ..storage import clips, config, highlights, library, share
 from ..storage.library import Clip
 from . import theme
@@ -64,7 +64,7 @@ def summary_text(clip: Clip) -> str:
     if stats:
         if "goals" in stats:
             parts.append(t("summary.gas", goals=stats["goals"], assists=stats["assists"], saves=stats["saves"]))
-        else:
+        elif stats["kills"] or stats["deaths"] or stats["assists"]:  # a line of zeros says nothing
             parts.append(t("summary.kda", kills=stats["kills"], deaths=stats["deaths"], assists=stats["assists"]))
         if stats["result"]:
             parts.append(t(f"summary.{stats['result']}"))
@@ -84,6 +84,21 @@ def placeholder(game: str) -> QPixmap:
     painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, game[:1].upper())
     painter.end()
     return pixmap
+
+
+def rounded(picture: QPixmap, size: QSize, radius: int) -> QPixmap:
+    """The picture cropped to fill `size`, with rounded corners."""
+    scaled = picture.scaled(size, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+    out = QPixmap(size)
+    out.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(out)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    path = QPainterPath()
+    path.addRoundedRect(QRectF(0, 0, size.width(), size.height()), radius, radius)
+    painter.setClipPath(path)
+    painter.drawPixmap((size.width() - scaled.width()) // 2, (size.height() - scaled.height()) // 2, scaled)
+    painter.end()
+    return out
 
 
 class _Signals(QObject):
@@ -108,76 +123,213 @@ class _Thumbnailer(QRunnable):
             pass  # the window was closed while we worked
 
 
+def event_kinds(clip: Clip) -> list[str]:
+    """What happened in a video, most telling first, without the match boundaries."""
+    kinds = list(dict.fromkeys(e["type"] for e in clip.events if e["type"] not in ("match_start", "match_end")))
+    return sorted(kinds, key=lambda kind: -highlights.WEIGHTS.get(kind, 1.0))
+
+
+class Card(QStyledItemDelegate):
+    """Paints one video in the grid: the picture with its length on it, the game, when, and
+    small tags for what happened. Plain list rows could not show any of that at a glance."""
+
+    PAD, RADIUS = 10, 8
+    SIZE = QSize(THUMB.width() + 2 * PAD, THUMB.height() + 2 * PAD + 74)
+
+    def sizeHint(self, option, index) -> QSize:
+        return self.SIZE
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        clip: Clip = index.data(Qt.ItemDataRole.UserRole)
+        c = theme.current
+        rtl = option.direction == Qt.LayoutDirection.RightToLeft
+        lead = Qt.AlignmentFlag.AlignRight if rtl else Qt.AlignmentFlag.AlignLeft
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        box = QRectF(option.rect).adjusted(2, 2, -2, -2)
+        selected = bool(option.state & QStyle.StateFlag.State_Selected)
+        if selected or option.state & QStyle.StateFlag.State_MouseOver:
+            painter.setPen(QPen(QColor(c["accent"]), 1.5) if selected else Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(c["accent_dim"] if selected else c["panel"]))
+            painter.drawRoundedRect(box, 12, 12)
+
+        # the picture, with rounded corners
+        thumb = QRectF(option.rect.x() + self.PAD, option.rect.y() + self.PAD, THUMB.width(), THUMB.height())
+        path = QPainterPath()
+        path.addRoundedRect(thumb, self.RADIUS, self.RADIUS)
+        painter.setClipPath(path)
+        painter.drawPixmap(thumb.toRect(), index.data(Qt.ItemDataRole.DecorationRole).pixmap(THUMB))
+        painter.setClipping(False)
+
+        small = QFont(option.font)
+        small.setPixelSize(11)
+        small.setBold(True)
+        painter.setFont(small)
+        metrics = painter.fontMetrics()
+        if clip.seconds:  # length, on the picture, where video sites have taught everyone to look
+            text = clock(clip.seconds)
+            badge = QRectF(0, 0, metrics.horizontalAdvance(text) + 12, 20)
+            badge.moveBottomRight(thumb.bottomRight() - QPointF(6, 6))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(0, 0, 0, 190))
+            painter.drawRoundedRect(badge, 5, 5)
+            painter.setPen(QColor("#FFFFFF"))
+            painter.drawText(badge, Qt.AlignmentFlag.AlignCenter, text)
+        if clip.favorite:
+            star = QRectF(thumb.x() + 6, thumb.y() + 6, 22, 22)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(c["accent_fill"]))
+            painter.drawEllipse(star)
+            painter.setPen(QColor(c["on_accent"]))
+            painter.drawText(star, Qt.AlignmentFlag.AlignCenter, "★")
+
+        # words under it
+        line = QRectF(thumb.x() + 2, thumb.bottom() + 8, thumb.width() - 4, 20)
+        title = QFont(option.font)
+        title.setPixelSize(14)
+        title.setWeight(QFont.Weight.DemiBold)
+        painter.setFont(title)
+        painter.setPen(QColor(c["text"]))
+        painter.drawText(line, lead | Qt.AlignmentFlag.AlignVCenter, painter.fontMetrics().elidedText(clip.game, Qt.TextElideMode.ElideRight, int(line.width())))
+        sub = QFont(option.font)
+        sub.setPixelSize(12)
+        painter.setFont(sub)
+        painter.setPen(QColor(c["muted"]))
+        line.translate(0, 20)
+        about = when_text(clip.when) if clip.kind == "clip" or not clip.size else f"{when_text(clip.when)}   {size_text(clip.size)}"
+        painter.drawText(line, lead | Qt.AlignmentFlag.AlignVCenter, about)
+
+        # what happened, as small tags from the leading edge
+        painter.setFont(small)
+        metrics = painter.fontMetrics()
+        x, y = (thumb.right() - 2 if rtl else thumb.x() + 2), line.bottom() + 5
+        for kind in event_kinds(clip)[:3]:
+            text = t(f"event.{kind}")
+            width = metrics.horizontalAdvance(text) + 14
+            if (x - width < thumb.x()) if rtl else (x + width > thumb.right()):
+                break
+            tag = QRectF(x - width if rtl else x, y, width, 19)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(c["line"]))
+            painter.drawRoundedRect(tag, 9.5, 9.5)
+            painter.setPen(QColor(c["text"]))
+            painter.drawText(tag, Qt.AlignmentFlag.AlignCenter, text)
+            x += -(width + 5) if rtl else width + 5
+        painter.restore()
+
+
 class LibraryWindow(QDialog):
+    PREVIEW = QSize(308, 173)
+
     def __init__(self, parent: QWidget | None = None, root: Path | None = None, webhook: str = "", on_settings=None):
         super().__init__(parent)
         self.root = root or clips.ROOT
         self.webhook = webhook  # "" = sharing to Discord is not set up, and the button is not shown
         self.clips: list[Clip] = []
         self.items: dict[str, QListWidgetItem] = {}
+        self.thumbs: dict[str, str] = {}  # video -> its thumbnail file, for the side panel
         self.setWindowTitle(t("library.title"))
-        self.resize(1160, 700)
+        self.setWindowFlags(Qt.WindowType.Window)  # a real window: minimise, maximise, its own taskbar button
+        self.resize(1280, 830)
+        self.setMinimumSize(900, 560)
         self.pool = QThreadPool(self)
         self.pool.setMaxThreadCount(2)  # thumbnails must not compete with a game for CPU
         self.signals = _Signals(self)
         self.signals.done.connect(self._thumb_ready)
 
+        # -- header: what Laqta is, and what it is doing right now -------------------
+        logo = QLabel()
+        logo.setPixmap(QPixmap(str(Path(__file__).with_name("icon.png"))).scaled(
+            34, 34, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        brand = QLabel("Laqta" if not is_rtl() else "لقطة")
+        brand.setObjectName("brand")
+        self.dot = QLabel()
+        self.dot.setFixedSize(10, 10)
+        self.state = QLabel()
+        self.state.setObjectName("state")
+        pill = QWidget()
+        pill.setObjectName("pill")
+        in_pill = QHBoxLayout(pill)
+        in_pill.setContentsMargins(12, 6, 14, 6)
+        in_pill.setSpacing(8)
+        in_pill.addWidget(self.dot)
+        in_pill.addWidget(self.state)
+        header = QWidget()
+        header.setObjectName("header")
+        top = QHBoxLayout(header)
+        top.setContentsMargins(20, 12, 20, 12)
+        top.setSpacing(12)
+        top.addWidget(logo)
+        top.addWidget(brand)
+        top.addSpacing(10)
+        top.addWidget(pill)
+        top.addStretch(1)
+        if on_settings:
+            settings = QPushButton(t("library.settings"))
+            settings.clicked.connect(on_settings)
+            top.addWidget(settings)
+        self.set_state(t("status.idle"), "idle")
+
+        # -- filters ---------------------------------------------------------------------
         self.game, self.event, self.days, self.kind = QComboBox(), QComboBox(), QComboBox(), QComboBox()
         for label, value in (("library.all_time", None), ("library.today", 1), ("library.week", 7), ("library.month", 30)):
             self.days.addItem(t(label), value)
         for label, value in (("library.everything", None), ("library.clips", "clip"), ("library.recordings", "recording")):
             self.kind.addItem(t(label), value)
-        self.count = QLabel()
-        self.count.setObjectName("muted")
         self.search = QLineEdit()
         self.search.setPlaceholderText(t("library.search"))
         self.search.setClearButtonEnabled(True)
-        self.search.setMinimumWidth(210)
+        self.search.setMinimumWidth(240)
         self.search.textChanged.connect(self._filter)
         self.favorites = QCheckBox(t("library.favorites"))
         self.favorites.setToolTip(t("library.fav_hint"))
         self.favorites.toggled.connect(self._filter)
         filters = QHBoxLayout()
-        filters.setContentsMargins(20, 16, 20, 10)
+        filters.setContentsMargins(20, 14, 20, 6)
         filters.setSpacing(10)
-        filters.addWidget(self.search)
+        filters.addWidget(self.search, 1)
         for combo in (self.game, self.event, self.days, self.kind):
-            combo.setMinimumWidth(130)
+            combo.setMinimumWidth(150)
+            combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
             combo.currentIndexChanged.connect(self._filter)
             filters.addWidget(combo)
         filters.addWidget(self.favorites)
-        filters.addStretch(1)
-        filters.addWidget(self.count)
-        if on_settings:  # opened as the app's main window: give it the way into Settings
-            settings = QPushButton(t("library.settings"))
-            settings.clicked.connect(on_settings)
-            filters.addWidget(settings)
-            self.setWindowFlag(Qt.WindowType.WindowMinimizeButtonHint, True)
 
+        # -- the videos ------------------------------------------------------------------
         self.grid = QListWidget()
         self.grid.setObjectName("grid")
         self.grid.setViewMode(QListView.ViewMode.IconMode)
+        self.grid.setItemDelegate(Card(self.grid))
         self.grid.setIconSize(THUMB)
-        self.grid.setGridSize(QSize(THUMB.width() + 28, THUMB.height() + 66))
+        self.grid.setGridSize(Card.SIZE + QSize(8, 8))
         self.grid.setResizeMode(QListView.ResizeMode.Adjust)
         self.grid.setMovement(QListView.Movement.Static)
-        self.grid.setWordWrap(True)
         self.grid.setUniformItemSizes(True)
+        self.grid.setMouseTracking(True)  # for the hover highlight
         self.grid.itemSelectionChanged.connect(self._selection_changed)
         self.grid.itemDoubleClicked.connect(lambda _: self._play())
         self.empty = QLabel()
-        self.empty.setObjectName("hint")
+        self.empty.setObjectName("empty")
         self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty.setWordWrap(True)
 
-        self.status = QLabel()
-        self.status.setObjectName("muted")
-        self.buttons: list[QPushButton] = []
-        actions = QHBoxLayout()
-        actions.setContentsMargins(20, 10, 20, 16)
-        actions.setSpacing(10)
+        # -- side panel: the selected video and everything you can do with it -------------
+        self.preview = QLabel()
+        self.preview.setObjectName("preview")
+        self.preview.setFixedSize(self.PREVIEW)
+        self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title = QLabel()
+        self.title.setObjectName("gameName")
+        self.title.setWordWrap(True)
+        if is_rtl():  # a game's name is usually Latin text, which Qt would otherwise push to the left edge
+            self.title.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute | Qt.AlignmentFlag.AlignVCenter)
+        self.about = QLabel()
+        self.about.setObjectName("muted")
+        self.about.setWordWrap(True)
         self.summary = QLabel()
-        self.summary.setObjectName("muted")
-        self.summary.setContentsMargins(22, 8, 22, 0)
+        self.summary.setWordWrap(True)
+        self.buttons: list[QPushButton] = []
+        made: dict[str, QPushButton] = {}
         for key, handler, name in (
             ("library.play", self._play, "primary"),
             ("library.favorite", self._favorite, ""),
@@ -189,33 +341,91 @@ class LibraryWindow(QDialog):
             ("library.post", self._post, ""),
             ("library.delete", self._delete, "danger"),
         ):
-            button = QPushButton(t(key))
+            button = made[key] = QPushButton(t(key))
             button.setObjectName(name)
             button.clicked.connect(handler)
             self.buttons.append(button)
-            actions.addWidget(button)
-        self.post_button = self.buttons[-2]
+        self.post_button = made["library.post"]
         self.post_button.setVisible(bool(webhook))
+        made["library.play"].setMinimumHeight(38)
+        made["library.trim"].setMinimumHeight(38)
+        pairs = QGridLayout()
+        pairs.setSpacing(8)
+        for i, key in enumerate(("library.favorite", "library.tags", "library.export", "library.copy", "library.show", "library.post")):
+            pairs.addWidget(made[key], i // 2, i % 2)
+        chosen = QWidget()
+        side = QVBoxLayout(chosen)
+        side.setContentsMargins(16, 16, 16, 16)
+        side.setSpacing(8)
+        side.addWidget(self.preview)
+        side.addSpacing(4)
+        side.addWidget(self.title)
+        side.addWidget(self.about)
+        side.addWidget(self.summary)
+        side.addSpacing(8)
+        side.addWidget(made["library.play"])
+        side.addWidget(made["library.trim"])
+        side.addSpacing(6)
+        side.addLayout(pairs)
+        side.addStretch(1)
+        side.addWidget(made["library.delete"])
+        nothing = QLabel(t("library.pick"))
+        nothing.setObjectName("empty")
+        nothing.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        nothing.setWordWrap(True)
+        nothing.setContentsMargins(24, 0, 24, 0)
+        scroll = QScrollArea()  # on a short window the actions scroll instead of squeezing into each other
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(chosen)
+        chosen.setObjectName("detailBody")
+        self.panel = QStackedWidget()
+        self.panel.setObjectName("detail")
+        self.panel.setFixedWidth(self.PREVIEW.width() + 44)
+        self.panel.addWidget(nothing)
+        self.panel.addWidget(scroll)
+
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+        body.addWidget(self.grid, 1)
+        body.addWidget(self.empty, 1)
+        body.addWidget(self.panel)
+
+        # -- footer --------------------------------------------------------------------------
+        self.count = QLabel()
+        self.count.setObjectName("muted")
+        self.status = QLabel()
+        self.status.setWordWrap(True)
         self.reel = QPushButton(t("library.reel"))
         self.reel.setToolTip(t("library.reel_hint"))
         self.reel.clicked.connect(self._reel)
-        actions.addWidget(self.reel)
-        actions.addStretch(1)
-        self.status.setWordWrap(True)  # on its own line: ten buttons leave no room beside them
-        self.status.setContentsMargins(22, 6, 22, 0)
+        footer = QWidget()
+        footer.setObjectName("footer")
+        bottom = QHBoxLayout(footer)
+        bottom.setContentsMargins(20, 10, 20, 10)
+        bottom.setSpacing(16)
+        bottom.addWidget(self.count)
+        bottom.addWidget(self.status, 1)
+        bottom.addWidget(self.reel)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        layout.addWidget(header)
         layout.addLayout(filters)
-        layout.addWidget(self.grid, 1)
-        layout.addWidget(self.empty, 1)
-        layout.addWidget(self.summary)
-        layout.addWidget(self.status)
-        layout.addLayout(actions)
+        layout.addLayout(body, 1)
+        layout.addWidget(footer)
         QShortcut(QKeySequence(Qt.Key.Key_F5), self, self.reload)
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self, self._delete)
         self.reload()
+
+    def set_state(self, text: str, kind: str) -> None:
+        """What Laqta is doing right now: "idle", "busy" (getting ready, or a problem) or "rec"."""
+        color = {"idle": theme.current["muted"], "busy": theme.STATUS["warn"], "rec": theme.REC}[kind]
+        self.dot.setStyleSheet(f"background: {color}; border-radius: 5px;")
+        self.state.setText(text)
 
     # -- contents ----------------------------------------------------------------
 
@@ -252,6 +462,9 @@ class LibraryWindow(QDialog):
     def _thumb_ready(self, video: str, thumb: str) -> None:
         item = self.items.get(video)
         if item is not None and thumb:
+            self.thumbs[video] = thumb
+            if (chosen := self.selected()) and str(chosen.path) == video:
+                self._selection_changed()
             pixmap = QPixmap(thumb).scaled(THUMB, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
             x, y = (pixmap.width() - THUMB.width()) // 2, (pixmap.height() - THUMB.height()) // 2
             item.setIcon(QIcon(pixmap.copy(x, y, THUMB.width(), THUMB.height())))
@@ -282,7 +495,17 @@ class LibraryWindow(QDialog):
         clip = self.selected()
         for button in self.buttons:
             button.setEnabled(clip is not None)
-        self.summary.setText(summary_text(clip) if clip else "")
+        self.panel.setCurrentIndex(1 if clip else 0)
+        # One fact per line in the narrow panel; the length moves up beside the date.
+        facts = summary_text(clip).split("     ") if clip else []
+        self.summary.setText("\n".join(facts[1:] if clip and clip.seconds else facts))
+        self.summary.setVisible(bool(self.summary.text()))
+        if clip:
+            self.title.setText(clip.game)
+            length = f"{clock(clip.seconds)}   " if clip.seconds else ""
+            self.about.setText(f"{when_text(clip.when)}\n{length}{size_text(clip.size)}")
+            picture = QPixmap(self.thumbs.get(str(clip.path), "")) if str(clip.path) in self.thumbs else placeholder(clip.game)
+            self.preview.setPixmap(rounded(picture, self.PREVIEW, 8))
         self.buttons[1].setText(t("library.unfavorite" if clip and clip.favorite else "library.favorite"))
 
     def _favorite(self) -> None:
