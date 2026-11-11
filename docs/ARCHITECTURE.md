@@ -206,6 +206,7 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Settings, Arabic/RTL, colours | Works | Rendered and driven by script; not clicked through by hand |
 | Clip library, tags, favourites, search, match summary | Works | Driven by script on test videos |
 | Trim and export editor, export presets | Works | Real ffmpeg encodes in tests; driven by script, including on a real 17-minute recording; not operated by hand |
+| Highlight reel | Works | Real join of mixed-size sources in tests; driven by script through the library window |
 | Instant-replay hotkey | Unit-tested | Recorder logic tested; the second global hotkey registers; not pressed in a real game |
 | Library scan | Steam, Epic, GOG | Steam checked on a real library; Epic and GOG from fixtures |
 | Unknown-fullscreen prompt | Unit-tested | Has not fired for real |

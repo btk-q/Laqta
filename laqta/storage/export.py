@@ -174,12 +174,21 @@ class Job:
     def join(self, timeout: float | None = None) -> None:
         self._thread.join(timeout)
 
+    @property
+    def work(self) -> Path:
+        """Where ffmpeg writes. The real name appears only once the file is complete, so a failed
+        or cancelled export can never damage a file of the same name made earlier."""
+        return self.out.with_name(f"{self.out.stem}.part{self.out.suffix}")
+
+    def _args(self, safety: float) -> list[str]:
+        return command(self.src, self.work, self.preset, self.start_s, self.end_s, self.info, self.without_mic, safety)
+
     def _encode(self, safety: float) -> str:
         """Run ffmpeg once. Returns "" on success, else what went wrong."""
         exe = shutil.which("ffmpeg")
         if exe is None:
             return "ffmpeg was not found. Install ffmpeg to use this."
-        args = command(self.src, self.out, self.preset, self.start_s, self.end_s, self.info, self.without_mic, safety)
+        args = self._args(safety)
         self._process = process = self.popen([exe, *args], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                              stderr=subprocess.PIPE, creationflags=NO_WINDOW)
         if self._cancelled:
@@ -196,7 +205,7 @@ class Job:
         drain.join(timeout=5)
         if self._cancelled:
             return "cancelled"
-        if code != 0 or not self.out.exists() or self.out.stat().st_size == 0:
+        if code != 0 or not self.work.exists() or self.work.stat().st_size == 0:
             return (b"".join(errors).decode(errors="replace").strip()[-300:]) or "ffmpeg could not write this file"
         return ""
 
@@ -206,16 +215,18 @@ class Job:
             # Real gameplay can overshoot a target bitrate: check the size and try again lower.
             for safety in (0.95, 0.85, 0.72) if self.preset == "discord" else (0.95,):
                 problem = self._encode(safety)
-                if problem or self.preset != "discord" or self.out.stat().st_size <= DISCORD_LIMIT:
+                if problem or self.preset != "discord" or self.work.stat().st_size <= DISCORD_LIMIT:
                     break
             else:
                 problem = "This clip is too long to fit in 10 MB. Trim it shorter."
-            if not problem and self.preset == "exact":
-                self._carry_marks()
+            if not problem:
+                self.work.replace(self.out)
+                if self.preset == "exact":
+                    self._carry_marks()
         except (OSError, ValueError) as e:
             problem = str(e)
         if problem:
-            self.out.unlink(missing_ok=True)  # never leave half a file where a clip should be
+            self.work.unlink(missing_ok=True)  # never leave half a file behind
             self.on_done(None, problem)
         else:
             self.on_progress(1.0)

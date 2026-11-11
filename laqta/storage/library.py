@@ -42,7 +42,7 @@ def scan(root: Path | None = None) -> list[Clip]:
     """Everything Laqta has saved, newest first. Layout: <root>/<Game>/<date>/<video>."""
     found = []
     for path in (root or clips.ROOT).glob("*/*/*"):
-        if path.suffix.lower() not in VIDEO or ".trim" in path.suffixes or path.parents[1].name == EXPORTS:
+        if path.suffix.lower() not in VIDEO or {".trim", ".part"} & set(path.suffixes) or path.parents[1].name == EXPORTS:
             continue
         try:
             stat = path.stat()

@@ -129,7 +129,7 @@ def run_job(tmp_path, preset, sizes, lines=("out_time_us=5000000\n", "out_time_u
 
     def popen(argv, **kw):
         calls.append(argv)
-        return FakeProcess(job_ref["job"].out, sizes[min(len(calls), len(sizes)) - 1], lines, code, hang=cancel)
+        return FakeProcess(job_ref["job"].work, sizes[min(len(calls), len(sizes)) - 1], lines, code, hang=cancel)
 
     src = tmp_path / "Game" / "d" / "Replay 1.mkv"
     src.parent.mkdir(parents=True, exist_ok=True)
@@ -160,7 +160,7 @@ def test_discord_export_retries_lower_when_the_file_comes_out_too_big(tmp_path):
 
 def test_discord_export_that_can_never_fit_says_so_and_leaves_no_file(tmp_path):
     job, _, done, calls = run_job(tmp_path, "discord", sizes=[DISCORD_LIMIT + 1])
-    assert len(calls) == 3 and done[0][0] is None and "10 MB" in done[0][1] and not job.out.exists()
+    assert len(calls) == 3 and done[0][0] is None and "10 MB" in done[0][1] and not job.out.exists() and not job.work.exists()
 
 
 def test_failed_export_reports_ffmpegs_words_and_leaves_no_file(tmp_path):
@@ -170,8 +170,18 @@ def test_failed_export_reports_ffmpegs_words_and_leaves_no_file(tmp_path):
 
 def test_cancel_asks_ffmpeg_to_quit_and_removes_the_partial_file(tmp_path):
     job, _, done, _ = run_job(tmp_path, "1080p60", sizes=[4000], cancel=True)
-    assert done == [(None, "cancelled")] and not job.out.exists()
+    assert done == [(None, "cancelled")] and not job.out.exists() and not job.work.exists()
     assert job._process.stdin.getvalue() == b"q"  # not terminate(): that corrupts the file being written
+
+
+def test_cancelling_or_failing_never_damages_an_earlier_file_of_the_same_name(tmp_path):
+    for kwargs in ({"cancel": True, "sizes": [4000]}, {"code": 1, "sizes": [0]}):
+        earlier = tmp_path / "Exports" / "Game Replay 1 2-12 1080p60.mp4"
+        earlier.parent.mkdir(parents=True, exist_ok=True)
+        earlier.write_bytes(b"the good export from last time")
+        job, _, done, _ = run_job(tmp_path, "1080p60", **kwargs)
+        assert job.out == earlier and done[0][0] is None
+        assert earlier.read_bytes() == b"the good export from last time"
 
 
 def test_exact_trim_carries_the_event_marks_inside_the_cut(tmp_path):

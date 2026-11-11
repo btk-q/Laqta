@@ -10,12 +10,13 @@ from pathlib import Path
 from PySide6.QtCore import QFile, QObject, QRunnable, QSize, Qt, QThreadPool, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (
+    QProgressDialog,
     QCheckBox, QComboBox, QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
     QListWidgetItem, QPushButton, QVBoxLayout, QWidget,
 )  # fmt: skip
 
 from ..i18n import t
-from ..storage import clips, config, library
+from ..storage import clips, config, highlights, library
 from ..storage.library import Clip
 from . import theme
 
@@ -84,6 +85,11 @@ def placeholder(game: str) -> QPixmap:
 
 class _Signals(QObject):
     done = Signal(str, str)  # video path, thumbnail path ("" if none)
+
+
+class _ReelSignals(QObject):
+    progress = Signal(float)
+    done = Signal(str, str)
 
 
 class _Thumbnailer(QRunnable):
@@ -177,8 +183,13 @@ class LibraryWindow(QDialog):
             button.clicked.connect(handler)
             self.buttons.append(button)
             actions.addWidget(button)
+        self.reel = QPushButton(t("library.reel"))
+        self.reel.setToolTip(t("library.reel_hint"))
+        self.reel.clicked.connect(self._reel)
+        actions.addWidget(self.reel)
         actions.addStretch(1)
-        actions.addWidget(self.status)
+        actions.addWidget(self.status, 1)
+        self.status.setWordWrap(True)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -309,6 +320,42 @@ class LibraryWindow(QDialog):
                 made = dialog.finished_file
                 self.reload(made if made.parent == clip.path.parent else clip.path)
                 self.status.setText(t("library.trimmed", name=made.name))
+
+    def visible(self) -> list[Clip]:
+        return [self.grid.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.grid.count()) if not self.grid.item(i).isHidden()]
+
+    def _reel(self) -> None:
+        """Join the best moments of everything currently shown (so the filters choose the material)."""
+        segments = highlights.pick(highlights.candidates(self.visible()))
+        if not segments:
+            return self.status.setText(t("reel.none"))
+        shown = self.visible()
+        name = shown[0].game if len({c.game for c in shown}) == 1 else "Laqta"
+        length = sum(s.length for s in segments)
+        signals = _ReelSignals(self)
+        box = QProgressDialog(t("reel.working", count=len(segments), length=clock(length)), t("button.cancel"), 0, 1000, self)
+        box.setWindowTitle(t("library.reel"))
+        box.setWindowModality(Qt.WindowModality.WindowModal)
+        box.setMinimumDuration(0)
+        box.setAutoClose(False)
+        box.setAutoReset(False)
+        job = highlights.ReelJob(segments, highlights.reel_path(name, self.root),
+                                 signals.progress.emit, lambda path, why: signals.done.emit(str(path or ""), why))
+
+        def done(path: str, why: str) -> None:
+            box.close()
+            box.deleteLater()
+            if path:
+                self.status.setText(t("reel.done", name=Path(path).name, folder=str(Path(path).parent)))
+            else:
+                self.status.setText(t("edit.cancelled") if why == "cancelled" else t("library.failed", error=why))
+
+        signals.progress.connect(lambda fraction: box.setValue(int(fraction * 1000)))
+        signals.done.connect(done)
+        box.canceled.connect(job.cancel)
+        self.status.setText("")
+        self._reel_job = job  # keep it alive while it runs
+        job.start()
 
     def _export(self) -> None:
         if clip := self.selected():

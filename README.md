@@ -79,6 +79,12 @@ double-click it to select a clip around it. Then save a trimmed copy, or export 
 Cancel. "Leave my microphone out" uses the game-sound track. The preview is a still frame,
 not playback.
 
+**Highlight reel** joins the best moments of everything currently shown in the Clips window,
+up to one minute, into one MP4 in `Exports`. Use the filters to choose the material, for
+example one game today. Moments are ranked by event type (an ace outranks a kill; your own
+hotkey presses rank near the top), nearby moments merge into one scene, and the reel plays
+in the order things happened.
+
 Favourites are never removed by automatic cleanup. Selecting a recording from a game with
 event detection shows its length, kills, deaths, assists and result.
 

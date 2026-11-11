@@ -124,6 +124,7 @@ QCheckBox::indicator:focus {{ border-color: {c['accent']}; }}
 QLabel#preview {{ background: #000000; border-radius: 6px; }}
 QProgressBar {{ background: {c['panel']}; border: none; border-radius: 4px; }}
 QProgressBar::chunk {{ background: {c['accent']}; border-radius: 4px; }}
+QProgressDialog {{ background: {c['ink']}; }}
 QScrollArea {{ border: none; background: {c['ink']}; }}
 QFrame#rule {{ background: {c['line']}; max-height: 1px; border: none; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; }}

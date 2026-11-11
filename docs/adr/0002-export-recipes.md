@@ -40,6 +40,15 @@ index and an empty MKV in testing. A cancelled or failed export deletes its part
 
 **"Leave my microphone out"** maps audio track 2 (the game) instead of track 1 (the mix).
 
+**Exports are written to `<name>.part.<ext>` and renamed when complete.** A failed or
+cancelled export can therefore never damage an earlier file of the same name. Found by
+driving the highlight reel: rebuilding one and cancelling would have deleted the previous reel.
+
+**Highlight reel:** score = event-type weight x confidence; windows of 8 s before and 4 s after
+each event, overlapping windows merged with scores added; best windows kept until 60 s is
+full; sources fitted into 1920x1080 (letterboxed) and joined with the concat filter, since
+they can differ in size and frame rate.
+
 ## Consequences
 
 - Exports are slower than a remux: roughly real-time-or-better at these settings.
