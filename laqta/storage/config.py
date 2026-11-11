@@ -42,6 +42,7 @@ DEFAULTS = {
     "save_folder": "",  # where recordings go; "" = Videos\\Laqta
     "cleanup_days": 0,  # delete recordings older than this; 0 = never
     "cleanup_gb": 0,  # keep the recordings folder under this size; 0 = no limit
+    "min_free_gb": 5,  # do not record with less free disk space than this; 0 = no guard
     "accent": "#8B5CF6",  # UI colour
     "asked": [],  # fullscreen apps we already asked "is this a game?" about
     "games": [],  # user games and overrides of built-in ones, matched by exe
@@ -71,6 +72,7 @@ def _check(cfg: dict) -> dict:
     need(isinstance(cfg["replay_seconds"], int) and 5 <= cfg["replay_seconds"] <= 300, "replay_seconds must be between 5 and 300")
     for key in ("cleanup_days", "cleanup_gb"):
         need(isinstance(cfg[key], (int, float)) and 0 <= cfg[key] <= 100000, f"{key} must be 0 or more")
+    need(isinstance(cfg["min_free_gb"], (int, float)) and 0 <= cfg["min_free_gb"] <= 1000, "min_free_gb must be between 0 and 1000")
     for key in ("pre_seconds", "post_seconds", "max_clip_seconds", "exit_debounce_seconds"):
         need(isinstance(cfg[key], (int, float)) and 0 <= cfg[key] <= 600, f"{key} must be between 0 and 600")
     need(isinstance(cfg["mic_enabled"], bool) and isinstance(cfg["mic_device"], str), "mic_enabled must be true or false")

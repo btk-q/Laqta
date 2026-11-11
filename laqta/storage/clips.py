@@ -20,6 +20,31 @@ DEFAULT_ROOT = Path.home() / "Videos" / "Laqta"
 ROOT = DEFAULT_ROOT  # where recordings go now; read it as clips.ROOT, it changes with settings
 
 
+def free_bytes(folder: Path | None = None) -> int | None:
+    """Free space on the drive recordings go to. The folder may not exist yet: ask its nearest parent."""
+    folder = folder or ROOT
+    for place in (folder, *folder.parents):
+        if place.exists():
+            try:
+                return shutil.disk_usage(place).free
+            except OSError:
+                return None
+    return None
+
+
+def usable_folder(folder: Path) -> bool:
+    """Can recordings be written there? Checked by actually writing, the only test that is right
+    for network drives, read-only media and protected folders alike."""
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / ".laqta-write-test"
+        probe.write_bytes(b"")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
 def set_root(folder: str | None) -> Path:
     """Use the folder from settings ("" or None = the default under Videos)."""
     global ROOT

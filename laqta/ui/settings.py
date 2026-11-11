@@ -20,6 +20,7 @@ from ..obs_controller import audio, encoders
 from ..obs_controller.capture import KINDS
 from ..plugins import PLUGINS
 from ..storage import clips, config
+from ..storage.clips import usable_folder
 from . import theme
 
 # -- config edits (no Qt: unit-tested) ------------------------------------------------
@@ -29,19 +30,6 @@ def builtin_exes() -> set[str]:
     import json
 
     return {g["exe"].lower() for g in json.loads(GAMES_JSON.read_text(encoding="utf-8"))}
-
-
-def usable_folder(folder: Path) -> bool:
-    """Can recordings be written there? Checked by actually writing, the only test that is right
-    for network drives, read-only media and protected folders alike."""
-    try:
-        folder.mkdir(parents=True, exist_ok=True)
-        probe = folder / ".laqta-write-test"
-        probe.write_bytes(b"")
-        probe.unlink()
-        return True
-    except OSError:
-        return False
 
 
 def set_game(cfg: dict, exe: str, **fields) -> None:
@@ -242,6 +230,10 @@ class SettingsWindow(QDialog):
         form.addRow(t("rec.debounce"), self.debounce)
         form.addRow(t("rec.cleanup_days"), self.cleanup_days)
         form.addRow(t("rec.cleanup_gb"), self.cleanup_gb)
+        self.min_free = _spin(self.cfg["min_free_gb"], 0, 1000)
+        self.min_free.setSpecialValueText(t("rec.min_free_off"))
+        form.addRow(t("rec.min_free"), self.min_free)
+        form.addRow("", _label(t("rec.min_free_hint"), "hint"))
         layout.addLayout(form)
         layout.addWidget(_label(t("rec.cleanup_hint"), "hint"))
         self.save_folder = QLineEdit(self.cfg["save_folder"] or str(clips.DEFAULT_ROOT))
@@ -549,6 +541,7 @@ class SettingsWindow(QDialog):
             exit_debounce_seconds=self.debounce.value(),
             cleanup_days=self.cleanup_days.value(),
             cleanup_gb=self.cleanup_gb.value(),
+            min_free_gb=self.min_free.value(),
             mic_enabled=self.mic_enabled.isChecked(),
             mic_device=self.mic_device.currentData(),
             mic_volume=self.mic_volume.value(),

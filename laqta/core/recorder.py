@@ -27,6 +27,8 @@ MODES = ("session", "hybrid", "match", "events")
 RETRY = 3.0  # seconds between attempts to get OBS back
 LIVENESS = 5.0  # how often to ping OBS while a game is active
 SAVE_TIMEOUT = 10.0  # how long OBS gets to report a saved replay
+DISK_RETRY = 30.0  # how often to look again while the disk is too full to record
+GB = 1024**3
 DUPLICATE = 1.0  # same event type within this window is one event
 BOUNDARIES = ("match_start", "match_end")
 
@@ -61,11 +63,15 @@ class Recorder:
         max_clip: float = 60.0,
         exit_debounce: float = 10.0,
         min_confidence: float = 0.5,
+        free_space: Callable[[], float | None] = lambda: None,  # bytes free where recordings go; None = unknown
+        min_free: float = 0.0,  # bytes; with less than this nothing is recorded. 0 = no guard
     ):
         self.obs, self.connect, self.prepare = obs, connect, prepare
         self.on_clip, self.on_recording, self.notify, self.clock = on_clip, on_recording, notify, clock
         self.pre, self.post, self.max_clip = pre, post, max_clip
         self.exit_debounce, self.min_confidence = exit_debounce, min_confidence
+        self.free_space, self.min_free = free_space, min_free
+        self._low_disk = False  # not recording because the disk is nearly full
 
         self.game: dict | None = None
         self.ready = False  # OBS is connected and set up for self.game
@@ -96,6 +102,8 @@ class Recorder:
             return "idle"
         if self._exit_at is not None:
             return "exit_debounce"
+        if self._low_disk:
+            return "low_disk"
         return "active" if self.ready else "wait_obs"
 
     @property
@@ -188,6 +196,8 @@ class Recorder:
                 self._stop_record()
             if now >= self._live_at:
                 self._live_at = now + LIVENESS
+                if self._disk_short() is not None:
+                    return self._disk_stop()
                 self.obs.call("GetVersion")
 
     @_obs_guard
@@ -234,6 +244,13 @@ class Recorder:
         mode = self.game["mode"]
         buffered = mode == "events"
         self._retry_at = self.clock() + RETRY  # used if anything below fails
+        free = self._disk_short()
+        if free is not None:
+            if not self._low_disk:  # say it once, then look again quietly
+                self.notify(t("toast.disk_refuse", free=f"{free / GB:.1f}"))
+            self._low_disk, self._retry_at = True, self.clock() + DISK_RETRY
+            return
+        self._low_disk = False
         try:
             self.connect()
             running = self.obs.call("GetReplayBufferStatus" if buffered else "GetRecordStatus")["outputActive"]
@@ -276,17 +293,34 @@ class Recorder:
     def _finish(self) -> None:
         try:
             if self.ready:
-                if self._window:
-                    self._save()  # flush a clip that was still waiting for its post-roll
-                if self._rec_start is not None:
-                    self._stop_record()
-                elif self.game["mode"] == "events" and not self._pending:
-                    self.obs.call("StopReplayBuffer")
+                self._stop_outputs()
         finally:
             self.game, self.ready, self._interrupted, self._in_match = None, False, False, False
+            self._low_disk = False
             self._exit_at = self._retry_at = self._window = self._stop_at = self._rec_start = None
             self._marks = []
             self._last.clear()
+
+    def _stop_outputs(self) -> None:
+        if self._window:
+            self._save()  # flush a clip that was still waiting for its post-roll
+        if self._rec_start is not None:
+            self._stop_record()
+        elif self.game["mode"] == "events" and not self._pending:
+            self.obs.call("StopReplayBuffer")
+
+    def _disk_short(self) -> float | None:
+        """Bytes free if that is under the limit, else None."""
+        free = self.free_space() if self.min_free else None
+        return free if free is not None and free < self.min_free else None
+
+    def _disk_stop(self) -> None:
+        """Stop while there is still room to close the file properly: a disk that fills up
+        mid-write costs the whole recording. Recording starts again once space is back."""
+        self._low_disk, self.ready = True, False
+        self._retry_at = self.clock() + DISK_RETRY
+        self.notify(t("toast.disk_stop"))
+        self._stop_outputs()
 
     def _down(self) -> None:
         if self._window or self._pending:

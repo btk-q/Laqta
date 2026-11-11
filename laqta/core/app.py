@@ -21,7 +21,7 @@ from ..obs_controller.client import Obs, ObsDown, ObsError
 from ..plugins import PLUGINS
 from ..storage import clips, config, library
 from .events import GameEvent, GamePlugin
-from .recorder import Recorder
+from .recorder import GB, Recorder
 
 log = logging.getLogger(__name__)
 
@@ -81,6 +81,8 @@ class Core(threading.Thread):
             post=cfg["post_seconds"],
             max_clip=cfg["max_clip_seconds"],
             exit_debounce=cfg["exit_debounce_seconds"],
+            free_space=clips.free_bytes,
+            min_free=cfg["min_free_gb"] * GB,
         )
         self.capture = Capture(self.obs, setup.NAME, config.DIR / "capture.json", notify)
         self.audio = Audio(self.obs)
@@ -229,6 +231,7 @@ class Core(threading.Thread):
             self.detector.asked |= {exe.lower() for exe in cfg["asked"]}
             rec.pre, rec.post, rec.max_clip = cfg["pre_seconds"], cfg["post_seconds"], cfg["max_clip_seconds"]
             rec.exit_debounce = cfg["exit_debounce_seconds"]
+            rec.min_free = cfg["min_free_gb"] * GB
 
     def _start_game(self, game: dict) -> None:
         self.recorder.game_started(with_usable_mode(game))

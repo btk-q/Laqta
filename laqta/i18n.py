@@ -15,6 +15,7 @@ STRINGS: dict[str, tuple[str, str]] = {
     # tray status
     "status.idle": ("Waiting for a game", "في انتظار لعبة"),
     "status.wait_obs": ("{game}: waiting for OBS", "{game}: في انتظار OBS"),
+    "status.low_disk": ("{game}: not recording, the disk is almost full", "{game}: التسجيل متوقف، القرص شبه ممتلئ"),
     "status.exit_debounce": ("{game}: closing", "{game}: جارٍ الإغلاق"),
     "status.session": ("{game}: recording", "{game}: جارٍ التسجيل"),
     "status.hybrid": ("{game}: recording", "{game}: جارٍ التسجيل"),
@@ -38,6 +39,8 @@ STRINGS: dict[str, tuple[str, str]] = {
     "toast.marked": ("Moment marked", "تم تعليم اللحظة"),
     "toast.hotkey_taken": ("Hotkey {hotkey} is taken by another app. Change it in Settings.", "الاختصار {hotkey} مستخدم في تطبيق آخر. غيّره من الإعدادات."),
     "toast.hotkey_bad": ("Hotkey {hotkey} is not valid. Use something like Ctrl+Alt+F9.", "الاختصار {hotkey} غير صالح. استخدم مثلًا Ctrl+Alt+F9."),
+    "toast.disk_refuse": ("Not recording: only {free} GB free on the recordings drive. Free some space, or change the limit in Settings > Recording.", "لن يبدأ التسجيل: المتاح على قرص التسجيلات {free} غيغابايت فقط. أفرغ بعض المساحة أو غيّر الحد من الإعدادات > التسجيل."),
+    "toast.disk_stop": ("Recording stopped and saved: the disk is almost full. It starts again when there is space.", "توقف التسجيل وتم حفظه: القرص شبه ممتلئ. سيبدأ من جديد عند توفر مساحة."),
     "toast.skipped": ("The recording skipped {percent}% of its frames. Lower the quality or output size in Settings.", "تخطّى التسجيل {percent}% من إطاراته. خفّض الجودة أو حجم الإخراج من الإعدادات."),
     "toast.encoder_fallback": ("{wanted} would not start. Recording with {used} instead.", "تعذّر تشغيل {wanted}. يجري التسجيل بـ {used} بدلًا منه."),
     "toast.black": ("{game}: the recording is black and no capture method worked", "{game}: التسجيل أسود ولم تنجح أي طريقة التقاط"),
@@ -130,6 +133,9 @@ STRINGS: dict[str, tuple[str, str]] = {
     "color.rose": ("Rose", "وردي"),
     "rec.cleanup_days": ("Delete recordings older than, days (0 = never)", "احذف التسجيلات الأقدم من، بالأيام (0 = أبدًا)"),
     "rec.cleanup_gb": ("Keep the folder under, GB (0 = no limit)", "أبقِ المجلد أقل من، غيغابايت (0 = بلا حد)"),
+    "rec.min_free": ("Stop recording below this much free space (GB)", "أوقف التسجيل إذا قلّت المساحة الحرة عن (غيغابايت)"),
+    "rec.min_free_off": ("Off", "متوقف"),
+    "rec.min_free_hint": ("A recording that fills the disk is lost, so Laqta stops and saves it before that happens. It never deletes anything to make room.", "التسجيل الذي يملأ القرص يضيع، لذلك يوقفه Laqta ويحفظه قبل ذلك. لا يحذف شيئًا لإفساح المساحة."),
     "rec.cleanup_hint": ("Cleanup deletes the oldest files permanently, not to the Recycle Bin.", "التنظيف يحذف أقدم الملفات نهائيًا، لا إلى سلة المحذوفات."),
     # clip library
     "library.title": ("Laqta clips", "لقطات لقطة"),
