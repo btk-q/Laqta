@@ -340,6 +340,11 @@ class SettingsWindow(QDialog):
         layout.addWidget(self.webhook)
         self.webhook_note = _label(t("share.webhook_hint"), "hint")
         layout.addWidget(self.webhook_note)
+        layout.addSpacing(10)
+        self.update_check = QCheckBox(t("share.update"))
+        self.update_check.setChecked(self.cfg["update_check"])
+        layout.addWidget(self.update_check)
+        layout.addWidget(_label(t("share.update_hint"), "hint"))
         layout.addStretch(1)
         return page
 
@@ -684,6 +689,7 @@ class SettingsWindow(QDialog):
             mic_volume=self.mic_volume.value(),
             mic_trigger=self.mic_trigger.isChecked(),
             toast_window=self.toast_window.isChecked(),
+            update_check=self.update_check.isChecked(),
             discord_webhook=webhook,
             mic_trigger_db=self.mic_trigger_db.value(),
             save_folder="" if Path(self.save_folder.text()) == clips.DEFAULT_ROOT else self.save_folder.text(),

@@ -109,7 +109,7 @@ class _Thumbnailer(QRunnable):
 
 
 class LibraryWindow(QDialog):
-    def __init__(self, parent: QWidget | None = None, root: Path | None = None, webhook: str = ""):
+    def __init__(self, parent: QWidget | None = None, root: Path | None = None, webhook: str = "", on_settings=None):
         super().__init__(parent)
         self.root = root or clips.ROOT
         self.webhook = webhook  # "" = sharing to Discord is not set up, and the button is not shown
@@ -148,6 +148,11 @@ class LibraryWindow(QDialog):
         filters.addWidget(self.favorites)
         filters.addStretch(1)
         filters.addWidget(self.count)
+        if on_settings:  # opened as the app's main window: give it the way into Settings
+            settings = QPushButton(t("library.settings"))
+            settings.clicked.connect(on_settings)
+            filters.addWidget(settings)
+            self.setWindowFlag(Qt.WindowType.WindowMinimizeButtonHint, True)
 
         self.grid = QListWidget()
         self.grid.setObjectName("grid")

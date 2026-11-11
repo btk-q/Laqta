@@ -18,11 +18,12 @@ VALUE = "Laqta"
 
 
 def command() -> str:
-    """The command line that starts this copy of Laqta without a console window."""
+    """The command line that starts this copy of Laqta without a console window, and without
+    opening its main window: at sign-in it should just sit in the tray."""
     if getattr(sys, "frozen", False):
-        return f'"{sys.executable}"'
+        return f'"{sys.executable}" --tray'
     windowless = Path(sys.executable).with_name("pythonw.exe")
-    return f'"{windowless if windowless.exists() else sys.executable}" -m laqta'
+    return f'"{windowless if windowless.exists() else sys.executable}" -m laqta --tray'
 
 
 def _read(key: str):

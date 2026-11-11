@@ -31,8 +31,19 @@ closed when a game starts, Laqta launches it minimised to the tray.
 
 ## Install and run
 
-**Packaged build:** unzip `Laqta-<version>-win64.zip` and run `Laqta.exe`. It lives in the
-system tray.
+**Packaged build (what to give a friend):** download `Laqta-<version>-win64.zip` from the
+[latest release](https://github.com/btk-q/Laqta/releases/latest), unzip it somewhere you can
+write to (Documents or Desktop, not Program Files) and run `Laqta.exe`. Your clips window
+opens; closing it leaves Laqta running next to the clock. Windows may show a "Windows
+protected your PC" notice the first time, because the app is not code-signed: choose
+**More info → Run anyway**.
+
+**Updates:** at start Laqta asks GitHub whether a newer version exists. If there is one it
+shows the patch notes and installs it with one click (the update is needed to keep using
+Laqta; if it fails you can carry on with the old version). It waits until no game is being
+recorded. The download is used only if its SHA-256 matches the one GitHub lists. This is one
+anonymous request and sends nothing about you; turn it off in **Settings → Sharing and
+updates**, after which Laqta never goes online by itself.
 
 **From source:**
 
@@ -239,6 +250,14 @@ Official local APIs first, then screen or audio analysis.
 
 A step-by-step guide for AI coding assistants is in
 [skills/add-game-plugin](skills/add-game-plugin/SKILL.md).
+
+## Publishing a new version
+
+1. Raise the number in `laqta/__init__.py`.
+2. Add a `## <number>` section at the top of `CHANGELOG.md`: these are the patch notes shown
+   in everyone's update window.
+3. Commit, then run `powershell -File packaging\release.ps1`. It runs the tests, builds the
+   zip and creates the GitHub release. Every copy of Laqta offers the update at its next start.
 
 ## Development
 

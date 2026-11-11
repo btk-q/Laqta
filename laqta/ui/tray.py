@@ -10,13 +10,14 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
+import threading
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
-from .. import i18n
+from .. import __version__, i18n
 from ..core.app import Core
 from ..i18n import t
-from ..storage import clips, config
+from ..storage import clips, config, update
 from . import theme
 from .hotkey import Hotkey
 from .library import LibraryWindow
@@ -33,6 +34,7 @@ class Bridge(QObject):
     state = Signal(dict)
     toast = Signal(str)
     prompt = Signal(dict)
+    update = Signal(object, bool)  # the newer Release or None; True if the user asked
 
 
 def _with_dot(base: QPixmap, color: str) -> QIcon:
@@ -76,11 +78,16 @@ class TrayApp:
         self.menu = QMenu()
         self.tray.setContextMenu(self.menu)
         self.tray.messageClicked.connect(self._toast_clicked)
+        self.tray.activated.connect(lambda why: why == QSystemTrayIcon.ActivationReason.Trigger and self.open_library())
+        self.found: update.Release | None = None  # a newer version, waiting for a moment when nothing is recording
+        self.updating = False  # the new files are unpacked: quit so they can be swapped in
+        self._hinted = False
 
         self.bridge = Bridge()
         self.bridge.state.connect(self._on_state)
         self.bridge.toast.connect(self.toast)
         self.bridge.prompt.connect(self._on_prompt)
+        self.bridge.update.connect(self._on_update)
         self.core = Core(cfg, on_state=self.bridge.state.emit, notify=self.bridge.toast.emit, on_prompt=self.bridge.prompt.emit)
 
         self._apply_language()
@@ -103,6 +110,7 @@ class TrayApp:
         self.menu.addAction(t("menu.library")).triggered.connect(self.open_library)
         self.menu.addAction(t("menu.folder")).triggered.connect(self._open_folder)
         self.menu.addAction(t("menu.settings")).triggered.connect(self.open_settings)
+        self.menu.addAction(t("menu.update")).triggered.connect(lambda: self.check_update(asked=True))
         self.menu.addSeparator()
         self.menu.addAction(t("menu.quit")).triggered.connect(self.app.quit)
         self._on_state(self.state)
@@ -136,6 +144,7 @@ class TrayApp:
         self.clip.setEnabled(live)
         self.replay.setEnabled(live)
         self.tray.setIcon(self.icons["rec" if live else "idle" if s["state"] == "idle" else "busy"])
+        self._offer_update()
 
     def toast(self, text: str) -> None:
         self.pending = None
@@ -177,11 +186,47 @@ class TrayApp:
     def open_library(self) -> None:
         if self.library is not None:
             self.library.reload()
+            self.library.showNormal()
             self.library.raise_()
             return self.library.activateWindow()
-        self.library = window = LibraryWindow(webhook=self.cfg["discord_webhook"])
-        window.finished.connect(lambda _: (setattr(self, "library", None), window.deleteLater()))
+        self.library = window = LibraryWindow(webhook=self.cfg["discord_webhook"], on_settings=self.open_settings)
+        window.finished.connect(lambda _: self._library_closed(window))
         window.show()
+
+    def _library_closed(self, window: LibraryWindow) -> None:
+        self.library = None
+        window.deleteLater()
+        if not self._hinted:  # once per run: closing the window does not stop Laqta
+            self._hinted = True
+            self.toast(t("library.tray_hint"))
+
+    # -- updates --------------------------------------------------------------------------
+
+    def check_update(self, asked: bool = False) -> None:
+        """Ask GitHub in the background; the answer comes back through the bridge."""
+        threading.Thread(target=lambda: self.bridge.update.emit(update.check(), asked), name="laqta-update-check", daemon=True).start()
+
+    def _on_update(self, release, asked: bool) -> None:
+        if release is None:
+            if asked:
+                self.toast(t("update.none", version=__version__))
+            return
+        self.found = release
+        self._offer_update()
+
+    def _offer_update(self) -> None:
+        """Show the update window, but never in the middle of a game."""
+        if self.found is None or self.state["state"] != "idle":
+            return
+        from .update import UpdateDialog  # imported here: most runs never need it
+
+        release, self.found = self.found, None
+        dialog = UpdateDialog(release)
+        accepted = dialog.exec()
+        if accepted:
+            self.updating = True
+        if accepted or not dialog.proceed:  # updated, or chose "Quit Laqta"
+            self.app.quit()
 
     def open_settings(self) -> None:
         if self.settings is not None:
@@ -211,11 +256,20 @@ class TrayApp:
         theme.apply(self.app, self.cfg["accent"])
 
 
-def run(cfg: dict) -> int:
+MUTEX = "Laqta.SingleInstance"
+SHOW = "Laqta.ShowWindow"  # a named Windows event: a second launch sets it, the running one opens its window
+
+
+def run(cfg: dict, show: bool = True) -> int:
     # One instance only: two would fight over OBS and the hotkey.
-    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Laqta.SingleInstance")
-    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+    kernel32 = ctypes.windll.kernel32
+    mutex = kernel32.CreateMutexW(None, False, MUTEX)
+    if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        handle = kernel32.OpenEventW(0x0002, False, SHOW)  # EVENT_MODIFY_STATE
+        if handle and show:
+            kernel32.SetEvent(handle)  # double-clicking the exe again brings the window up
         return 0
+    wake = kernel32.CreateEventW(None, False, False, SHOW)
 
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
@@ -228,8 +282,12 @@ def run(cfg: dict) -> int:
     # would not run. A no-op timer gives the interpreter a turn twice a second.
     signal.signal(signal.SIGINT, lambda *_: app.quit())
     heartbeat = QTimer()
-    heartbeat.timeout.connect(lambda: None)
+    heartbeat.timeout.connect(lambda: kernel32.WaitForSingleObject(wake, 0) == 0 and tray.open_library())
     heartbeat.start(500)
+    if show:
+        tray.open_library()
+    if cfg["update_check"]:
+        tray.check_update()
 
     tray.core.start()
     code = app.exec()

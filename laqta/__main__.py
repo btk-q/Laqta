@@ -145,6 +145,33 @@ def calibrate(plugin_name: str, video: str, at: str, cut: str | None, out: str |
     return 0
 
 
+def update_now(install: bool, restart: bool) -> int:
+    """The updater without the window: for a broken install, and for testing the real thing."""
+    import tempfile
+    from pathlib import Path
+
+    from .storage import update
+
+    release = update.check()
+    if release is None:
+        print(f"laqta {__version__} is the latest version (or GitHub could not be reached)")
+        return 0
+    print(f"laqta {release.version} is available ({release.size / 1024 / 1024:.0f} MB)\n\n{release.notes}\n")
+    if not install:
+        return 0
+    app = update.app_dir()
+    if app is None:
+        print("This copy runs from source: update it with git.")
+        return 1
+    try:
+        update.install(update.download(release, Path(tempfile.gettempdir()) / "laqta-download"), app, restart)
+    except OSError as e:
+        print(f"FAILED: {e}")
+        return 1
+    print("downloaded and checked; the files are swapped as soon as this program exits")
+    return 0
+
+
 def diagnose(out: str | None) -> int:
     """Print the health checks and write the diagnostic zip, for when the window will not open."""
     import datetime
@@ -170,6 +197,7 @@ def diagnose(out: str | None) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="laqta")
     parser.add_argument("--version", action="version", version=f"laqta {__version__}")
+    parser.add_argument("--tray", action="store_true", help="start in the tray without opening the window (used at Windows sign-in)")
     sub = parser.add_subparsers(dest="command")
     check = sub.add_parser("obs-check", help="verify Laqta can drive OBS on this machine")
     check.add_argument("--watch", action="store_true", help="stay connected and prove reconnect")
@@ -183,6 +211,9 @@ def main(argv: list[str] | None = None) -> int:
     cal.add_argument("--at", required=True, help="the moment to look at: seconds, mm:ss or h:mm:ss")
     cal.add_argument("--cut", help="save a template: event:x,y,width,height inside region_<event>.png")
     cal.add_argument("--out", help="folder for the pictures (default: ./calibrate-<plugin>)")
+    upd = sub.add_parser("update", help="check GitHub for a newer Laqta; with --install, download and install it")
+    upd.add_argument("--install", action="store_true")
+    upd.add_argument("--no-restart", action="store_true", help="do not start Laqta again after installing")
     diag = sub.add_parser("diagnose", help="check that everything Laqta needs is in place and save a diagnostic zip")
     diag.add_argument("--out", help="where to write the zip (default: the current folder)")
     args = parser.parse_args(argv)
@@ -190,6 +221,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "obs-check":
         logging.basicConfig(level=logging.INFO, format=fmt)
         return obs_check(args.watch)
+    if args.command == "update":
+        return update_now(args.install, not args.no_restart)
     if args.command == "calibrate":
         return calibrate(args.plugin, args.video, args.at, args.cut, args.out)
     if args.command == "diagnose":
@@ -211,7 +244,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     from .ui import tray  # imported late so obs-check works without Qt
 
-    return tray.run(cfg)
+    return tray.run(cfg, show=not args.tray)
 
 
 if __name__ == "__main__":

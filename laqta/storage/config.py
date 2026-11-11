@@ -48,6 +48,7 @@ DEFAULTS = {
     "cleanup_gb": 0,  # keep the recordings folder under this size; 0 = no limit
     "min_free_gb": 5,  # do not record with less free disk space than this; 0 = no guard
     "accent": "#8B5CF6",  # UI colour
+    "update_check": True,  # ask GitHub for a newer Laqta at start (one anonymous request)
     "toast_window": False,  # show Laqta's notes in a small corner window instead of Windows notifications
     "discord_webhook": "",  # where "Post to Discord" sends a clip; "" = the button is not shown. A secret.
     "asked": [],  # fullscreen apps we already asked "is this a game?" about
@@ -83,6 +84,7 @@ def _check(cfg: dict) -> dict:
         need(isinstance(cfg[key], (int, float)) and 0 <= cfg[key] <= 600, f"{key} must be between 0 and 600")
     need(isinstance(cfg["mic_enabled"], bool) and isinstance(cfg["mic_device"], str), "mic_enabled must be true or false")
     need(isinstance(cfg["toast_window"], bool), "toast_window must be true or false")
+    need(isinstance(cfg["update_check"], bool), "update_check must be true or false")
     need(cfg["discord_webhook"] == "" or (isinstance(cfg["discord_webhook"], str) and WEBHOOK.fullmatch(cfg["discord_webhook"])),
          "discord_webhook must be empty or a Discord webhook address (https://discord.com/api/webhooks/...)")
     need(isinstance(cfg["mic_trigger"], bool), "mic_trigger must be true or false")

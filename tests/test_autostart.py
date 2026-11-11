@@ -44,7 +44,7 @@ def test_switched_off_in_task_manager_shows_as_blocked_and_ticking_the_box_lifts
 
 
 def test_command_starts_this_copy_without_a_console():
-    assert autostart.command().endswith('pythonw.exe" -m laqta') and autostart.command().startswith('"')
+    assert autostart.command().endswith('pythonw.exe" -m laqta --tray') and autostart.command().startswith('"')
 
 
 def test_the_real_run_key_is_only_ever_addressed_by_default():

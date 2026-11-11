@@ -218,6 +218,8 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Copy clip to clipboard | Works | Driven through the Clips window; the clipboard held the file |
 | Post to Discord | Unit-tested | Request built and checked against a stand-in; the window flow (confirm, too big, offline) driven by script; never uploaded to a real channel |
 | Corner note window | Works on the desktop | On the real desktop: shown without taking the foreground window, click-through and topmost styles set. Not seen over a game |
+| Main window on start, second launch re-opens it | Works | Driven as the real app: opens, closes to the tray, re-opened by a second launch |
+| Self-update from GitHub releases | see ADR 0005 | Check, hash-verified download and file swap described there with what was run for real |
 | Library scan | Steam, Epic, GOG | Steam checked on a real library; Epic and GOG from fixtures |
 | Unknown-fullscreen prompt | Unit-tested | Has not fired for real |
 | Packaged exe | Builds, imports cleanly | Not run as the only instance |
