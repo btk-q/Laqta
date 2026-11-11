@@ -21,6 +21,7 @@ from . import theme
 from .hotkey import Hotkey
 from .library import LibraryWindow
 from .settings import SettingsWindow, set_game
+from .toast import Toast
 
 log = logging.getLogger(__name__)
 ICON = Path(__file__).with_name("icon.png")
@@ -66,6 +67,7 @@ class TrayApp:
         self.library: LibraryWindow | None = None
         self.hotkey: Hotkey | None = None
         self.replay_key: Hotkey | None = None
+        self.popup: Toast | None = None  # made on first use, and only if the user turned it on
 
         base = QPixmap(str(ICON))
         self.icons = {"idle": QIcon(base), "busy": _with_dot(base, "#F5A524"), "rec": _with_dot(base, theme.REC)}
@@ -137,6 +139,9 @@ class TrayApp:
 
     def toast(self, text: str) -> None:
         self.pending = None
+        if self.cfg["toast_window"]:
+            self.popup = self.popup or Toast()
+            return self.popup.show_text(text)
         self.tray.showMessage("Laqta", text, self.icons["idle"], 4000)
 
     def _on_prompt(self, found: dict) -> None:
@@ -174,7 +179,7 @@ class TrayApp:
             self.library.reload()
             self.library.raise_()
             return self.library.activateWindow()
-        self.library = window = LibraryWindow()
+        self.library = window = LibraryWindow(webhook=self.cfg["discord_webhook"])
         window.finished.connect(lambda _: (setattr(self, "library", None), window.deleteLater()))
         window.show()
 
@@ -196,6 +201,8 @@ class TrayApp:
         self._save()
         clips.set_root(self.cfg["save_folder"])  # so "Open clips folder" and the library follow at once
         self.core.apply(self.cfg)
+        if self.library is not None:
+            self.library.set_webhook(self.cfg["discord_webhook"])
         keys = ("hotkey", "replay_hotkey", "replay_seconds")
         if self.cfg["language"] != old["language"] or any(self.cfg[k] != old[k] for k in keys):
             self._apply_language()

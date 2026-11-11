@@ -92,6 +92,23 @@ event detection shows its length, kills, deaths, assists and result.
 toggles, quality and frame rate, clip timing, automatic cleanup by age or folder size, and
 the interface colour. Settings are stored in `%APPDATA%\Laqta\config.toml`.
 
+### Sharing
+
+Everything here is off until you turn it on, in **Settings → Sharing**.
+
+- **Copy** (Clips window) puts the video file on the clipboard, as Explorer's Copy does. Paste
+  it into a chat or a folder. Nothing leaves the PC until you paste it somewhere.
+- **Post to Discord** is the one feature that sends data off your PC. It appears only after
+  you paste a Discord webhook address into Settings → Sharing. Pressing it on a clip asks for
+  confirmation, then uploads that one clip (as MP4) to the channel the address belongs to.
+  Nothing is posted automatically, and no address other than a Discord webhook is accepted.
+  Files over 10 MB are refused with a pointer to the Discord export preset. The address is a
+  secret kept in plain text in `config.toml`; the diagnostic file leaves it out.
+- **Corner note:** shows Laqta's messages ("Clip saved") in a small window in the corner of
+  the screen instead of a Windows notification, which Windows often hides during games. It
+  never takes focus and clicks pass through it. It is an ordinary desktop window, so it
+  cannot appear over a game in exclusive fullscreen.
+
 ### Keeping it running
 
 - **Start with Windows:** tick "Start Laqta when I sign in to Windows" in **Settings → General**.
@@ -176,6 +193,8 @@ worked for that game. You can also force a method per game in **Settings → Gam
 - **AMD and Intel encoders are unverified.** Laqta tries NVENC, AMF, Quick Sync, then x264,
   and uses the first that starts; only NVENC and x264 have been run.
 - **Battle.net and EA libraries** are not scanned.
+- **Post to Discord has never uploaded to a real channel.** The request is tested against a
+  stand-in; it needs a webhook address to try for real.
 - **Clutches are not detected in any game.** CS2 tells a playing client only about its own
   player, not how many teammates are alive, so a clutch cannot be told from an ordinary round win.
 - **Start with Windows is unverified across a real sign-in.** The entry is written and read
@@ -250,3 +269,7 @@ to save the raw data CS2, League or Rocket League sends, for building test fixtu
 من **الإعدادات ← عام** يمكن تشغيل لقطة مع بدء ويندوز. ولا يبدأ التسجيل إذا قلّت المساحة
 الحرة عن 5 غيغابايت، ويتوقف ويحفظ الملف قبل امتلاء القرص. صفحة **الحالة** في الإعدادات
 تفحص ما يحتاجه لقطة وتشرح علاج أي مشكلة، ومنها يُحفظ ملف تشخيص بلا كلمات مرور.
+
+صفحة **المشاركة** متوقفة كلها افتراضيًا: نسخ اللقطة إلى الحافظة، ونافذة صغيرة في زاوية
+الشاشة للملاحظات، والنشر في Discord. النشر هو الميزة الوحيدة التي ترسل بيانات خارج
+حاسوبك، ولا يحدث إلا عندما تضغط الزر على لقطة واحدة وتؤكد.

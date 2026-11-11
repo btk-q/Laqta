@@ -117,6 +117,21 @@ STRINGS: dict[str, tuple[str, str]] = {
     "button.cancel": ("Cancel", "إلغاء"),
     "button.add": ("Add", "أضف"),
     # appearance and cleanup settings
+    # sharing
+    "nav.sharing": ("Sharing", "المشاركة"),
+    "share.intro": ("Everything here is off until you turn it on. Laqta sends nothing anywhere by itself.", "كل ما هنا متوقف حتى تشغّله أنت. لا يرسل لقطة شيئًا إلى أي مكان من تلقاء نفسه."),
+    "share.toast": ("Show Laqta's notes in a small corner window", "اعرض ملاحظات لقطة في نافذة صغيرة في زاوية الشاشة"),
+    "share.toast_hint": ("For when Windows hides notifications during games. The window never takes focus and clicks pass through it. It cannot appear over a game in exclusive fullscreen; use borderless or windowed mode.", "لحين يخفي ويندوز الإشعارات أثناء اللعب. النافذة لا تأخذ التركيز وتمرّ النقرات من خلالها. لا تظهر فوق لعبة في وضع ملء الشاشة الحصري؛ استخدم وضع النافذة بلا حدود أو النافذة."),
+    "share.webhook": ("Discord webhook address", "عنوان Webhook في Discord"),
+    "share.webhook_hint": ("This sends data off your PC, and only this: when you press \"Post to Discord\" on one clip in the Clips window and confirm, that one clip goes to the Discord channel this address belongs to. Leave it empty and nothing is ever sent. To get an address: in Discord, channel settings > Integrations > Webhooks > New Webhook > Copy Webhook URL. Anyone who has the address can post to that channel, so keep it to yourself.", "هذا يرسل بيانات خارج حاسوبك، وهذا فقط: عندما تضغط «انشر في Discord» على لقطة واحدة في نافذة اللقطات وتؤكد، تُرسَل تلك اللقطة وحدها إلى قناة Discord التي يخصّها هذا العنوان. اتركه فارغًا فلا يُرسَل شيء أبدًا. للحصول على عنوان: في Discord، إعدادات القناة > Integrations > Webhooks > New Webhook > Copy Webhook URL. كل من يملك العنوان يستطيع النشر في تلك القناة، فاحتفظ به لنفسك."),
+    "share.webhook_bad": ("That is not a Discord webhook address. It should start with https://discord.com/api/webhooks/", "هذا ليس عنوان Webhook في Discord. يجب أن يبدأ بـ https://discord.com/api/webhooks/"),
+    "library.copy": ("Copy", "انسخ"),
+    "library.copied": ("Copied {name}. Paste it into a chat or a folder.", "تم نسخ {name}. الصقه في محادثة أو مجلد."),
+    "library.post": ("Post to Discord", "انشر في Discord"),
+    "library.post_title": ("Post to Discord", "النشر في Discord"),
+    "library.post_confirm": ("Send {name} to your Discord channel? Everyone in that channel will be able to see it.", "هل ترسل {name} إلى قناتك في Discord؟ سيتمكن كل من في القناة من رؤيتها."),
+    "library.posted": ("Posted {name} to Discord.", "تم نشر {name} في Discord."),
+    "library.post_big": ("{name} is too big for Discord ({size} MB; the limit is 10 MB). Use \"Trim and export\" > Discord to make a smaller copy, then post that.", "{name} أكبر من حد Discord ({size} ميغابايت؛ الحد 10). استخدم «قص وتصدير» > Discord لعمل نسخة أصغر ثم انشرها."),
     # health page and diagnostic file
     "nav.health": ("Health", "الحالة"),
     "health.intro": ("What Laqta needs in order to record, checked on this PC just now.", "ما يحتاجه لقطة للتسجيل، وقد فُحص على هذا الحاسوب الآن."),

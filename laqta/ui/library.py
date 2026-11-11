@@ -7,16 +7,16 @@ import os
 import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import QFile, QObject, QRunnable, QSize, Qt, QThreadPool, Signal
-from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
+from PySide6.QtCore import QFile, QMimeData, QObject, QRunnable, QSize, Qt, QThreadPool, QUrl, Signal
+from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QProgressDialog,
     QCheckBox, QComboBox, QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
-    QListWidgetItem, QPushButton, QVBoxLayout, QWidget,
+    QListWidgetItem, QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )  # fmt: skip
 
 from ..i18n import t
-from ..storage import clips, config, highlights, library
+from ..storage import clips, config, highlights, library, share
 from ..storage.library import Clip
 from . import theme
 
@@ -109,9 +109,10 @@ class _Thumbnailer(QRunnable):
 
 
 class LibraryWindow(QDialog):
-    def __init__(self, parent: QWidget | None = None, root: Path | None = None):
+    def __init__(self, parent: QWidget | None = None, root: Path | None = None, webhook: str = ""):
         super().__init__(parent)
         self.root = root or clips.ROOT
+        self.webhook = webhook  # "" = sharing to Discord is not set up, and the button is not shown
         self.clips: list[Clip] = []
         self.items: dict[str, QListWidgetItem] = {}
         self.setWindowTitle(t("library.title"))
@@ -179,6 +180,8 @@ class LibraryWindow(QDialog):
             ("library.trim", self._trim, ""),
             ("library.export", self._export, ""),
             ("library.show", self._show, ""),
+            ("library.copy", self._copy, ""),
+            ("library.post", self._post, ""),
             ("library.delete", self._delete, "danger"),
         ):
             button = QPushButton(t(key))
@@ -186,13 +189,15 @@ class LibraryWindow(QDialog):
             button.clicked.connect(handler)
             self.buttons.append(button)
             actions.addWidget(button)
+        self.post_button = self.buttons[-2]
+        self.post_button.setVisible(bool(webhook))
         self.reel = QPushButton(t("library.reel"))
         self.reel.setToolTip(t("library.reel_hint"))
         self.reel.clicked.connect(self._reel)
         actions.addWidget(self.reel)
         actions.addStretch(1)
-        actions.addWidget(self.status, 1)
-        self.status.setWordWrap(True)
+        self.status.setWordWrap(True)  # on its own line: ten buttons leave no room beside them
+        self.status.setContentsMargins(22, 6, 22, 0)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -201,6 +206,7 @@ class LibraryWindow(QDialog):
         layout.addWidget(self.grid, 1)
         layout.addWidget(self.empty, 1)
         layout.addWidget(self.summary)
+        layout.addWidget(self.status)
         layout.addLayout(actions)
         QShortcut(QKeySequence(Qt.Key.Key_F5), self, self.reload)
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self, self._delete)
@@ -359,6 +365,36 @@ class LibraryWindow(QDialog):
         self.status.setText("")
         self._reel_job = job  # keep it alive while it runs
         job.start()
+
+    def _copy(self) -> None:
+        """Put the file itself on the clipboard, as Explorer's Copy does: paste into a chat or a folder."""
+        if clip := self.selected():
+            data = QMimeData()
+            data.setUrls([QUrl.fromLocalFile(str(clip.path))])
+            QGuiApplication.clipboard().setMimeData(data)
+            self.status.setText(t("library.copied", name=clip.path.name))
+
+    def set_webhook(self, webhook: str) -> None:
+        self.webhook = webhook
+        self.post_button.setVisible(bool(webhook))
+
+    def _post(self) -> None:
+        """Send one clip to the user's Discord channel. The only thing in Laqta that leaves the PC."""
+        clip = self.selected()
+        if clip is None or not self.webhook:
+            return
+        size = clip.path.stat().st_size
+        if size > share.DISCORD_LIMIT:  # a remux would not shrink it: say what will, before asking anything
+            return self.status.setText(t("library.post_big", name=clip.path.name, size=f"{size / 1024 / 1024:.0f}"))
+        asked = QMessageBox.question(self, t("library.post_title"), t("library.post_confirm", name=clip.path.name))
+        if asked != QMessageBox.StandardButton.Yes:
+            return
+
+        def work() -> Path:
+            share.post(self.webhook, share.for_sharing(clip.path, self.root), clip.game)
+            return clip.path
+
+        self._attempt(work, "library.posted")
 
     def _export(self) -> None:
         if clip := self.selected():

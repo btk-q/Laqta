@@ -128,7 +128,7 @@ class SettingsWindow(QDialog):
         self.rail.setFixedWidth(170)
         self.pages = QStackedWidget()
         for key, page in (("nav.general", self._general()), ("nav.games", self._games()), ("nav.recording", self._recording()),
-                          ("nav.audio", self._audio()), ("nav.appearance", self._appearance()), ("nav.health", self._health())):
+                          ("nav.audio", self._audio()), ("nav.appearance", self._appearance()), ("nav.sharing", self._sharing()), ("nav.health", self._health())):
             self.rail.addItem(t(key))
             scroll = QScrollArea()  # pages outgrow a 768-pixel-high screen
             scroll.setWidgetResizable(True)
@@ -320,6 +320,27 @@ class SettingsWindow(QDialog):
         self.mic_enabled.toggled.connect(sync)
         self.mic_trigger.toggled.connect(sync)
         sync()
+        return page
+
+    # -- Sharing ---------------------------------------------------------------
+
+    def _sharing(self) -> QWidget:
+        page, layout = self._page("nav.sharing")
+        layout.addWidget(_label(t("share.intro"), "hint"))
+        self.toast_window = QCheckBox(t("share.toast"))
+        self.toast_window.setChecked(self.cfg["toast_window"])
+        layout.addWidget(self.toast_window)
+        layout.addWidget(_label(t("share.toast_hint"), "hint"))
+        layout.addSpacing(10)
+        layout.addWidget(_label(t("share.webhook")))
+        self.webhook = QLineEdit(self.cfg["discord_webhook"])
+        self.webhook.setEchoMode(QLineEdit.EchoMode.PasswordEchoOnEdit)  # it is a secret: hidden once typed
+        self.webhook.setAccessibleName(t("share.webhook"))
+        self.webhook.setClearButtonEnabled(True)
+        layout.addWidget(self.webhook)
+        self.webhook_note = _label(t("share.webhook_hint"), "hint")
+        layout.addWidget(self.webhook_note)
+        layout.addStretch(1)
         return page
 
     # -- Health ----------------------------------------------------------------
@@ -630,6 +651,10 @@ class SettingsWindow(QDialog):
         if clip_key == replay_key:  # one key cannot do both: say so instead of silently breaking one
             self.rail.setCurrentRow(0)
             return self.replay_hint.setText(t("general.hotkey_same"))
+        webhook = self.webhook.text().strip()
+        if webhook and not config.WEBHOOK.fullmatch(webhook):
+            self.rail.setCurrentRow(5)
+            return self.webhook_note.setText(t("share.webhook_bad"))
         if self.autostart.isChecked() != (self._autostart == "on"):  # only touch the registry when the box was changed
             try:
                 autostart.set_enabled(self.autostart.isChecked())
@@ -658,6 +683,8 @@ class SettingsWindow(QDialog):
             mic_device=self.mic_device.currentData(),
             mic_volume=self.mic_volume.value(),
             mic_trigger=self.mic_trigger.isChecked(),
+            toast_window=self.toast_window.isChecked(),
+            discord_webhook=webhook,
             mic_trigger_db=self.mic_trigger_db.value(),
             save_folder="" if Path(self.save_folder.text()) == clips.DEFAULT_ROOT else self.save_folder.text(),
         )

@@ -127,6 +127,7 @@ QLabel#badge_ok {{ color: {STATUS['ok']}; }}
 QLabel#badge_warn {{ color: {STATUS['warn']}; }}
 QLabel#badge_bad {{ color: {STATUS['bad']}; }}
 QLabel#checkTitle {{ font-weight: 600; }}
+QLabel#toast {{ background: {c['panel']}; border: 1px solid {c['accent']}; padding: 12px 16px; font-size: 14px; }}
 QLabel#preview {{ background: #000000; border-radius: 6px; }}
 QProgressBar {{ background: {c['panel']}; border: none; border-radius: 4px; }}
 QProgressBar::chunk {{ background: {c['accent']}; border-radius: 4px; }}

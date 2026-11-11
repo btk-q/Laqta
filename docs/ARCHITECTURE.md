@@ -215,6 +215,9 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Disk-space guard | Works | Live on OBS 33 with the free-space figure faked: refused at start, resumed, stopped mid-recording into a playable file. Never run on a disk that was really full |
 | Start with Windows | Unit-tested | Real registry writes in a throwaway key; the real Run entry has not been through a sign-in |
 | Health page, diagnostic zip | Works | Run on this PC from the window and the command line; secret removal tested with planted secrets |
+| Copy clip to clipboard | Works | Driven through the Clips window; the clipboard held the file |
+| Post to Discord | Unit-tested | Request built and checked against a stand-in; the window flow (confirm, too big, offline) driven by script; never uploaded to a real channel |
+| Corner note window | Works on the desktop | On the real desktop: shown without taking the foreground window, click-through and topmost styles set. Not seen over a game |
 | Library scan | Steam, Epic, GOG | Steam checked on a real library; Epic and GOG from fixtures |
 | Unknown-fullscreen prompt | Unit-tested | Has not fired for real |
 | Packaged exe | Builds, imports cleanly | Not run as the only instance |
@@ -237,6 +240,8 @@ Differences from the plan above:
   option is on, and are judged on OBS's event thread by `audio.Shout`; only an actual shout
   reaches the core's inbox, so the core loop is not woken by meters. A muted input reports
   zero, which is why the trigger needs the microphone turned on.
+- **`storage/share.py`** is the only code that sends anything off the PC; see
+  [ADR 0004](adr/0004-sharing.md). **`ui/toast.py`** is the corner note.
 - **`plugins/scoring.py`** derives multi-kills from plain kills for screen-reading plugins.
   Clutch detection, in the v2 plan, was dropped: CS2's Game State Integration gives a playing
   client no teammate state, and no other supported game has the concept.
