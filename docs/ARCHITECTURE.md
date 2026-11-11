@@ -204,6 +204,7 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | CS2 events | Unit-tested | Hand-built payloads only; no real match yet |
 | Valorant events | Not working | Framework only; no template images. Waits on a real recording |
 | Template calibration (`calibrate`) | Works | Whole loop in tests on a generated video; frame seek and region outlines checked on a real 3440x1440 recording against ffmpeg |
+| Shout trigger (microphone loudness) | Works with a test tone | Live on OBS 33: one trigger 0.1 s after a tone turned loud, none for a short click or with the option off; the real microphone reports a level; not tried with a voice |
 | Multi-kills for screen-reading plugins | Unit-tested | No calibrated vision plugin exists to produce real kills yet |
 | Settings, Arabic/RTL, colours | Works | Rendered and driven by script; not clicked through by hand |
 | Clip library, tags, favourites, search, match summary | Works | Driven by script on test videos |
@@ -231,6 +232,10 @@ Differences from the plan above:
 - **`core/health.py`** holds the health checks (`gather` reads the machine, `checks` is pure)
   and the diagnostic zip; **`storage/autostart.py`** owns the Run-key entry. See
   [ADR 0003](adr/0003-reliability.md).
+- **Shout trigger:** OBS's volume-meter events (20 a second) are subscribed to only while the
+  option is on, and are judged on OBS's event thread by `audio.Shout`; only an actual shout
+  reaches the core's inbox, so the core loop is not woken by meters. A muted input reports
+  zero, which is why the trigger needs the microphone turned on.
 - **`plugins/scoring.py`** derives multi-kills from plain kills for screen-reading plugins.
   Clutch detection, in the v2 plan, was dropped: CS2's Game State Integration gives a playing
   client no teammate state, and no other supported game has the concept.

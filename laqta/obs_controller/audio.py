@@ -25,6 +25,42 @@ KINDS = {DESKTOP: "wasapi_output_capture", GAME: "wasapi_process_output_capture"
 MATCH_EXE = 2  # OBS window "priority": match by executable
 
 
+class Shout:
+    """Decides, from the microphone's peak level 20 times a second, when the player shouted."""
+
+    def __init__(self, db: float = -12.0, sustain: int = 3, cooldown: float = 10.0):
+        self.db = db
+        self.sustain = sustain  # samples in a row (3 = 150 ms): a click or a bumped desk is shorter
+        self.cooldown = cooldown  # seconds before the next one counts: one shout, one moment
+        self._run, self._quiet_until = 0, 0.0
+
+    @property
+    def db(self) -> float:
+        return self._db
+
+    @db.setter
+    def db(self, value: float) -> None:
+        self._db, self.level = value, 10 ** (value / 20)  # decibels below full scale -> linear
+
+    def feed(self, peak: float, now: float) -> bool:
+        if peak < self.level:
+            self._run = 0
+            return False
+        self._run += 1
+        if self._run != self.sustain or now < self._quiet_until:
+            return False
+        self._quiet_until = now + self.cooldown
+        return True
+
+
+def mic_peak(meters: dict) -> float:
+    """The microphone's loudest channel in one InputVolumeMeters event, 0..1, before the volume setting."""
+    for item in meters.get("inputs") or ():
+        if item.get("inputName") == MIC:
+            return max((ch[2] for ch in item.get("inputLevelsMul") or () if len(ch) > 2), default=0.0)
+    return 0.0
+
+
 def tracks(*on: int) -> dict[str, bool]:
     return {str(i): i in on for i in range(1, 7)}
 

@@ -17,7 +17,7 @@ from .library import Clip
 # What makes a moment worth keeping. A key the player pressed outranks anything detected.
 WEIGHTS = {
     "manual": 8.0, "replay": 8.0, "ace": 10.0, "multikill": 6.0, "first_blood": 4.0, "kill": 3.0, "objective": 3.0,
-    "win": 2.0, "headshot": 1.0, "round_win": 1.0, "assist": 1.0, "death": 0.5,
+    "win": 2.0, "shout": 2.0, "headshot": 1.0, "round_win": 1.0, "assist": 1.0, "death": 0.5,
     "lose": 0.0, "round_lose": 0.0, "match_start": 0.0, "match_end": 0.0,
 }  # fmt: skip
 BEFORE, AFTER = 8.0, 4.0  # seconds kept around a marked moment in a full recording

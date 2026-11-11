@@ -160,6 +160,9 @@ STRINGS: dict[str, tuple[str, str]] = {
     "audio.mic_device": ("Microphone", "الميكروفون"),
     "audio.mic_default": ("Windows default", "الافتراضي في ويندوز"),
     "audio.mic_volume": ("Microphone volume, percent", "مستوى صوت الميكروفون، بالمئة"),
+    "audio.trigger": ("Mark the moment when I shout", "علّم اللحظة عندما أصرخ"),
+    "audio.trigger_level": ("How loud counts as a shout (dB)", "مستوى الصوت الذي يُعدّ صراخًا (ديسيبل)"),
+    "audio.trigger_hint": ("Off by default. Laqta only watches how loud the microphone is, through OBS, on this PC; it does not listen to words and nothing is sent anywhere. A shout saves a clip in Events only and adds a mark in Hybrid and Full match. -12 suits a raised voice on most microphones: move towards -30 if shouts are missed, towards 0 if normal talking sets it off.", "متوقف افتراضيًا. يراقب لقطة شدة صوت الميكروفون فقط، عبر OBS، على هذا الحاسوب؛ لا يستمع إلى الكلام ولا يُرسَل شيء إلى أي مكان. الصراخ يحفظ لقطة في وضع الأحداث فقط ويضيف علامة في الهجين والمباراة الكاملة. القيمة ‎-12 تناسب الصوت المرتفع في أغلب الميكروفونات: اقترب من ‎-30 إذا لم تُلتقط الصرخات، ومن 0 إذا فعّله الكلام العادي."),
     "audio.tracks": ("Recordings carry separate audio tracks: 1 is everything, 2 is the game, 3 is your microphone. Normal players use track 1.", "تحمل التسجيلات مسارات صوت منفصلة: 1 كل شيء، 2 اللعبة، 3 ميكروفونك. المشغّلات العادية تستخدم المسار 1."),
     "audio.privacy": ("Off by default. When on, your voice is saved in every recording and clip.", "متوقف افتراضيًا. عند تشغيله يُحفظ صوتك في كل تسجيل ولقطة."),
     "games.game_audio": ("Record this game's sound only", "سجّل صوت هذه اللعبة فقط"),
@@ -241,6 +244,7 @@ STRINGS: dict[str, tuple[str, str]] = {
     # event names
     "event.kill": ("Kill", "قتل"),
     "event.headshot": ("Headshot", "إصابة في الرأس"),
+    "event.shout": ("Shout", "صرخة"),
     "event.multikill": ("Multi-kill", "قتل متعدد"),
     "event.ace": ("Ace", "إيس"),
     "event.death": ("Death", "موت"),

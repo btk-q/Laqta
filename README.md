@@ -120,6 +120,12 @@ your microphone. Ordinary players use track 1.
 - **Game sound only** is a per-game option in **Settings → Games**. It keeps voice chat and
   music off track 2 and out of the mix.
 - MP4 exports carry track 1 only.
+- **Mark the moment when I shout** (Settings → Audio, off by default, needs the microphone
+  on): when the microphone stays loud for a moment, Laqta saves a clip in Events only or adds
+  a mark in Hybrid and Full match, at most once every 10 seconds. It only compares the
+  loudness figure OBS already measures; it does not listen to words, and nothing leaves the
+  PC. Set how loud counts with the dB box. Unverified with a real voice: it was checked with
+  a test tone.
 
 ### Picture
 

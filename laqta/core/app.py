@@ -14,7 +14,7 @@ from typing import Callable
 from ..game_detector.detector import Detector, game_window, load_games
 from ..i18n import t
 from ..obs_controller import setup
-from ..obs_controller.audio import Audio
+from ..obs_controller.audio import Audio, Shout, mic_peak
 from ..obs_controller.capture import Capture
 from ..obs_controller import encoders
 from ..obs_controller.client import Obs, ObsDown, ObsError
@@ -69,7 +69,9 @@ class Core(threading.Thread):
         clips.set_root(cfg["save_folder"])
         self.on_state, self.notify, self.on_prompt = on_state, notify, on_prompt
         self.detector = Detector(load_games(cfg["games"], cfg["default_mode"]), asked=cfg["asked"])
-        self.obs = Obs(4455, "", on_event=lambda name, data: self.inbox.put(("obs", name, data)))
+        self.shout = Shout(cfg["mic_trigger_db"])
+        self.obs = Obs(4455, "", on_event=lambda name, data: self.inbox.put(("obs", name, data)), on_meters=self._meters)
+        self.obs.meters = cfg["mic_trigger"] and cfg["mic_enabled"]
         self.recorder = Recorder(
             self.obs,
             connect=self._connect,
@@ -107,6 +109,12 @@ class Core(threading.Thread):
     def apply(self, cfg: dict) -> None:
         """New settings from the UI. Takes effect for the next game (timings: the next clip)."""
         self.inbox.put(("config", copy.deepcopy(cfg)))
+
+    def _meters(self, data: dict) -> None:
+        """OBS's event thread, 20 times a second while the shout trigger is on: only a comparison here."""
+        now = time.monotonic()
+        if self.shout.feed(mic_peak(data), now):
+            self.inbox.put(("event", GameEvent("shout", now, confidence=0.7, source="audio")))
 
     # Core thread ---------------------------------------------------------------
 
@@ -232,6 +240,12 @@ class Core(threading.Thread):
             rec.pre, rec.post, rec.max_clip = cfg["pre_seconds"], cfg["post_seconds"], cfg["max_clip_seconds"]
             rec.exit_debounce = cfg["exit_debounce_seconds"]
             rec.min_free = cfg["min_free_gb"] * GB
+            self.shout.db = cfg["mic_trigger_db"]
+            wanted = cfg["mic_trigger"] and cfg["mic_enabled"]
+            if wanted != self.obs.meters:
+                self.obs.meters = wanted  # OBS is told at connect time
+                if rec.game is None and rec.next_deadline() is None:
+                    self.obs.close()  # idle: reconnect for the next game with the new choice
 
     def _start_game(self, game: dict) -> None:
         self.recorder.game_started(with_usable_mode(game))
