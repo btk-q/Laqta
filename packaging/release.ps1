@@ -14,9 +14,11 @@ if (git status --porcelain) { throw "Commit your changes first: the release must
 $existing = gh release list --limit 100 --json tagName --jq ".[].tagName"
 if ($existing -contains $tag) { throw "Release $tag already exists. Raise the number in laqta\__init__.py." }
 
-# The patch notes are this version's section of CHANGELOG.md.
-$notes = & $py -c "import re,sys,pathlib; t=pathlib.Path('CHANGELOG.md').read_text(encoding='utf-8'); m=re.search(r'(?ms)^## +v?' + re.escape(sys.argv[1]) + r'\b[^\n]*\n(.*?)(?=^## |\Z)', t); print(m.group(1).strip() if m else '')" $version
-if (-not $notes) { throw "CHANGELOG.md has no '## $version' section. Write the patch notes first." }
+$file = Join-Path $env:TEMP "laqta-notes-$version.md"
+# Fails here, before the slow build, if the patch notes have not been written.
+& $py packaging
+otes.py $version "no-zip-yet" $file
+if ($LASTEXITCODE -ne 0) { throw "Write the patch notes first: add a '## $version' section to CHANGELOG.md." }
 
 & $py -m pytest -q
 if ($LASTEXITCODE -ne 0) { throw "Tests failed; nothing was published." }
@@ -25,11 +27,8 @@ powershell -NoProfile -File packaging\build.ps1
 if ($LASTEXITCODE -ne 0) { throw "Build failed; nothing was published." }
 $zip = "dist\Laqta-$version-win64.zip"
 
-# The updater refuses a download whose hash it cannot check. GitHub lists one itself;
-# this line in the notes is the fallback.
-$hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-$file = Join-Path $env:TEMP "laqta-notes-$version.md"
-[IO.File]::WriteAllText($file, ($notes -join "`n") + "`n`nSHA256: $hash`n")
+& $py packaging
+otes.py $version $zip $file   # again, now with the zip's hash
 
 git push origin HEAD
 gh release create $tag $zip --title "Laqta $version" --notes-file $file
