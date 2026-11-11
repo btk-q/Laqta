@@ -115,7 +115,7 @@ def unpack(archive: Path, folder: Path) -> Path:
     return found
 
 
-def swap_script(new: Path, app: Path, pid: int, restart: bool = True, work: Path | None = None) -> str:
+def swap_script(new: Path, app: Path, pid: int, restart: bool = True, work: Path | None = None, archive: Path | None = None) -> str:
     """A batch file that waits for this Laqta to close, replaces its files and starts it again.
     It removes only the app's own `_internal` folder: whatever else sits beside Laqta.exe
     (the user may have unpacked it straight onto the Desktop) is never deleted."""
@@ -129,6 +129,7 @@ def swap_script(new: Path, app: Path, pid: int, restart: bool = True, work: Path
         f'robocopy "{new}" "{app}" /E /R:5 /W:1 /NFL /NDL /NJH /NJS >nul',
         f'start "" "{app}\\Laqta.exe"' if restart else "rem no restart",
         f'rmdir /s /q "{work or new.parent}"',
+        f'del /q "{archive}"' if archive else "rem nothing downloaded to remove",
         '(goto) 2>nul & del "%~f0"',
     ]
     return "\r\n".join(lines) + "\r\n"
@@ -151,6 +152,6 @@ def install(archive: Path, app: Path, restart: bool = True) -> None:
     work = Path(tempfile.mkdtemp(prefix="laqta-update-"))
     new = unpack(archive, work / "new")
     script = work.parent / f"{work.name}.cmd"
-    script.write_text(swap_script(new, app, os.getpid(), restart, work), encoding="utf-8")
+    script.write_text(swap_script(new, app, os.getpid(), restart, work, archive), encoding="utf-8")
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     subprocess.Popen(["cmd", "/c", str(script)], creationflags=flags, close_fds=True, cwd=str(work.parent))

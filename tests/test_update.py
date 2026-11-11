@@ -110,6 +110,7 @@ def test_the_swap_script_waits_then_replaces_only_laqtas_own_files():
 def test_install_refuses_a_folder_it_cannot_write_to(tmp_path, monkeypatch):
     started = []
     monkeypatch.setattr(update.subprocess, "Popen", lambda *a, **k: started.append(a))
+    monkeypatch.setattr(update.tempfile, "mkdtemp", lambda prefix="": str((tmp_path / "work").resolve()) if not (tmp_path / "work").mkdir() else "")
     blocked = tmp_path / "missing" / "folder"
     with pytest.raises(OSError, match="cannot write"):
         update.install(release_zip(tmp_path / "a.zip"), blocked)
@@ -118,7 +119,8 @@ def test_install_refuses_a_folder_it_cannot_write_to(tmp_path, monkeypatch):
     app.mkdir()
     update.install(release_zip(tmp_path / "a.zip"), app)
     assert len(started) == 1 and started[0][0][:2] == ["cmd", "/c"] and Path(started[0][0][2]).read_text(encoding="utf-8").startswith("@echo off")
-    Path(started[0][0][2]).unlink()
+    script = Path(started[0][0][2]).read_text(encoding="utf-8")
+    assert f'del /q "{tmp_path / "a.zip"}"' in script  # the 94 MB download is not left behind
 
 
 def test_running_from_source_has_no_exe_to_replace():
