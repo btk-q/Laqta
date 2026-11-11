@@ -62,7 +62,10 @@ def summary_text(clip: Clip) -> str:
     if clip.seconds:
         parts.append(clock(clip.seconds))
     if stats:
-        parts.append(t("summary.kda", kills=stats["kills"], deaths=stats["deaths"], assists=stats["assists"]))
+        if "goals" in stats:
+            parts.append(t("summary.gas", goals=stats["goals"], assists=stats["assists"], saves=stats["saves"]))
+        else:
+            parts.append(t("summary.kda", kills=stats["kills"], deaths=stats["deaths"], assists=stats["assists"]))
         if stats["result"]:
             parts.append(t(f"summary.{stats['result']}"))
     if clip.tags:

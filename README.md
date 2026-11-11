@@ -146,8 +146,16 @@ fullscreen, Laqta asks once with a toast, and clicking the toast adds it.
 |---|---|---|
 | League of Legends | Riot's Live Client Data API | Works. Checked against a real match's event list. |
 | Counter-Strike 2 | Valve Game State Integration | Written and unit-tested with hand-built payloads. Not yet run in a real match. |
+| Rocket League | The game's own Stats API | Written from the published format and unit-tested with hand-built messages. Not yet run in a real match. Goals, assists, saves, demolitions, win or loss, match start and end. |
 | Valorant | Screen analysis | Framework and calibration tool only. It has no template images yet, so it detects nothing. Needs a real recording. |
 | Everything else | Clip hotkey | Always available. |
+
+Rocket League's Stats API is off by default. The first time Rocket League starts with Laqta
+running, Laqta turns it on by changing one line (`PacketSendRate`) in your own
+`Documents\My Games\Rocket League\TAGame\Config\TAStatsAPI.ini`, and asks you to restart the
+game once. The game's install folder is not touched. The game does not say which player is
+you: Laqta recognises the Steam accounts signed in on this PC, and for an Epic account you
+type your in-game name in **Settings → Games → Rocket League**.
 
 The first time CS2 starts with Laqta running, Laqta writes
 `gamestate_integration_laqta.cfg` into CS2's `cfg` folder and asks you to restart CS2 once.
@@ -223,8 +231,8 @@ powershell -File packaging\build.ps1           # builds dist\Laqta\Laqta.exe and
 .venv\Scripts\python -m laqta diagnose                                # health checks + diagnostic zip
 ```
 
-Set `LAQTA_GSI_DUMP` or `LAQTA_LOL_DUMP` to a file path before starting Laqta to save the raw
-data CS2 or League sends, for building test fixtures.
+Set `LAQTA_GSI_DUMP`, `LAQTA_LOL_DUMP` or `LAQTA_RL_DUMP` to a file path before starting Laqta
+to save the raw data CS2, League or Rocket League sends, for building test fixtures.
 
 ## بالعربية
 

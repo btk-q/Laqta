@@ -85,6 +85,7 @@ def _check(cfg: dict) -> dict:
         need("exe" in game, "every [[games]] entry needs an exe")
         need(game.get("mode", "session") in MODES, f'{game["exe"]}: mode must be one of {", ".join(MODES)}')
         video(game, f'{game["exe"]}: ', optional=True)
+        need(isinstance(game.get("player", ""), str), f'{game["exe"]}: player must be text')
         need(isinstance(game.get("game_audio_only", False), bool), f'{game["exe"]}: game_audio_only must be true or false')
         need(game.get("capture") in (None, *KINDS), f'{game["exe"]}: capture must be one of {", ".join(KINDS)}')
     return cfg

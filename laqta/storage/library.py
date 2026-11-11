@@ -122,11 +122,14 @@ def set_meta(path: Path, **fields) -> None:
 def summary(clip: Clip) -> dict | None:
     """Kills / deaths / assists and the result, for a video whose plugin reported events."""
     counted = [e["type"] for e in clip.events]
-    if not any(t in counted for t in ("kill", "death", "assist", "win", "lose")):
+    if not any(t in counted for t in ("kill", "death", "assist", "goal", "save", "win", "lose")):
         return None
     result = "win" if "win" in counted else "lose" if "lose" in counted else None
-    return {"kills": counted.count("kill"), "deaths": counted.count("death"), "assists": counted.count("assist"),
-            "result": result, "seconds": clip.seconds}
+    stats = {"kills": counted.count("kill"), "deaths": counted.count("death"), "assists": counted.count("assist"),
+             "result": result, "seconds": clip.seconds}
+    if "goal" in counted or "save" in counted:  # a ball game: goals and saves, not kills and deaths
+        stats |= {"goals": counted.count("goal"), "saves": counted.count("save")}
+    return stats
 
 
 # -- actions ---------------------------------------------------------------------------

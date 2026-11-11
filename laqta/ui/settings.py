@@ -556,6 +556,18 @@ class SettingsWindow(QDialog):
         if plugin is None:
             self.detail.addWidget(_label(t("games.no_plugin"), "hint"))
         else:
+            if getattr(plugin, "wants_player", False):
+                player = QLineEdit(game.get("player", ""))
+                player.setAccessibleName(t("games.player"))
+                player.textChanged.connect(lambda text: set_game(self.cfg, exe, player=text.strip() or None))
+                who = QFormLayout()
+                who.setHorizontalSpacing(16)
+                who.addRow(t("games.player"), player)
+                box = QWidget()
+                box.setObjectName("page")
+                box.setLayout(who)
+                self.detail.addWidget(box)
+                self.detail.addWidget(_label(t("games.player_hint"), "hint"))
             self.detail.addWidget(_label(t("games.events"), "muted"))
             disabled = set(game.get("disabled_events", ()))
             boxes: dict[str, QCheckBox] = {}

@@ -177,7 +177,7 @@ Until M6, modes and toggles are edited in the TOML file.
 | LoL | Live Client Data API, port 2999 | Verified against a real match's event list: `GameEnd` (`Result`), `FirstBlood` (`Recipient`), `Multikill`, `Ace`, and names without the `#tag`. If the game process exits before a poll sees `GameEnd`, the match still ends but without a win/lose. No key needed; wide distribution may fall under Riot's product registration. Game Capture worked in window mode. |
 | Valorant | Vision (killfeed) | No official statement that passive screen reading is permitted — no known bans, but not confirmed safe. Game Capture may be black under Vanguard. HUD details are from memory; colour-blind modes and patches break templates. **Needs real screenshots from you.** |
 | Dota 2 | GSI | Same mechanism as CS2; needs the `-gamestateintegration` launch option; Valve notes a possible framerate cost. Not in this plan's milestones. |
-| Rocket League | Official Stats API (TCP 49123) | Exists since the April 2026 EAC update; payload schema undocumented and whether it works in online matches is unconfirmed. Later plugin. |
+| Rocket League | Official Stats API (TCP 49123) | Plugin written. The API is the game's own feature, switched on in the user's `TAStatsAPI.ini`; the message format comes from third-party descriptions, and whether it streams in online matches under EAC is unconfirmed until a real match. No local-player marker: matched by Steam id or typed name. |
 | Apex / Fortnite / OW2 / COD | Vision | Signals are mostly text, so they depend on language and need OCR. Later, using the Valorant plugin as the template. |
 
 General: clips trimmed with stream copy can start up to ~2 s early (keyframes). The
@@ -202,6 +202,7 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Capture fallback (black picture) | Works for Game -> Window | Live on the League client; Display Capture untested |
 | League of Legends events | Works | Replay of a real match's event list |
 | CS2 events | Unit-tested | Hand-built payloads only; no real match yet |
+| Rocket League events | Unit-tested | Hand-built messages from the published format; the real settings file on this PC was read and edited correctly; no real match yet |
 | Valorant events | Not working | Framework only; no template images. Waits on a real recording |
 | Template calibration (`calibrate`) | Works | Whole loop in tests on a generated video; frame seek and region outlines checked on a real 3440x1440 recording against ffmpeg |
 | Shout trigger (microphone loudness) | Works with a test tone | Live on OBS 33: one trigger 0.1 s after a tone turned loud, none for a short click or with the option off; the real microphone reports a level; not tried with a voice |
