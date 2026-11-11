@@ -220,10 +220,12 @@ class Core(threading.Thread):
             if ev.type == "manual":
                 if rec.state != "active":
                     return self.notify(t("toast.no_game"))
-                if rec.game["mode"] == "session" or not (rec.recording or rec.game["mode"] == "events"):
+                if not (rec.recording or rec.game["mode"] == "events"):
                     return self.notify(t("toast.hotkey_idle"))
                 if rec.game["mode"] != "events":
                     self.notify(t("toast.marked"))
+            if ev.type != "manual":
+                log.info("event: %s (%s, %.2f)", ev.type, ev.source, ev.confidence)  # so "nothing was detected" can be told from "nothing was kept"
             rec.event(ev)
         elif kind == "obs":
             rec.obs_event(*args)

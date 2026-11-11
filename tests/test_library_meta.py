@@ -137,7 +137,8 @@ def test_instant_replay_marks_the_moment_while_recording_and_does_nothing_otherw
     assert rig.obs.count("SaveReplayBuffer") == 0
     other = Rig()
     other.rec.game_started(SESSION)
-    assert other.rec.instant_replay(GameEvent("replay", 150.0), 30) is False  # plain session: nothing to mark
+    assert other.rec.instant_replay(GameEvent("replay", 150.0), 30) is True  # a plain session keeps marks too
+    assert [m.type for m in other.rec._marks] == ["replay"]
 
 
 def test_recorder_exposes_no_new_required_arguments():

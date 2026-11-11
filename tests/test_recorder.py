@@ -137,12 +137,18 @@ def test_duplicates_toggles_and_confidence(rig):
     assert [e.type for e in rig.rec._events] == ["kill", "manual"]
 
 
-def test_events_are_ignored_in_session_mode_and_when_idle(rig):
-    rig.ev(0, "manual")
+def test_session_mode_marks_events_in_the_recording_and_saves_no_clips(rig):
+    """Found in a real League game: objectives were detected but the recording kept none of them."""
+    rig.ev(0, "manual")  # no game yet: ignored
     rig.rec.game_started(SESSION)
-    rig.ev(1, "manual")
+    rig.ev(1, "objective")
+    rig.ev(5, "manual")
     rig.at(20)
     assert rig.obs.count("SaveReplayBuffer") == 0
+    rig.rec.game_exited()
+    rig.at(40)
+    (_, _, marks, _), = rig.recordings
+    assert [m.type for m in marks] == ["objective", "manual"]
 
 
 def test_exit_flushes_a_waiting_clip_and_stops_buffer_after_it_is_saved(rig):

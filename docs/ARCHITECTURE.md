@@ -195,7 +195,7 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Full Session recording | Works | Real matches: 3440x1440, 60 fps, with sound |
 | Advanced output, encoder choice | Works for NVENC and x264 | Live on OBS 33; AMF and Quick Sync unverified |
 | Per-game video settings, second monitor | Works | Live on OBS 33: sizes, fps, bitrate, x264, portrait second monitor; not yet in a real game |
-| Skipped-frames report | Unit-tested | Counter read live; no overloaded recording to confirm the toast |
+| Skipped-frames report | Works | A real League practice game (3440x1440, 60 fps, 12 Mbit) logged 0.3 % skipped, down from 4.3 % before the lighter preset; the over-2 % toast itself has not fired for real |
 | Microphone track, game-only audio | Works against ordinary apps | Live with test tones; not yet in a real game |
 | Events Only + clip hotkey | Works | Live with a stand-in process; not yet in a real game |
 | Hybrid and Full Match | Unit-tested | Not yet run in a real game |
@@ -245,6 +245,9 @@ Differences from the plan above:
 - **`plugins/scoring.py`** derives multi-kills from plain kills for screen-reading plugins.
   Clutch detection, in the v2 plan, was dropped: CS2's Game State Integration gives a playing
   client no teammate state, and no other supported game has the concept.
+- **Full session keeps event marks.** It was built to keep none (that was Hybrid's job), and a
+  real League game showed the result: objectives taken, nothing in the recording. Hybrid is
+  now the same mode under an older name.
 - **Not built:** audio cue detection, Battle.net/EA scan, per-game resolution/bitrate/encoder,
   OBS chapter markers (recordings are MKV), Dota 2 and Rocket League plugins, an installer
   (the build produces a zip).

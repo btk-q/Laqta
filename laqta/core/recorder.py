@@ -2,8 +2,8 @@
 and every method must be called from the one core thread.
 
 Modes (game["mode"]):
-  session  record from game start until exit
-  hybrid   like session, and remember when events happened so clips can be cut later
+  session  record from game start until exit, remembering when events happened
+  hybrid   the same as session now (kept so older settings files still load)
   match    record from each match_start event to match_end (needs a plugin), with event marks
   events   keep OBS's replay buffer running; save a clip around each event
 """
@@ -161,8 +161,8 @@ class Recorder:
                 # Merge: push the save back, but never past what the replay buffer still holds.
                 self._window[1] = min(ev.t + self.post, self._window[0] + self.max_clip)
                 self._events.append(ev)
-        elif mode != "session" and self._rec_start is not None:
-            self._marks.append(ev)
+        elif self._rec_start is not None:
+            self._marks.append(ev)  # every recording mode keeps marks: a recording without them cannot be searched
 
     @_obs_guard
     def obs_event(self, name: str, data: dict) -> None:
@@ -216,7 +216,7 @@ class Recorder:
             self._pending = (self.game, events, keep, keep - (ev.t - events[0].t))
             self._save_timeout = self.clock() + SAVE_TIMEOUT
             return True
-        if self._rec_start is not None and self.game["mode"] != "session":
+        if self._rec_start is not None:
             self._marks.append(ev)
             return True
         return False

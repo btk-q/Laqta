@@ -57,17 +57,17 @@ Recordings go to `Videos\Laqta\<Game>\<date>\`. Change the folder in **Settings 
 
 | Mode | What you get |
 |---|---|
-| Full session | One file from the moment the game opens until it closes. The default. |
-| Hybrid | The full session, plus a `.json` next to it marking when each event happened. |
+| Full session | One file from the moment the game opens until it closes, plus a `.json` next to it marking when each event and hotkey press happened. The default. |
+| Hybrid | The same as Full session (which used to keep no marks). Kept so older settings still work. |
 | Full match | One file per match. Needs a game with event detection; others record the session. |
 | Events only | Nothing is kept except short clips around each event or hotkey press. |
 
 Two hotkeys, both changeable in **Settings → General**:
 
 - **Ctrl+Alt+F9, clip:** in Events only, saves a clip around this moment (with time before and
-  after). In Hybrid and Full match it adds a mark.
+  after). In the recording modes it adds a mark.
 - **Ctrl+Alt+F10, instant replay:** saves the last 30 seconds, ending the moment you press it.
-  In Hybrid and Full match it adds a mark.
+  In the recording modes it adds a mark.
 
 **Clips window:** search by game, tag or event; filter by game, event, date and favourites;
 play, tag, export as MP4, show in folder, or delete to the Recycle Bin.
@@ -139,7 +139,7 @@ your microphone. Ordinary players use track 1.
 - MP4 exports carry track 1 only.
 - **Mark the moment when I shout** (Settings → Audio, off by default, needs the microphone
   on): when the microphone stays loud for a moment, Laqta saves a clip in Events only or adds
-  a mark in Hybrid and Full match, at most once every 10 seconds. It only compares the
+  a mark to the recording in the other modes, at most once every 10 seconds. It only compares the
   loudness figure OBS already measures; it does not listen to words, and nothing leaves the
   PC. Set how loud counts with the dB box. Unverified with a real voice: it was checked with
   a test tone.

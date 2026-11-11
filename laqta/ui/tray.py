@@ -133,8 +133,8 @@ class TrayApp:
         self.status.setText(text)
         self.tray.setToolTip(f"Laqta — {text}"[:127])  # Windows truncates tray tooltips
         live = s["state"] == "active" and (s["recording"] or s["mode"] == "events")
-        self.clip.setEnabled(live and s["mode"] != "session")
-        self.replay.setEnabled(live and s["mode"] != "session")
+        self.clip.setEnabled(live)
+        self.replay.setEnabled(live)
         self.tray.setIcon(self.icons["rec" if live else "idle" if s["state"] == "idle" else "busy"])
 
     def toast(self, text: str) -> None:
