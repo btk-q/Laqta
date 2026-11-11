@@ -88,7 +88,7 @@ for a laugh, and so on). They appear on the trim window's timeline with a legend
 on each clip's tags, and on a strip in the side panel that shows where in the video each
 event happened; click a symbol there to open the trim window on that moment.
 
-**Clips window:** search by game, tag or event; filter by game, event, date and favourites;
+**Clips window:** videos are grouped by game and day, newest first. Search by game, tag or event; filter by game, event, date and favourites;
 play, tag, export as MP4, show in folder, or delete to the Recycle Bin.
 
 **Trim and export** opens a filmstrip of the video with two handles and a marker for each
@@ -148,7 +148,7 @@ Everything here is off until you turn it on, in **Settings → Sharing**.
 
 ### Adding a game
 
-**Settings → Games → Add a game…** opens a searchable list of the games installed on this PC
+**Settings → Add a game…** (at the bottom of the sidebar, under **My games**) opens a searchable list of the games installed on this PC
 (from your Steam, Epic and GOG libraries) and the programs running right now. Select one or
 more and add them; "Browse for a program…" covers anything else. The list is built from your
 own PC; nothing is looked up online. Deadlock is in the built-in list (recording and hotkeys;
@@ -156,6 +156,13 @@ it has no event detection, because the game offers no official data feed).
 
 Each game's page shows the recording mode as three choices and, for games with event
 detection, one tile per event with its symbol: switch off the ones you do not want marked.
+
+### Video quality
+
+**Settings → Recording** offers four choices: **Light** (720p, 30 fps), **Balanced** (1080p,
+60 fps), **High** (your screen's full size, 60 fps, near-lossless) and **Custom**, which
+shows the size, frame rate, encoder and bitrate controls. A game can still have its own
+values on its page.
 
 ### Sound
 

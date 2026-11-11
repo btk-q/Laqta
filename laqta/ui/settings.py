@@ -33,6 +33,19 @@ def builtin_exes() -> set[str]:
     return {g["exe"].lower() for g in json.loads(GAMES_JSON.read_text(encoding="utf-8"))}
 
 
+# Video quality in one choice. "custom" is whatever does not match one of these.
+VIDEO_PRESETS = {
+    "light": {"quality": "Stream", "fps": 30, "output_height": 720, "bitrate": 0},
+    "balanced": {"quality": "Small", "fps": 60, "output_height": 1080, "bitrate": 0},
+    "high": {"quality": "HQ", "fps": 60, "output_height": 0, "bitrate": 0},
+}
+
+
+def preset_of(values: dict) -> str:
+    """Which preset these video settings are, or "custom"."""
+    return next((name for name, preset in VIDEO_PRESETS.items() if all(values.get(k) == v for k, v in preset.items())), "custom")
+
+
 def set_game(cfg: dict, exe: str, **fields) -> None:
     """Create or update the user's entry for `exe`. A field set to None is removed."""
     entry = next((g for g in cfg["games"] if g["exe"].lower() == exe.lower()), None)
@@ -202,7 +215,7 @@ class SettingsWindow(QDialog):
 
         self.rail = QListWidget()
         self.rail.setObjectName("rail")
-        self.rail.setFixedWidth(196)
+        self.rail.setFixedWidth(230)
         self.rail.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.pages = QStackedWidget()
         for key, page in (("nav.general", self._general()), ("nav.games", self._games()), ("nav.recording", self._recording()),
@@ -213,8 +226,30 @@ class SettingsWindow(QDialog):
             scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             scroll.setWidget(page)
             self.pages.addWidget(scroll)
-        self.rail.currentRowChanged.connect(self.pages.setCurrentIndex)
+        # The Games page is reached by picking a game under "My games", not from this list.
+        self.rail.item(1).setHidden(True)
+        self.rail.setFixedHeight(sum(self.rail.sizeHintForRow(i) for i in range(self.rail.count()) if i != 1) + 34)
+        self.rail.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.rail.currentRowChanged.connect(self._page_chosen)
         self.rail.setCurrentRow(0)
+        add = QPushButton(t("games.add_title"))
+        add.clicked.connect(self._add_game)
+        side = QVBoxLayout()
+        side.setContentsMargins(1, 14, 1, 12)  # 1 px each side so the lists do not cover the sidebar border
+        side.setSpacing(0)
+        side.addWidget(_label(t("nav.settings"), "railTitle"))
+        side.addWidget(self.rail)
+        side.addWidget(_label(t("nav.my_games"), "railTitle"))
+        side.addWidget(self.game_list, 1)
+        side.addWidget(self.scan_result)
+        below = QHBoxLayout()
+        below.setContentsMargins(12, 8, 12, 0)
+        below.addWidget(add)
+        side.addLayout(below)
+        sidebar = QWidget()
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(232)
+        sidebar.setLayout(side)
 
         save, cancel = QPushButton(t("button.save")), QPushButton(t("button.cancel"))
         save.setObjectName("primary")
@@ -235,8 +270,20 @@ class SettingsWindow(QDialog):
         root = QHBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-        root.addWidget(self.rail)
+        root.addWidget(sidebar)
         root.addLayout(right, 1)
+
+    def _page_chosen(self, row: int) -> None:
+        self.pages.setCurrentIndex(row)
+        if row != 1 and self.game_list.currentItem() is not None:  # left the games: nothing stays highlighted there
+            self.game_list.blockSignals(True)
+            self.game_list.setCurrentRow(-1)
+            self.game_list.blockSignals(False)
+
+    def _game_chosen(self) -> None:
+        self._show_game()
+        if self.game_list.currentItem() is not None:
+            self.rail.setCurrentRow(1)
 
     def _page(self, title_key: str) -> tuple[QWidget, QVBoxLayout]:
         page = QWidget()
@@ -303,11 +350,33 @@ class SettingsWindow(QDialog):
         self.post = _spin(self.cfg["post_seconds"], 0, 60)
         self.max_clip = _spin(self.cfg["max_clip_seconds"], 10, 300)
         self.debounce = _spin(self.cfg["exit_debounce_seconds"], 0, 120)
-        form.addRow(t("rec.quality"), self.quality)
-        form.addRow(t("rec.fps"), self.fps)
-        form.addRow(t("rec.output"), self.output_height)
-        form.addRow(t("rec.encoder"), self.encoder)
-        form.addRow(t("rec.bitrate"), self.bitrate)
+        video = QFormLayout()
+        video.setVerticalSpacing(14)
+        video.setHorizontalSpacing(20)
+        video.addRow(t("rec.quality"), self.quality)
+        video.addRow(t("rec.fps"), self.fps)
+        video.addRow(t("rec.output"), self.output_height)
+        video.addRow(t("rec.encoder"), self.encoder)
+        video.addRow(t("rec.bitrate"), self.bitrate)
+        self.custom_video = QWidget()  # the detailed controls, shown only for "Custom"
+        self.custom_video.setObjectName("page")
+        self.custom_video.setLayout(video)
+        tiles = QGridLayout()
+        tiles.setSpacing(8)
+        self.presets: dict[str, Tile] = {}
+        group = QButtonGroup(page)
+        current = preset_of(self.cfg)
+        for i, name in enumerate((*VIDEO_PRESETS, "custom")):
+            tile = self.presets[name] = Tile(t(f"preset.{name}"), t(f"preset.{name}.hint"))
+            tile.setChecked(name == current)
+            tile.clicked.connect(lambda _=False, chosen=name: self._use_preset(chosen))
+            group.addButton(tile)
+            tiles.addWidget(tile, i // 2, i % 2)
+        layout.addWidget(_label(t("rec.preset")))
+        layout.addLayout(tiles)
+        layout.addWidget(self.custom_video)
+        self.custom_video.setVisible(current == "custom")
+        layout.addSpacing(6)
         form.addRow(t("rec.pre"), self.pre)
         form.addRow(t("rec.post"), self.post)
         form.addRow(t("rec.max_clip"), self.max_clip)
@@ -338,6 +407,13 @@ class SettingsWindow(QDialog):
         layout.addWidget(self.folder_note)
         layout.addStretch(1)
         return page
+
+    def _use_preset(self, name: str) -> None:
+        """A preset fills in the detailed controls (which is what gets saved); Custom reveals them."""
+        self.custom_video.setVisible(name == "custom")
+        for key, value in VIDEO_PRESETS.get(name, {}).items():
+            widget = {"quality": self.quality, "fps": self.fps, "output_height": self.output_height, "bitrate": self.bitrate}[key]
+            widget.setValue(value) if key == "bitrate" else widget.setCurrentIndex(max(0, widget.findData(value)))
 
     @staticmethod
     def _encoder_options(first: str, first_value) -> list[tuple[str, object]]:
@@ -561,32 +637,18 @@ class SettingsWindow(QDialog):
     # -- Games -----------------------------------------------------------------
 
     def _games(self) -> QWidget:
-        page, layout = self._page("nav.games")
-        self.game_list = QListWidget()
-        self.game_list.setFixedWidth(220)
-        self.game_list.setMinimumHeight(300)
+        self.game_list = QListWidget()  # shown in the sidebar under "My games"
+        self.game_list.setObjectName("rail")
         self.game_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.game_list.setTextElideMode(Qt.TextElideMode.ElideMiddle)
-        self.game_list.currentItemChanged.connect(lambda *_: self._show_game())
-        add = QPushButton(t("games.add_title"))
-        add.setObjectName("primary")
-        add.clicked.connect(self._add_game)
+        self.game_list.currentItemChanged.connect(lambda *_: self._game_chosen())
         self.scan_result = _label("", "hint")
-        left = QVBoxLayout()
-        left.addWidget(add)  # above the list: below it, it fell off the bottom of a short window
-        left.addWidget(self.game_list, 1)
-        left.addWidget(self.scan_result)
-
-        self.detail = QVBoxLayout()
-        self.detail.setContentsMargins(20, 0, 0, 0)
+        self.scan_result.setContentsMargins(16, 4, 12, 0)
+        page = QWidget()
+        page.setObjectName("page")
+        self.detail = QVBoxLayout(page)
+        self.detail.setContentsMargins(28, 22, 28, 8)
         self.detail.setSpacing(10)
-        holder = QWidget()
-        holder.setObjectName("page")
-        holder.setLayout(self.detail)
-        body = QHBoxLayout()
-        body.addLayout(left)
-        body.addWidget(holder, 1)
-        layout.addLayout(body, 1)
         self._fill_games()
         return page
 
@@ -624,7 +686,7 @@ class SettingsWindow(QDialog):
             self.detail.addStretch(1)
             return
         exe = game["exe"]
-        self.detail.addWidget(_label(game.get("name") or exe, "gameName"))
+        self.detail.addWidget(_label(game.get("name") or exe, "heading"))
         self.detail.addWidget(_label(exe, "muted"))
 
         tiles = QGridLayout()

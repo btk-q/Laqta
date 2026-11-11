@@ -57,3 +57,31 @@ def test_library_captions():
     assert caption(older, today) == "Hades II\n2026-10-01 09:05   1 MB"
     assert (clock(7), clock(125), clock(3725)) == ("0:07", "2:05", "1:02:05")
     assert (size_text(900 * 1024**2), size_text(1536 * 1024**2)) == ("900 MB", "1.5 GB")
+
+
+def test_videos_are_grouped_by_game_and_day_newest_first():
+    import datetime
+    from pathlib import Path
+
+    from laqta.storage.library import Clip
+    from laqta.ui.library import day_text, grouped
+
+    def clip(game, day, hour):
+        return Clip(Path(f"{game}-{day}-{hour}.mkv"), game, datetime.datetime(2026, 11, day, hour), 1, "clip")
+
+    groups = grouped([clip("LoL", 10, 9), clip("CS2", 11, 8), clip("LoL", 11, 20), clip("LoL", 11, 7), clip("CS2", 10, 23)])
+    assert [(game, day.day, [c.when.hour for c in members]) for game, day, members in groups] == [
+        ("LoL", 11, [20, 7]), ("CS2", 11, [8]), ("CS2", 10, [23]), ("LoL", 10, [9])]
+    today = datetime.date(2026, 11, 11)
+    assert [day_text(datetime.date(2026, 11, d), today) for d in (11, 10, 2)] == ["Today", "Yesterday", "2026-11-02"]
+
+
+def test_video_presets():
+    from laqta.storage import config
+    from laqta.ui.settings import VIDEO_PRESETS, preset_of
+
+    assert preset_of({**config.DEFAULTS, **VIDEO_PRESETS["balanced"]}) == "balanced"
+    assert preset_of({**config.DEFAULTS, **VIDEO_PRESETS["high"], "encoder": "obs_x264"}) == "high"  # the encoder is not part of a preset
+    assert preset_of({**config.DEFAULTS, "bitrate": 12000}) == "custom"
+    for preset in VIDEO_PRESETS.values():
+        config._check({**config.DEFAULTS, **preset})  # every preset is a valid setting

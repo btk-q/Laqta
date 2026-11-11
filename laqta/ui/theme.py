@@ -97,7 +97,11 @@ QStackedWidget#detail QPushButton#primary {{ background: {c['accent_fill']}; }}
 QLabel#empty {{ color: {c['muted']}; font-size: 15px; background: transparent; }}
 
 QListWidget {{ background: {c['panel']}; border: none; outline: 0; padding: 6px; }}
-QListWidget#rail {{ padding: 14px 8px; font-size: 14px; }}
+QListWidget#rail {{ padding: 4px 8px; font-size: 14px; }}
+QWidget#sidebar {{ background: {c['panel']}; border-right: 1px solid {c['line']}; }}
+QLabel#railTitle {{ color: {c['muted']}; font-size: 12px; font-weight: 600; padding: 10px 20px 4px 20px; background: transparent; }}
+QWidget#sidebar QLabel {{ background: transparent; }}
+QWidget#sidebar QPushButton {{ background: {c['ink']}; }}
 QListWidget::item {{ padding: 8px 12px; border-radius: 6px; margin: 1px 0; }}
 QListWidget::item:hover {{ background: {c['line']}; }}
 QListWidget::item:selected {{ background: {c['accent_dim']}; color: {c['text']}; }}

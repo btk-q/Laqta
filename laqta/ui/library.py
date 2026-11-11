@@ -21,6 +21,7 @@ from ..storage.library import Clip
 from . import icons, theme
 
 THUMB = QSize(256, 144)
+HEADING_ROLE = Qt.ItemDataRole.UserRole + 1  # (game, day) on the grid's heading rows
 CACHE = config.DIR / "thumbs"
 
 
@@ -39,6 +40,20 @@ def when_text(when: datetime.datetime, today: datetime.date | None = None) -> st
     days = (today - when.date()).days
     day = t("library.today") if days == 0 else t("library.yesterday") if days == 1 else when.strftime("%Y-%m-%d")
     return f"{day} {when:%H:%M}"
+
+
+def day_text(day: datetime.date, today: datetime.date | None = None) -> str:
+    days = ((today or datetime.date.today()) - day).days
+    return t("library.today") if days == 0 else t("library.yesterday") if days == 1 else day.strftime("%Y-%m-%d")
+
+
+def grouped(clips: list[Clip]) -> list[tuple[str, datetime.date, list[Clip]]]:
+    """Videos as the window shows them: one group per game per day, newest day first, and
+    inside a day the game played most recently first."""
+    groups: dict[tuple[datetime.date, str], list[Clip]] = {}
+    for clip in sorted(clips, key=lambda c: c.when, reverse=True):
+        groups.setdefault((clip.when.date(), clip.game), []).append(clip)
+    return [(game, day, members) for (day, game), members in groups.items()]
 
 
 def caption(clip: Clip, today: datetime.date | None = None) -> str:
@@ -136,14 +151,40 @@ class Card(QStyledItemDelegate):
     PAD, RADIUS = 10, 8
     SIZE = QSize(THUMB.width() + 2 * PAD, THUMB.height() + 2 * PAD + 74)
 
+    HEADING = 44
+
     def sizeHint(self, option, index) -> QSize:
+        if index.data(Qt.ItemDataRole.UserRole) is None:  # a heading takes a whole row of the grid
+            return QSize(max(200, self.parent().viewport().width() - 28), self.HEADING)
         return self.SIZE
+
+    def _heading(self, painter: QPainter, option, index, lead) -> None:
+        game, day = index.data(HEADING_ROLE)
+        c = theme.current
+        painter.save()
+        box = QRectF(option.rect).adjusted(self.PAD + 2, 12, -self.PAD, 0)
+        name = QFont(option.font)
+        name.setPixelSize(16)
+        name.setWeight(QFont.Weight.DemiBold)
+        painter.setFont(name)
+        painter.setPen(QColor(c["text"]))
+        painter.drawText(box, lead | Qt.AlignmentFlag.AlignVCenter, game)
+        used = painter.fontMetrics().horizontalAdvance(game) + 12
+        when = QFont(option.font)
+        when.setPixelSize(13)
+        painter.setFont(when)
+        painter.setPen(QColor(c["muted"]))
+        rest = box.adjusted(0, 0, -used, 0) if lead == Qt.AlignmentFlag.AlignRight else box.adjusted(used, 0, 0, 0)
+        painter.drawText(rest, lead | Qt.AlignmentFlag.AlignVCenter, day)
+        painter.restore()
 
     def paint(self, painter: QPainter, option, index) -> None:
         clip: Clip = index.data(Qt.ItemDataRole.UserRole)
         c = theme.current
         rtl = option.direction == Qt.LayoutDirection.RightToLeft
         lead = Qt.AlignmentFlag.AlignRight if rtl else Qt.AlignmentFlag.AlignLeft
+        if clip is None:
+            return self._heading(painter, option, index, lead)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         box = QRectF(option.rect).adjusted(2, 2, -2, -2)
@@ -190,7 +231,7 @@ class Card(QStyledItemDelegate):
         title.setWeight(QFont.Weight.DemiBold)
         painter.setFont(title)
         painter.setPen(QColor(c["text"]))
-        painter.drawText(line, lead | Qt.AlignmentFlag.AlignVCenter, painter.fontMetrics().elidedText(clip.game, Qt.TextElideMode.ElideRight, int(line.width())))
+        painter.drawText(line, lead | Qt.AlignmentFlag.AlignVCenter, painter.fontMetrics().elidedText(f"{t('card.' + clip.kind) if clip.kind in ('clip', 'recording') else clip.kind}  {clip.when:%H:%M}", Qt.TextElideMode.ElideRight, int(line.width())))
         sub = QFont(option.font)
         sub.setPixelSize(12)
         painter.setFont(sub)
@@ -198,11 +239,9 @@ class Card(QStyledItemDelegate):
         line.translate(0, 20)
         stats = library.summary(clip)
         if stats and (stats["kills"] or stats["deaths"] or stats["assists"]) and "goals" not in stats:
-            about = f"{when_text(clip.when)}   {t('card.kda', kills=stats['kills'], deaths=stats['deaths'], assists=stats['assists'])}"
-        elif clip.kind == "clip" or not clip.size:
-            about = when_text(clip.when)
+            about = f"{t('card.kda', kills=stats['kills'], deaths=stats['deaths'], assists=stats['assists'])}   {size_text(clip.size)}"
         else:
-            about = f"{when_text(clip.when)}   {size_text(clip.size)}"
+            about = size_text(clip.size)
         painter.drawText(line, lead | Qt.AlignmentFlag.AlignVCenter, about)
 
         # what happened, as small tags from the leading edge
@@ -356,10 +395,9 @@ class LibraryWindow(QDialog):
         self.grid.setViewMode(QListView.ViewMode.IconMode)
         self.grid.setItemDelegate(Card(self.grid))
         self.grid.setIconSize(THUMB)
-        self.grid.setGridSize(Card.SIZE + QSize(8, 8))
+        self.grid.setSpacing(4)
         self.grid.setResizeMode(QListView.ResizeMode.Adjust)
         self.grid.setMovement(QListView.Movement.Static)
-        self.grid.setUniformItemSizes(True)
         self.grid.setMouseTracking(True)  # for the hover highlight
         self.grid.itemSelectionChanged.connect(self._selection_changed)
         self.grid.itemDoubleClicked.connect(lambda _: self._play())
@@ -505,16 +543,20 @@ class LibraryWindow(QDialog):
 
         self.grid.clear()
         self.items.clear()
-        for clip in self.clips:
-            item = QListWidgetItem(QIcon(placeholder(clip.game)), caption(clip))
-            item.setData(Qt.ItemDataRole.UserRole, clip)
-            item.setToolTip(str(clip.path))
-            item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
-            self.grid.addItem(item)
-            self.items[str(clip.path)] = item
-            self.pool.start(_Thumbnailer(clip.path, self.signals))
-            if select is not None and clip.path == select:
-                self.grid.setCurrentItem(item)
+        for game, day, members in grouped(self.clips):
+            heading = QListWidgetItem()
+            heading.setFlags(Qt.ItemFlag.NoItemFlags)  # not a video: cannot be selected
+            heading.setData(HEADING_ROLE, (game, day_text(day)))
+            self.grid.addItem(heading)
+            for clip in members:
+                item = QListWidgetItem(QIcon(placeholder(clip.game)), caption(clip))
+                item.setData(Qt.ItemDataRole.UserRole, clip)
+                item.setToolTip(str(clip.path))
+                self.grid.addItem(item)
+                self.items[str(clip.path)] = item
+                self.pool.start(_Thumbnailer(clip.path, self.signals))
+                if select is not None and clip.path == select:
+                    self.grid.setCurrentItem(item)
         self._filter()
 
     def _thumb_ready(self, video: str, thumb: str) -> None:
@@ -528,15 +570,20 @@ class LibraryWindow(QDialog):
             item.setIcon(QIcon(pixmap.copy(x, y, THUMB.width(), THUMB.height())))
 
     def _filter(self) -> None:
-        shown, total = 0, 0
+        shown, total, heading = 0, 0, None
         for i in range(self.grid.count()):
             item = self.grid.item(i)
             clip = item.data(Qt.ItemDataRole.UserRole)
+            if clip is None:  # a heading: shown only if something under it is
+                heading = item
+                heading.setHidden(True)
+                continue
             visible = library.matches(clip, self.game.currentData(), self.event.currentData(), self.days.currentData(),
                                       self.kind.currentData(), text=self.search.text(), favorite=self.favorites.isChecked())
             item.setHidden(not visible)
             if visible:
                 shown, total = shown + 1, total + clip.size
+                heading.setHidden(False)
             elif item.isSelected():
                 item.setSelected(False)
         free = clips.free_bytes(self.root)
@@ -621,7 +668,8 @@ class LibraryWindow(QDialog):
                 self.status.setText(t("library.trimmed", name=made.name))
 
     def visible(self) -> list[Clip]:
-        return [self.grid.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.grid.count()) if not self.grid.item(i).isHidden()]
+        items = (self.grid.item(i) for i in range(self.grid.count()))
+        return [item.data(Qt.ItemDataRole.UserRole) for item in items if not item.isHidden() and item.data(Qt.ItemDataRole.UserRole)]
 
     def _reel(self) -> None:
         """Join the best moments of everything currently shown (so the filters choose the material)."""
