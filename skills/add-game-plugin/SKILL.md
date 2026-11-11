@@ -14,6 +14,9 @@ Read these first; they are short and are the patterns to copy:
 - `laqta/core/events.py` — `GameEvent` and the `GamePlugin` interface
 - `laqta/plugins/lol_live.py` — polling a local API
 - `laqta/plugins/cs2_gsi.py` — receiving data the game posts to us, plus installing a config file
+- `laqta/plugins/rocket_league.py` — reading a local TCP stream the game serves, switching the
+  feature on in the game's own settings file, and working out which player is the user when
+  the game does not say
 - `laqta/plugins/vision.py` and `valorant_vision.py` — reading regions of the screen
 
 ## The rule that is not negotiable
@@ -33,18 +36,26 @@ workaround.
 ## Step 1: find out what the game really offers
 
 Do not design from memory of how an API "should" look. Field names and behaviour drift, and
-two of the three existing plugins had details that only real data settled. Look up the
+every existing plugin had details that only real data settled. Look up the
 current official documentation, then get real data before writing detection logic:
 
-- API or feed: add a dump switch like the existing ones (`LAQTA_LOL_DUMP`, `LAQTA_GSI_DUMP`
-  write the raw data to a file) and ask the user to play one match with it set.
+- API or feed: add a dump switch like the existing ones (`LAQTA_LOL_DUMP`, `LAQTA_GSI_DUMP`,
+  `LAQTA_RL_DUMP` write the raw data to a file) and ask the user to play one match with it set.
+  If you must write the plugin before that match exists, say in the module docstring and the
+  test file that it is built from a description and not yet from a capture, and mark it
+  unverified in the README table until the capture replaces the hand-built messages.
+- Look at the real files on the user's PC before trusting a description of them. Rocket
+  League's settings file turned out to be already present, in a different folder from the
+  one most write-ups name.
 - Screen: ask the user for one recorded match (Laqta records it in session mode), then pull
   frames out of the video with ffmpeg.
 
 Things to establish, because each has bitten an existing plugin:
 
 - How do you tell the **local player's** events from everyone else's? (CS2 swaps `player` to
-  whoever you spectate after death; League reports names without the `#tag`.)
+  whoever you spectate after death; League reports names without the `#tag`; Rocket League
+  has no marker at all, so the plugin matches the Steam ids signed in on the PC and offers a
+  "your name in this game" box, shown when the plugin class sets `wants_player = True`.)
 - What marks a match starting and ending, and what happens if the game process dies first?
 - What does the data look like when you join late or reconnect? Old events must not replay
   as new clips.
@@ -81,6 +92,10 @@ twice. `setup(game)` is optional, for a one-time install such as a config file t
 reads; return a short message if the user has to do something (for example restart the game).
 
 If you open a local listener, bind `127.0.0.1` only and require a secret, as `cs2_gsi.py` does.
+If the game needs a setting changed, ask the user before the first edit, change the user's
+own settings file rather than anything in the install folder, change only the line you need,
+leave a value the user already chose alone, and return a message from `setup()` when a
+restart is needed. Messages a plugin shows go in `laqta/i18n.py` in both languages.
 For screen plugins, subclass `VisionPlugin` and return `Signal`s; do not write a capture loop.
 
 ## Step 4: register it
@@ -90,6 +105,8 @@ For screen plugins, subclass `VisionPlugin` and return `Signal`s; do not write a
    entry, with the exact exe name, if the game is new).
 3. `laqta/i18n.py` — add English and Arabic names for any new event types, as
    `"event.<type>"`. A test fails if a language is missing.
+4. `laqta/storage/highlights.py` — give a new event type a weight in `WEIGHTS`, or the
+   highlight reel treats it as barely interesting.
 
 Nothing else needs to change: the settings window lists the plugin's `event_types` as
 toggles automatically.
