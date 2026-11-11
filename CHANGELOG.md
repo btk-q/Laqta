@@ -2,6 +2,36 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## 0.4.0
+
+**A new look, and Laqta now shows you what happened in every video.**
+
+### New
+- **Redesigned main window.** A header shows what Laqta is doing right now (waiting,
+  recording, or a problem). Your videos are grouped by game and day, each with its length on
+  the picture and small tags for what happened. Select one to get a bigger preview and all
+  its actions in a side panel.
+- **A symbol for every event.** Kills, deaths, assists, objectives, goals, wins and more each
+  have their own coloured symbol: on the trim timeline (with a legend), on the cards, and on
+  a strip that shows where in the video each one happened. Click a symbol on the strip to
+  jump straight to that moment.
+- **Funny moments (optional).** Turn on "Catch funny moments when I laugh" in Settings, Audio.
+  Laqta marks each laugh and, when the game closes, also saves the minutes around it as its
+  own clip. It listens for the rhythm of laughing in your microphone's loudness, so it is
+  approximate: loud, fast talking can set it off.
+- **Add a game by searching.** Settings, "Add a game" lists the games installed on your PC
+  (Steam, Epic, GOG) and the programs running now. Type to find one.
+- **Deadlock** is in the built-in list (recording and hotkeys; no automatic events yet).
+- **Video quality in one click:** Light, Balanced, High or Custom.
+- **Settings sidebar:** your games are listed under the settings pages; click one to open it.
+  Recording mode and events are now tiles you click.
+- **The window can be maximised**, and the footer shows free disk space.
+
+### Fixed
+- Thumbnails no longer show a black loading screen.
+- The update download (about 94 MB) is now removed after installing.
+- A summary line of "Kills 0, deaths 0, assists 0" is no longer shown.
+
 ## 0.3.1
 
 ### Fixed
