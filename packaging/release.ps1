@@ -11,8 +11,8 @@ $version = & $py -c "import laqta; print(laqta.__version__)"
 $tag = "v$version"
 
 if (git status --porcelain) { throw "Commit your changes first: the release must match what is in git." }
-gh release view $tag *> $null
-if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists. Raise the number in laqta\__init__.py." }
+$existing = gh release list --limit 100 --json tagName --jq ".[].tagName"
+if ($existing -contains $tag) { throw "Release $tag already exists. Raise the number in laqta\__init__.py." }
 
 # The patch notes are this version's section of CHANGELOG.md.
 $notes = & $py -c "import re,sys,pathlib; t=pathlib.Path('CHANGELOG.md').read_text(encoding='utf-8'); m=re.search(r'(?ms)^## +v?' + re.escape(sys.argv[1]) + r'\b[^\n]*\n(.*?)(?=^## |\Z)', t); print(m.group(1).strip() if m else '')" $version
