@@ -16,8 +16,7 @@ if ($existing -contains $tag) { throw "Release $tag already exists. Raise the nu
 
 $file = Join-Path $env:TEMP "laqta-notes-$version.md"
 # Fails here, before the slow build, if the patch notes have not been written.
-& $py packaging
-otes.py $version "no-zip-yet" $file
+& $py packaging/notes.py $version "no-zip-yet" $file
 if ($LASTEXITCODE -ne 0) { throw "Write the patch notes first: add a '## $version' section to CHANGELOG.md." }
 
 & $py -m pytest -q
@@ -27,8 +26,7 @@ powershell -NoProfile -File packaging\build.ps1
 if ($LASTEXITCODE -ne 0) { throw "Build failed; nothing was published." }
 $zip = "dist\Laqta-$version-win64.zip"
 
-& $py packaging
-otes.py $version $zip $file   # again, now with the zip's hash
+& $py packaging/notes.py $version $zip $file  # again, now with the zip's hash
 
 git push origin HEAD
 gh release create $tag $zip --title "Laqta $version" --notes-file $file
