@@ -10,6 +10,7 @@ from pathlib import Path
 CHEVRON = Path(__file__).with_name("chevron.png").as_posix()
 DEFAULT_ACCENT = "#8B5CF6"
 REC = "#FF3B3B"
+STATUS = {"ok": "#3DD68C", "warn": "#F5A524", "bad": REC}  # health badges; each also carries a word
 PRESETS = {  # name -> accent; red is left out on purpose
     "violet": "#8B5CF6",
     "blue": "#4C8DFF",
@@ -121,6 +122,11 @@ QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {c['line']}
 QCheckBox::indicator:checked {{ background: {c['accent']}; border-color: {c['accent']}; }}
 QCheckBox::indicator:focus {{ border-color: {c['accent']}; }}
 
+QLabel#badge_ok, QLabel#badge_warn, QLabel#badge_bad {{ border-radius: 6px; padding: 3px 8px; font-weight: 600; background: {c['panel']}; }}
+QLabel#badge_ok {{ color: {STATUS['ok']}; }}
+QLabel#badge_warn {{ color: {STATUS['warn']}; }}
+QLabel#badge_bad {{ color: {STATUS['bad']}; }}
+QLabel#checkTitle {{ font-weight: 600; }}
 QLabel#preview {{ background: #000000; border-radius: 6px; }}
 QProgressBar {{ background: {c['panel']}; border: none; border-radius: 4px; }}
 QProgressBar::chunk {{ background: {c['accent']}; border-radius: 4px; }}

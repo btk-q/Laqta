@@ -97,6 +97,28 @@ def vision_test(plugin_name: str, video: str, fps: float) -> int:
     return 0
 
 
+def diagnose(out: str | None) -> int:
+    """Print the health checks and write the diagnostic zip, for when the window will not open."""
+    import datetime
+    from pathlib import Path
+
+    from .core import health
+    from .i18n import t
+
+    try:
+        cfg = config.load()
+    except (ValueError, OSError) as e:
+        print(f"settings file problem, using defaults: {e}")
+        cfg = dict(config.DEFAULTS)
+    clips.set_root(cfg["save_folder"])
+    results = health.checks(health.gather(cfg))
+    for check in results:
+        print(f"[{check.status:<4}] {t('health.' + check.key)}: {check.text}")
+    dest = Path(out or f"Laqta diagnostics {datetime.date.today().isoformat()}.zip").resolve()
+    print("saved:", health.write_zip(dest, cfg, results))
+    return 1 if any(check.status == "bad" for check in results) else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="laqta")
     parser.add_argument("--version", action="version", version=f"laqta {__version__}")
@@ -107,11 +129,15 @@ def main(argv: list[str] | None = None) -> int:
     vision.add_argument("plugin")
     vision.add_argument("video")
     vision.add_argument("--fps", type=float, default=3.0)
+    diag = sub.add_parser("diagnose", help="check that everything Laqta needs is in place and save a diagnostic zip")
+    diag.add_argument("--out", help="where to write the zip (default: the current folder)")
     args = parser.parse_args(argv)
     fmt = "%(asctime)s %(levelname)s %(name)s %(message)s"
     if args.command == "obs-check":
         logging.basicConfig(level=logging.INFO, format=fmt)
         return obs_check(args.watch)
+    if args.command == "diagnose":
+        return diagnose(args.out)
     if args.command == "vision-test":
         return vision_test(args.plugin, args.video, args.fps)
 

@@ -244,18 +244,16 @@ class Recorder:
         mode = self.game["mode"]
         buffered = mode == "events"
         self._retry_at = self.clock() + RETRY  # used if anything below fails
-        free = self._disk_short()
-        if free is not None:
-            if not self._low_disk:  # say it once, then look again quietly
-                self.notify(t("toast.disk_refuse", free=f"{free / GB:.1f}"))
-            self._low_disk, self._retry_at = True, self.clock() + DISK_RETRY
-            return
-        self._low_disk = False
         try:
             self.connect()
             running = self.obs.call("GetReplayBufferStatus" if buffered else "GetRecordStatus")["outputActive"]
             if running and self._interrupted and (buffered or self._rec_start is not None):
-                pass  # socket blip: our own output is still running, adopt it
+                pass  # socket blip: our own output is still running, adopt it (tick stops it if the disk is full)
+            elif (free := self._disk_short()) is not None:
+                if not self._low_disk:  # say it once, then look again quietly
+                    self.notify(t("toast.disk_refuse", free=f"{free / GB:.1f}"))
+                self._low_disk, self._retry_at = True, self.clock() + DISK_RETRY
+                return
             elif running and buffered:
                 self.obs.call("StopReplayBuffer")  # stale buffer with the wrong settings
                 return  # stopping is asynchronous; the retry starts it fresh
@@ -269,7 +267,7 @@ class Recorder:
         except ObsBusy as e:
             self.notify(str(e))
             return
-        self.ready, self._interrupted = True, False
+        self.ready, self._interrupted, self._low_disk = True, False, False
         self._live_at = self.clock() + LIVENESS
 
     def _start_record(self) -> None:

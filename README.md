@@ -92,6 +92,24 @@ event detection shows its length, kills, deaths, assists and result.
 toggles, quality and frame rate, clip timing, automatic cleanup by age or folder size, and
 the interface colour. Settings are stored in `%APPDATA%\Laqta\config.toml`.
 
+### Keeping it running
+
+- **Start with Windows:** tick "Start Laqta when I sign in to Windows" in **Settings → General**.
+  It adds one entry for your user account only; untick it to remove the entry. If you switch
+  it off in Task Manager instead, the box shows that.
+- **Disk space:** Laqta does not start recording with less than 5 GB free on the recordings
+  drive, and if the drive runs low mid-game it stops and saves the recording before the disk
+  fills (a recording that fills the disk is lost). It starts again by itself when there is
+  space. Change or turn off the limit in **Settings → Recording**. It never deletes files to
+  make room; that is what the cleanup settings are for.
+- **Health:** **Settings → Health** checks that OBS is installed and reachable, ffmpeg is
+  found, the recordings folder is writable, there is disk space, the hotkeys are free and the
+  video encoder is a graphics-card one, and says what to do about anything that is not right.
+- **Diagnostic file:** the Health page (or `python -m laqta diagnose`) saves a zip with Laqta's
+  log, the health results and your settings, for a bug report. Passwords and tokens are
+  removed and your user folder is written as `%USERPROFILE%`; no recordings go in, but the
+  names of games Laqta recorded do. Nothing is sent anywhere.
+
 ### Sound
 
 Recordings carry separate audio tracks: **1** is everything you hear, **2** is the game, **3** is
@@ -144,6 +162,8 @@ worked for that game. You can also force a method per game in **Settings → Gam
 - **AMD and Intel encoders are unverified.** Laqta tries NVENC, AMF, Quick Sync, then x264,
   and uses the first that starts; only NVENC and x264 have been run.
 - **Battle.net and EA libraries** are not scanned.
+- **Start with Windows is unverified across a real sign-in.** The entry is written and read
+  back correctly; nobody has signed out and in again to watch Laqta start.
 - **The editor shows stills, not moving video.** A fast trim lands on keyframes and can start
   up to two seconds early; tick "Cut on the exact frame" for a slower, exact copy.
 - **OBS crash recovery:** if OBS dies mid-game, Laqta relaunches it and starts a new file. To
@@ -191,6 +211,7 @@ A step-by-step guide for AI coding assistants is in
 .venv\Scripts\python -m pytest                 # tests; OBS and games are faked
 powershell -File packaging\build.ps1           # builds dist\Laqta\Laqta.exe and a zip
 .venv\Scripts\python -m laqta vision-test valorant "recording.mkv"   # run a vision plugin over a video
+.venv\Scripts\python -m laqta diagnose                                # health checks + diagnostic zip
 ```
 
 Set `LAQTA_GSI_DUMP` or `LAQTA_LOL_DUMP` to a file path before starting Laqta to save the raw
@@ -208,3 +229,7 @@ data CS2 or League sends, for building test fixtures.
 
 لتغيير اللغة: انقر بالزر الأيمن على الأيقونة ← **Settings** ← **Language** ← العربية.
 اختصار اللقطة الافتراضي هو **Ctrl+Alt+F9**.
+
+من **الإعدادات ← عام** يمكن تشغيل لقطة مع بدء ويندوز. ولا يبدأ التسجيل إذا قلّت المساحة
+الحرة عن 5 غيغابايت، ويتوقف ويحفظ الملف قبل امتلاء القرص. صفحة **الحالة** في الإعدادات
+تفحص ما يحتاجه لقطة وتشرح علاج أي مشكلة، ومنها يُحفظ ملف تشخيص بلا كلمات مرور.

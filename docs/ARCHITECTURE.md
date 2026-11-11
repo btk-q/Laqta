@@ -208,6 +208,9 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Trim and export editor, export presets | Works | Real ffmpeg encodes in tests; driven by script, including on a real 17-minute recording; not operated by hand |
 | Highlight reel | Works | Real join of mixed-size sources in tests; driven by script through the library window |
 | Instant-replay hotkey | Unit-tested | Recorder logic tested; the second global hotkey registers; not pressed in a real game |
+| Disk-space guard | Works | Live on OBS 33 with the free-space figure faked: refused at start, resumed, stopped mid-recording into a playable file. Never run on a disk that was really full |
+| Start with Windows | Unit-tested | Real registry writes in a throwaway key; the real Run entry has not been through a sign-in |
+| Health page, diagnostic zip | Works | Run on this PC from the window and the command line; secret removal tested with planted secrets |
 | Library scan | Steam, Epic, GOG | Steam checked on a real library; Epic and GOG from fixtures |
 | Unknown-fullscreen prompt | Unit-tested | Has not fired for real |
 | Packaged exe | Builds, imports cleanly | Not run as the only instance |
@@ -223,6 +226,9 @@ Differences from the plan above:
 - **Clip library data** is in `storage/library.py`; `storage/clips.py` only files new clips.
 - **Unknown-app prompt** is a clickable toast rather than a dialog, so it cannot take focus
   from a fullscreen game.
+- **`core/health.py`** holds the health checks (`gather` reads the machine, `checks` is pure)
+  and the diagnostic zip; **`storage/autostart.py`** owns the Run-key entry. See
+  [ADR 0003](adr/0003-reliability.md).
 - **Not built:** audio cue detection, Battle.net/EA scan, per-game resolution/bitrate/encoder,
   OBS chapter markers (recordings are MKV), Dota 2 and Rocket League plugins, an installer
   (the build produces a zip).

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )  # fmt: skip
 
+from ..core import health
 from ..core.recorder import BOUNDARIES, MODES
 from ..game_detector import library_scan
 from ..game_detector.detector import GAMES_JSON, NOT_GAMES, load_games, processes
@@ -19,7 +20,7 @@ from ..i18n import LANGUAGES, t
 from ..obs_controller import audio, encoders
 from ..obs_controller.capture import KINDS
 from ..plugins import PLUGINS
-from ..storage import clips, config
+from ..storage import autostart, clips, config
 from ..storage.clips import usable_folder
 from . import theme
 
@@ -114,9 +115,10 @@ class PickRunningApp(QDialog):
 
 
 class SettingsWindow(QDialog):
-    def __init__(self, cfg: dict, parent: QWidget | None = None):
+    def __init__(self, cfg: dict, parent: QWidget | None = None, hotkeys: dict[str, bool] | None = None):
         super().__init__(parent)
         self.cfg = copy.deepcopy(cfg)
+        self.hotkeys = hotkeys  # combo -> did Windows give it to us; shown on the Health page
         self.builtin = builtin_exes()
         self.setWindowTitle(t("settings.title"))
         self.resize(900, 660)
@@ -126,7 +128,7 @@ class SettingsWindow(QDialog):
         self.rail.setFixedWidth(170)
         self.pages = QStackedWidget()
         for key, page in (("nav.general", self._general()), ("nav.games", self._games()), ("nav.recording", self._recording()),
-                          ("nav.audio", self._audio()), ("nav.appearance", self._appearance())):
+                          ("nav.audio", self._audio()), ("nav.appearance", self._appearance()), ("nav.health", self._health())):
             self.rail.addItem(t(key))
             scroll = QScrollArea()  # pages outgrow a 768-pixel-high screen
             scroll.setWidgetResizable(True)
@@ -196,6 +198,12 @@ class SettingsWindow(QDialog):
         form.addRow(t("general.default_mode"), self.default_mode)
         form.addRow("", self.default_mode_help)
         layout.addLayout(form)
+        self._autostart = autostart.state()
+        self.autostart = QCheckBox(t("general.autostart"))
+        self.autostart.setChecked(self._autostart == "on")
+        layout.addWidget(self.autostart)
+        self.autostart_note = _label(t("general.autostart_blocked") if self._autostart == "blocked" else "", "hint")
+        layout.addWidget(self.autostart_note)
         layout.addStretch(1)
         return page
 
@@ -300,6 +308,79 @@ class SettingsWindow(QDialog):
         self.mic_enabled.toggled.connect(sync)
         sync()
         return page
+
+    # -- Health ----------------------------------------------------------------
+
+    def _health(self) -> QWidget:
+        page, layout = self._page("nav.health")
+        layout.addWidget(_label(t("health.intro"), "hint"))
+        self.health_rows = QVBoxLayout()
+        self.health_rows.setSpacing(14)
+        holder = QWidget()
+        holder.setObjectName("page")
+        holder.setLayout(self.health_rows)
+        layout.addWidget(holder)
+        again, save = QPushButton(t("health.again")), QPushButton(t("health.zip"))
+        again.clicked.connect(self._fill_health)
+        save.clicked.connect(self._save_zip)
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        row.addWidget(again)
+        row.addWidget(save)
+        row.addStretch(1)
+        layout.addSpacing(6)
+        layout.addLayout(row)
+        self.health_note = _label(t("health.zip_hint"), "hint")
+        layout.addWidget(self.health_note)
+        layout.addStretch(1)
+        self._fill_health()
+        return page
+
+    def _fill_health(self) -> None:
+        while self.health_rows.count():
+            item = self.health_rows.takeAt(0)
+            item.widget().hide()
+            item.widget().deleteLater()
+        # ponytail: checked on the UI thread (registry reads and one test write, a few
+        # milliseconds); move to a worker if a check ever needs OBS or the network.
+        self.health = health.checks(health.gather(self.cfg, self.hotkeys))
+        for check in self.health:
+            badge = _label(t(f"health.status.{check.status}"), f"badge_{check.status}")
+            badge.setWordWrap(False)
+            badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            badge.setFixedWidth(76)
+            words = QVBoxLayout()
+            words.setSpacing(2)
+            words.addWidget(_label(t(f"health.{check.key}"), "checkTitle"))
+            text = _label(check.text, "hint" if check.status == "ok" else "")
+            text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            words.addWidget(text)
+            if check.key == "encoder" and check.status == "warn":
+                fix = QPushButton(t("health.encoder.fix"))
+                fix.clicked.connect(lambda: (health.forget_encoder(), self._fill_health()))
+                words.addWidget(fix, 0, Qt.AlignmentFlag.AlignLeading)
+            line = QHBoxLayout()
+            line.setContentsMargins(0, 0, 0, 0)
+            line.setSpacing(14)
+            line.addWidget(badge, 0, Qt.AlignmentFlag.AlignTop)
+            line.addLayout(words, 1)
+            row = QWidget()
+            row.setObjectName("page")
+            row.setLayout(line)
+            self.health_rows.addWidget(row)
+
+    def _save_zip(self) -> None:
+        import datetime
+
+        name = t("health.zip_name", date=datetime.date.today().isoformat()) + ".zip"
+        chosen, _ = QFileDialog.getSaveFileName(self, t("health.zip"), str(Path.home() / "Desktop" / name), "Zip (*.zip)")
+        if not chosen:
+            return
+        try:
+            path = health.write_zip(Path(chosen), self.cfg, self.health)
+        except OSError as e:
+            return self.health_note.setText(t("health.zip_failed", error=e))
+        self.health_note.setText(t("health.zip_done", path=str(path)))
 
     # -- Appearance ------------------------------------------------------------
 
@@ -524,6 +605,12 @@ class SettingsWindow(QDialog):
         if clip_key == replay_key:  # one key cannot do both: say so instead of silently breaking one
             self.rail.setCurrentRow(0)
             return self.replay_hint.setText(t("general.hotkey_same"))
+        if self.autostart.isChecked() != (self._autostart == "on"):  # only touch the registry when the box was changed
+            try:
+                autostart.set_enabled(self.autostart.isChecked())
+            except OSError as e:
+                self.rail.setCurrentRow(0)
+                return self.autostart_note.setText(t("general.autostart_failed", error=e))
         self.cfg.update(
             replay_hotkey=replay_key,
             replay_seconds=self.replay_seconds.value(),

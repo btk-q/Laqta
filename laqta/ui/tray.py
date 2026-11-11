@@ -182,7 +182,8 @@ class TrayApp:
         if self.settings is not None:
             self.settings.raise_()
             return self.settings.activateWindow()
-        self.settings = window = SettingsWindow(self.cfg)
+        keys = {self.cfg[name]: bool(key and key.registered) for name, key in (('hotkey', self.hotkey), ('replay_hotkey', self.replay_key))}
+        self.settings = window = SettingsWindow(self.cfg, hotkeys=keys)
         window.finished.connect(lambda result: self._settings_closed(window, result))
         window.show()
 

@@ -71,3 +71,14 @@ def test_the_game_closing_while_stopped_for_disk_ends_quietly():
 
 def test_free_bytes_asks_the_nearest_folder_that_exists(tmp_path):
     assert clips.free_bytes(tmp_path / "not" / "made" / "yet") == clips.free_bytes(tmp_path) > 0
+
+
+def test_a_recording_that_survived_an_obs_blip_is_still_stopped_when_the_disk_is_full():
+    rig = rig_with(50)
+    rig.obs.down = True
+    rig.at(6)  # the liveness ping finds OBS gone
+    rig.obs.down, rig.free = False, 2 * GB
+    rig.at(10)  # back: OBS is still recording our file, so take it over rather than abandon it
+    assert rig.rec.recording and rig.obs.count("StopRecord") == 0
+    rig.at(16)
+    assert rig.obs.count("StopRecord") == 1 and len(rig.recordings) == 1 and rig.rec.state == "low_disk"
