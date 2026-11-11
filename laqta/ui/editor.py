@@ -15,7 +15,7 @@ from PySide6.QtWidgets import QCheckBox, QDialog, QHBoxLayout, QLabel, QProgress
 from ..i18n import t
 from ..storage import config, export, library
 from ..storage.library import Clip
-from . import theme
+from . import icons, theme
 
 CACHE = config.DIR / "thumbs"
 MIN_LENGTH = 0.5  # seconds a selection may not go below
@@ -102,6 +102,9 @@ class _Still(QRunnable):
             pass  # the window closed while ffmpeg worked
 
 
+BAND = 22  # height of the row of event symbols above the filmstrip
+
+
 class Timeline(QWidget):
     changed = Signal()  # the selection moved
     seek = Signal(float)  # show this moment in the preview
@@ -116,7 +119,7 @@ class Timeline(QWidget):
         self.playhead = 0.0
         self._drag: str | None = None
         self._active = "start"  # which handle the arrow keys move
-        self.setMinimumHeight(92)
+        self.setMinimumHeight(106)
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)  # time runs left to right in every language
@@ -140,7 +143,7 @@ class Timeline(QWidget):
 
     def paintEvent(self, _event) -> None:
         c, w, h = theme.current, self.width(), self.height()
-        strip = QRectF(0, 14, w, h - 14)  # the band above the strip holds the event markers
+        strip = QRectF(0, BAND, w, h - BAND)  # the band above the strip holds the event markers
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.fillRect(strip, QColor(c["panel"]))
@@ -162,13 +165,13 @@ class Timeline(QWidget):
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(c["text"] if self.hasFocus() and self._active == name else c["accent"]))
             p.drawRoundedRect(grip, 4, 4)
-        p.setBrush(QColor(c["text"]))
-        for marker in self.markers:
+        for marker in self.markers:  # each event: a line in its colour, topped by its symbol
             x = self.sel.x_at(marker["offset"], w)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawPolygon(QPolygonF([QPointF(x - 5, 2), QPointF(x + 5, 2), QPointF(x, 12)]))
-            p.setPen(QPen(QColor(c["text"]), 1))
-            p.drawLine(QPointF(x, 12), QPointF(x, h))
+            if not -10 <= x <= w + 10:
+                continue  # outside the zoomed stretch
+            p.setPen(QPen(QColor(icons.color(marker["type"])), 1.5))
+            p.drawLine(QPointF(x, BAND - 2), QPointF(x, h))
+            icons.draw(p, marker["type"], QRectF(x - 9, 1, 18, 18))
         px = self.sel.x_at(self.playhead, w)
         p.setPen(QPen(QColor("#FFFFFF"), 1, Qt.PenStyle.DashLine))
         p.drawLine(QPointF(px, strip.top()), QPointF(px, h))
@@ -189,7 +192,7 @@ class Timeline(QWidget):
 
     def mousePressEvent(self, event) -> None:
         x = event.position().x()
-        if event.position().y() <= 14 and (marker := self.sel.marker_near(x, self.width(), self.markers)):
+        if event.position().y() <= BAND and (marker := self.sel.marker_near(x, self.width(), self.markers)):
             return self._show(marker["offset"])  # a click on a marker jumps to that event
         self._drag = self.sel.handle_near(x, self.width())
         if self._drag:
@@ -232,7 +235,7 @@ class Timeline(QWidget):
 class EditorDialog(QDialog):
     """Opened from the library for one video. `finished_file` is the last file it made, if any."""
 
-    def __init__(self, clip: Clip, parent: QWidget | None = None, root: Path | None = None):
+    def __init__(self, clip: Clip, parent: QWidget | None = None, root: Path | None = None, at: float | None = None):
         super().__init__(parent)
         self.clip, self.root = clip, root
         self.info = export.probe(clip.path) or export.Info(clip.seconds or library.duration(clip.path) or 0.0, 1920, 1080, 1)
@@ -316,6 +319,20 @@ class EditorDialog(QDialog):
         layout.setSpacing(12)
         layout.addWidget(self.preview, 1)
         layout.addWidget(self.timeline)
+        if self.timeline.markers:  # what each symbol means, and how many of each there are
+            legend = QHBoxLayout()
+            legend.setSpacing(6)
+            kinds = [m["type"] for m in self.timeline.markers]
+            for kind in dict.fromkeys(kinds):
+                badge = QLabel()
+                badge.setPixmap(icons.pixmap(kind, 16))
+                name = QLabel(f"{t('event.' + kind)} {kinds.count(kind)}" if kinds.count(kind) > 1 else t("event." + kind))
+                name.setObjectName("muted")
+                legend.addWidget(badge)
+                legend.addWidget(name)
+                legend.addSpacing(12)
+            legend.addStretch(1)
+            layout.addLayout(legend)
         layout.addLayout(options)
         layout.addLayout(actions)
         layout.addLayout(working)
@@ -323,7 +340,13 @@ class EditorDialog(QDialog):
         self._busy(False)
         self._selection_changed()
         self._load_tiles()
-        self._seek(0.0)
+        if at is not None and 0 <= at <= self.info.duration:  # opened on one event: select a clip around it
+            self.timeline.sel.around(at)
+            self.timeline.playhead = at
+            self._selection_changed()
+            self._seek(at)
+        else:
+            self._seek(0.0)
 
     def _load_tiles(self) -> None:
         self._strip += 1

@@ -206,6 +206,8 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Valorant events | Not working | Framework only; no template images. Waits on a real recording |
 | Template calibration (`calibrate`) | Works | Whole loop in tests on a generated video; frame seek and region outlines checked on a real 3440x1440 recording against ffmpeg |
 | Shout trigger (microphone loudness) | Works with a test tone | Live on OBS 33: one trigger 0.1 s after a tone turned loud, none for a short click or with the option off; the real microphone reports a level; not tried with a voice |
+| Laugh trigger and "Funny" clips | Works with a test pattern | Live on OBS 33: a 4-per-second burst pattern was detected, a steady tone was not. Cutting clips out of a recording runs on a real file in tests. Never tried with a real laugh, and loud fast speech is expected to trigger it |
+| Event symbols (timeline, cards, side-panel strip) | Works | Rendered on a real recording; clicking a symbol was not exercised by hand |
 | Multi-kills for screen-reading plugins | Unit-tested | No calibrated vision plugin exists to produce real kills yet |
 | Settings, Arabic/RTL, colours | Works | Rendered and driven by script; not clicked through by hand |
 | Clip library, tags, favourites, search, match summary | Works | Driven by script on test videos |
@@ -238,6 +240,11 @@ Differences from the plan above:
 - **`core/health.py`** holds the health checks (`gather` reads the machine, `checks` is pure)
   and the diagnostic zip; **`storage/autostart.py`** owns the Run-key entry. See
   [ADR 0003](adr/0003-reliability.md).
+- **Laugh trigger:** uses OBS's *magnitude* meter value, not the peak. Measured here: the
+  peak is held across the gaps between bursts, the magnitude drops in them, and values change
+  about ten times a second, so a 4–6 Hz laugh sits near the limit of what the meter can show.
+  It tells "loud and choppy" from "loud and steady"; it cannot tell laughing from loud talk.
+  Doing better needs the audio itself and a classifier (a large new dependency).
 - **Shout trigger:** OBS's volume-meter events (20 a second) are subscribed to only while the
   option is on, and are judged on OBS's event thread by `audio.Shout`; only an actual shout
   reaches the core's inbox, so the core loop is not woken by meters. A muted input reports

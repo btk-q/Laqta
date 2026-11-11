@@ -309,6 +309,18 @@ class SettingsWindow(QDialog):
         layout.addWidget(self.mic_trigger)
         layout.addLayout(trigger)
         layout.addWidget(_label(t("audio.trigger_hint"), "hint"))
+        self.laugh = QCheckBox(t("audio.laugh"))
+        self.laugh.setChecked(self.cfg["laugh_trigger"])
+        self.laugh_db = _spin(self.cfg["laugh_db"], -60, 0)
+        self.laugh_minutes = _spin(self.cfg["laugh_clip_minutes"], 0, 15)
+        funny = QFormLayout()
+        funny.setHorizontalSpacing(20)
+        funny.addRow(t("audio.laugh_level"), self.laugh_db)
+        funny.addRow(t("audio.laugh_minutes"), self.laugh_minutes)
+        layout.addSpacing(10)
+        layout.addWidget(self.laugh)
+        layout.addLayout(funny)
+        layout.addWidget(_label(t("audio.laugh_hint"), "hint"))
         layout.addStretch(1)
 
         def sync() -> None:
@@ -316,9 +328,13 @@ class SettingsWindow(QDialog):
             self.mic_volume.setEnabled(self.mic_enabled.isChecked())
             self.mic_trigger.setEnabled(self.mic_enabled.isChecked())  # it reads the microphone track's meter
             self.mic_trigger_db.setEnabled(self.mic_enabled.isChecked() and self.mic_trigger.isChecked())
+            self.laugh.setEnabled(self.mic_enabled.isChecked())
+            self.laugh_db.setEnabled(self.mic_enabled.isChecked() and self.laugh.isChecked())
+            self.laugh_minutes.setEnabled(self.mic_enabled.isChecked() and self.laugh.isChecked())
 
         self.mic_enabled.toggled.connect(sync)
         self.mic_trigger.toggled.connect(sync)
+        self.laugh.toggled.connect(sync)
         sync()
         return page
 
@@ -692,6 +708,9 @@ class SettingsWindow(QDialog):
             update_check=self.update_check.isChecked(),
             discord_webhook=webhook,
             mic_trigger_db=self.mic_trigger_db.value(),
+            laugh_trigger=self.laugh.isChecked(),
+            laugh_db=self.laugh_db.value(),
+            laugh_clip_minutes=self.laugh_minutes.value(),
             save_folder="" if Path(self.save_folder.text()) == clips.DEFAULT_ROOT else self.save_folder.text(),
         )
         self.accept()

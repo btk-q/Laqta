@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from ..i18n import is_rtl, t
 from ..storage import clips, config, highlights, library, share
 from ..storage.library import Clip
-from . import theme
+from . import icons, theme
 
 THUMB = QSize(256, 144)
 CACHE = config.DIR / "thumbs"
@@ -205,17 +205,66 @@ class Card(QStyledItemDelegate):
         x, y = (thumb.right() - 2 if rtl else thumb.x() + 2), line.bottom() + 5
         for kind in event_kinds(clip)[:3]:
             text = t(f"event.{kind}")
-            width = metrics.horizontalAdvance(text) + 14
+            width = metrics.horizontalAdvance(text) + 30
             if (x - width < thumb.x()) if rtl else (x + width > thumb.right()):
                 break
-            tag = QRectF(x - width if rtl else x, y, width, 19)
+            tag = QRectF(x - width if rtl else x, y, width, 20)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor(c["line"]))
-            painter.drawRoundedRect(tag, 9.5, 9.5)
+            painter.drawRoundedRect(tag, 10, 10)
+            icons.draw(painter, kind, QRectF(tag.right() - 18 if rtl else tag.x() + 2, tag.y() + 2, 16, 16))
             painter.setPen(QColor(c["text"]))
-            painter.drawText(tag, Qt.AlignmentFlag.AlignCenter, text)
+            painter.drawText(tag.adjusted(4, 0, -20, 0) if rtl else tag.adjusted(20, 0, -4, 0), Qt.AlignmentFlag.AlignCenter, text)
             x += -(width + 5) if rtl else width + 5
         painter.restore()
+
+
+class EventStrip(QWidget):
+    """The selected video as one line, with a symbol where each event happened. Click one to
+    open the trim window on that moment."""
+
+    picked = Signal(float)
+
+    def __init__(self):
+        super().__init__()
+        self.events: list[dict] = []
+        self.seconds = 0.0
+        self.setFixedHeight(30)
+        self.setMouseTracking(True)
+        self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)  # time runs left to right in every language
+
+    def show_clip(self, clip: Clip | None) -> None:
+        self.seconds = float(clip.seconds or 0) if clip else 0.0
+        self.events = [e for e in (clip.events if clip else ()) if e["type"] not in ("match_start", "match_end")
+                       and 0 <= e.get("offset", -1) <= self.seconds]
+        self.setVisible(bool(self.events))
+        self.update()
+
+    def _x(self, event: dict) -> float:
+        return 10 + (self.width() - 20) * event["offset"] / max(self.seconds, 0.001)
+
+    def _near(self, x: float) -> dict | None:
+        scored = [(abs(x - self._x(e)), i) for i, e in enumerate(self.events)]
+        return self.events[min(scored)[1]] if scored and min(scored)[0] <= 10 else None
+
+    def paintEvent(self, _event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(theme.current["line"]))
+        p.drawRoundedRect(QRectF(4, 13, self.width() - 8, 4), 2, 2)
+        for event in self.events:
+            icons.draw(p, event["type"], QRectF(self._x(event) - 9, 6, 18, 18))
+        p.end()
+
+    def mouseMoveEvent(self, event) -> None:
+        found = self._near(event.position().x())
+        self.setCursor(Qt.CursorShape.PointingHandCursor if found else Qt.CursorShape.ArrowCursor)
+        self.setToolTip(f"{clock(found['offset'])}  {t('event.' + found['type'])}" if found else "")
+
+    def mousePressEvent(self, event) -> None:
+        if found := self._near(event.position().x()):
+            self.picked.emit(float(found["offset"]))
 
 
 class LibraryWindow(QDialog):
@@ -328,6 +377,8 @@ class LibraryWindow(QDialog):
         self.about.setWordWrap(True)
         self.summary = QLabel()
         self.summary.setWordWrap(True)
+        self.strip = EventStrip()
+        self.strip.picked.connect(self._trim)
         self.buttons: list[QPushButton] = []
         made: dict[str, QPushButton] = {}
         for key, handler, name in (
@@ -362,6 +413,7 @@ class LibraryWindow(QDialog):
         side.addWidget(self.title)
         side.addWidget(self.about)
         side.addWidget(self.summary)
+        side.addWidget(self.strip)
         side.addSpacing(8)
         side.addWidget(made["library.play"])
         side.addWidget(made["library.trim"])
@@ -496,6 +548,7 @@ class LibraryWindow(QDialog):
         for button in self.buttons:
             button.setEnabled(clip is not None)
         self.panel.setCurrentIndex(1 if clip else 0)
+        self.strip.show_clip(clip)
         # One fact per line in the narrow panel; the length moves up beside the date.
         facts = summary_text(clip).split("     ") if clip else []
         self.summary.setText("\n".join(facts[1:] if clip and clip.seconds else facts))
@@ -547,11 +600,12 @@ class LibraryWindow(QDialog):
         self.reload()
         self.status.setText(t(done_key, path=result, name=Path(result).name))
 
-    def _trim(self) -> None:
+    def _trim(self, at: float | bool | None = None) -> None:
         if clip := self.selected():
             from .editor import EditorDialog  # imported here: the library opens without it
 
-            dialog = EditorDialog(clip, self, self.root)
+            # `at`: an event picked on the strip. (A button click passes False, which means "no event".)
+            dialog = EditorDialog(clip, self, self.root, at=at if isinstance(at, float) else None)
             dialog.exec()
             if dialog.finished_file is not None:
                 made = dialog.finished_file

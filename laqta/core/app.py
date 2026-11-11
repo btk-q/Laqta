@@ -14,7 +14,7 @@ from typing import Callable
 from ..game_detector.detector import Detector, game_window, load_games
 from ..i18n import t
 from ..obs_controller import setup
-from ..obs_controller.audio import Audio, Shout, mic_peak
+from ..obs_controller.audio import Audio, Laugh, Shout, mic_magnitude, mic_peak
 from ..obs_controller.capture import Capture
 from ..obs_controller import encoders
 from ..obs_controller.client import Obs, ObsDown, ObsError
@@ -71,7 +71,8 @@ class Core(threading.Thread):
         self.detector = Detector(load_games(cfg["games"], cfg["default_mode"]), asked=cfg["asked"])
         self.shout = Shout(cfg["mic_trigger_db"])
         self.obs = Obs(4455, "", on_event=lambda name, data: self.inbox.put(("obs", name, data)), on_meters=self._meters)
-        self.obs.meters = cfg["mic_trigger"] and cfg["mic_enabled"]
+        self.laugh = Laugh(cfg["laugh_db"])
+        self.obs.meters = self._wants_meters(cfg)
         self.recorder = Recorder(
             self.obs,
             connect=self._connect,
@@ -112,9 +113,15 @@ class Core(threading.Thread):
 
     def _meters(self, data: dict) -> None:
         """OBS's event thread, 20 times a second while the shout trigger is on: only a comparison here."""
-        now = time.monotonic()
-        if self.shout.feed(mic_peak(data), now):
+        now, peak, cfg = time.monotonic(), mic_peak(data), self.cfg
+        if cfg["mic_trigger"] and self.shout.feed(peak, now):
             self.inbox.put(("event", GameEvent("shout", now, confidence=0.7, source="audio")))
+        if cfg["laugh_trigger"] and self.laugh.feed(mic_magnitude(data), now):
+            self.inbox.put(("event", GameEvent("laugh", now, confidence=0.6, source="audio")))
+
+    @staticmethod
+    def _wants_meters(cfg: dict) -> bool:
+        return bool((cfg["mic_trigger"] or cfg["laugh_trigger"]) and cfg["mic_enabled"])
 
     # Core thread ---------------------------------------------------------------
 
@@ -190,6 +197,15 @@ class Core(threading.Thread):
         except OSError:
             log.exception("could not write event marks for %s", path)
         self.notify(t("toast.recording_saved", name=path.name))
+        minutes = self.cfg["laugh_clip_minutes"]
+        if minutes and any(mark.type == "laugh" for mark in marks):
+            # ponytail: cut on the core thread (a stream copy, a second or two, after the game has closed).
+            try:
+                made = library.cut_moments(path, "laugh", before=max(minutes * 60 - 30, 10), after=30, label=t("clip.funny"))
+                if made:
+                    self.notify(t("toast.funny_saved", count=len(made)))
+            except Exception:
+                log.exception("could not cut the funny moments out of %s", path)
         self._report_skipped(time.monotonic() - start)
         self._cleanup()
 
@@ -242,8 +258,8 @@ class Core(threading.Thread):
             rec.pre, rec.post, rec.max_clip = cfg["pre_seconds"], cfg["post_seconds"], cfg["max_clip_seconds"]
             rec.exit_debounce = cfg["exit_debounce_seconds"]
             rec.min_free = cfg["min_free_gb"] * GB
-            self.shout.db = cfg["mic_trigger_db"]
-            wanted = cfg["mic_trigger"] and cfg["mic_enabled"]
+            self.shout.db, self.laugh.db = cfg["mic_trigger_db"], cfg["laugh_db"]
+            wanted = self._wants_meters(cfg)
             if wanted != self.obs.meters:
                 self.obs.meters = wanted  # OBS is told at connect time
                 if rec.game is None and rec.next_deadline() is None:

@@ -82,6 +82,12 @@ Two hotkeys, both changeable in **Settings → General**:
 - **Ctrl+Alt+F10, instant replay:** saves the last 30 seconds, ending the moment you press it.
   In the recording modes it adds a mark.
 
+**Event symbols:** every kind of event has its own coloured symbol (green crosshair for a
+kill, red cross for a death, amber flag for an objective, a crown for a win, a smiling face
+for a laugh, and so on). They appear on the trim window's timeline with a legend underneath,
+on each clip's tags, and on a strip in the side panel that shows where in the video each
+event happened; click a symbol there to open the trim window on that moment.
+
 **Clips window:** search by game, tag or event; filter by game, event, date and favourites;
 play, tag, export as MP4, show in folder, or delete to the Recycle Bin.
 
@@ -156,6 +162,14 @@ your microphone. Ordinary players use track 1.
   loudness figure OBS already measures; it does not listen to words, and nothing leaves the
   PC. Set how loud counts with the dB box. Unverified with a real voice: it was checked with
   a test tone.
+
+- **Catch funny moments when I laugh** (Settings → Audio, off by default, needs the microphone
+  on): each laugh is marked in the recording, and when the game closes Laqta also saves the
+  minutes leading up to it (5 by default) as a separate clip named "Funny …". Laughs close
+  together become one clip; the full recording is kept. This is approximate: Laqta cannot
+  hear what a sound is, only its rhythm (several loud bursts in a row), so loud fast talking
+  can set it off and a quiet chuckle will not. Unverified with a real laugh: it was checked
+  with a test pattern. In Events only a laugh saves an ordinary short clip.
 
 ### Picture
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
+import os
 import logging
 import shutil
 import subprocess
@@ -198,6 +199,39 @@ def trim(path: Path, start: float, end: float) -> Path:
     except (OSError, ValueError):
         pass
     return target
+
+
+def moment_spans(offsets: list[float], duration: float, before: float, after: float) -> list[tuple[float, float]]:
+    """The stretch to keep around each moment, with overlapping stretches joined into one."""
+    spans: list[list[float]] = []
+    for offset in sorted(o for o in offsets if 0 <= o <= duration):
+        start, end = max(0.0, offset - before), min(duration, offset + after)
+        if spans and start <= spans[-1][1]:
+            spans[-1][1] = max(spans[-1][1], end)
+        else:
+            spans.append([start, end])
+    return [(s, e) for s, e in spans if e - s >= 1.0]
+
+
+def cut_moments(path: Path, kind: str, before: float, after: float, label: str) -> list[Path]:
+    """After a recording ends: save a separate clip around each event of `kind` (for example
+    every laugh, with the minutes that led up to it). The recording itself is kept whole."""
+    meta = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+    duration = float(meta.get("seconds") or 0)
+    offsets = [e["offset"] for e in meta.get("events", []) if e.get("type") == kind]
+    made = []
+    for start, end in moment_spans(offsets, duration, before, after):
+        if end - start >= 0.9 * duration:
+            continue  # the "clip" would be the whole recording again
+        cut = trim(path, start, end)
+        named = path.with_name(f"{label} {path.stem} {int(start // 60):02d}m{int(start % 60):02d}s{path.suffix}")
+        os.replace(cut, named)
+        note = json.loads(cut.with_suffix(".json").read_text(encoding="utf-8"))
+        note["kind"] = "clip"
+        named.with_suffix(".json").write_text(json.dumps(note, indent=2), encoding="utf-8")
+        cut.with_suffix(".json").unlink()
+        made.append(named)
+    return made
 
 
 def export(path: Path, root: Path | None = None) -> Path:
