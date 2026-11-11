@@ -200,7 +200,7 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Events Only + clip hotkey | Works | Live with a stand-in process; not yet in a real game |
 | Hybrid and Full Match | Unit-tested | Not yet run in a real game |
 | Capture fallback (black picture) | Works for Game -> Window | Live on the League client; Display Capture untested |
-| League of Legends events | Works | Replay of a real match's event list |
+| League of Legends events | Works | Replay of a real match's event list; and live in a Practice Tool game recorded in Full session: match start, a dragon, the win and match end all landed in the recording's marks |
 | CS2 events | Unit-tested | Hand-built payloads only; no real match yet |
 | Rocket League events | Unit-tested | Hand-built messages from the published format; the real settings file on this PC was read and edited correctly; no real match yet |
 | Valorant events | Not working | Framework only; no template images. Waits on a real recording |
