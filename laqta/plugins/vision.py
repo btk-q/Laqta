@@ -22,6 +22,7 @@ import cv2
 import numpy as np
 
 from ..core.events import GameEvent, GamePlugin
+from .scoring import Streak
 
 log = logging.getLogger(__name__)
 
@@ -110,8 +111,9 @@ class Edge:
 class Watcher:
     """All of a plugin's signals over one stream of frames. Pure: give it regions, get events."""
 
-    def __init__(self, signals: list[Signal]):
+    def __init__(self, signals: list[Signal], streak: Streak | None = None):
         self.edges = [Edge(s) for s in signals]
+        self.streak = streak  # adds multi-kills on top of the kills seen
 
     def feed(self, regions: list[np.ndarray | None], screen_height: int, now: float) -> list[GameEvent]:
         """regions[i] is the screen crop for signals[i] (None or black = nothing captured)."""
@@ -121,17 +123,19 @@ class Watcher:
                 continue  # keep state: a black frame is "no information", not "icon gone"
             count, score = find(to_reference(region, screen_height), edge.signal)
             out += edge.feed(count, score, now)
+        if self.streak:
+            out += [extra for event in list(out) for extra in self.streak.feed(event)]
         return out
 
 
-def run_video(signals: list[Signal], path: Path, fps: float = 3.0) -> Iterator[tuple[float, GameEvent]]:
+def run_video(signals: list[Signal], path: Path, fps: float = 3.0, streak: Streak | None = None) -> Iterator[tuple[float, GameEvent]]:
     """Run the same detection over a recording: yields (seconds into the video, event).
     For calibrating templates and thresholds against real gameplay."""
     video = cv2.VideoCapture(str(path))
     if not video.isOpened():
         raise OSError(f"cannot open {path}")
     step = max(1, round((video.get(cv2.CAP_PROP_FPS) or 60) / fps))
-    watcher, index = Watcher(signals), 0
+    watcher, index = Watcher(signals, streak), 0
     try:
         while video.grab():
             if index % step == 0:
@@ -146,10 +150,82 @@ def run_video(signals: list[Signal], path: Path, fps: float = 3.0) -> Iterator[t
         video.release()
 
 
+# -- calibration: cut templates out of a real recording ---------------------------------------
+
+
+def frame_at(path: Path, seconds: float) -> np.ndarray:
+    video = cv2.VideoCapture(str(path))
+    if not video.isOpened():
+        raise OSError(f"cannot open {path}")
+    try:
+        video.set(cv2.CAP_PROP_POS_MSEC, seconds * 1000)
+        ok, frame = video.read()
+    finally:
+        video.release()
+    if not ok:
+        raise ValueError(f"no picture at {seconds:.1f} s; is that past the end of the video?")
+    return frame
+
+
+def reference_region(frame: np.ndarray, signal: Signal) -> np.ndarray:
+    """The signal's region exactly as detection sees it. Templates must be cut from this."""
+    return to_reference(crop(frame, signal.roi), frame.shape[0])
+
+
+def outlined(frame: np.ndarray, signals: list[Signal]) -> np.ndarray:
+    """The frame with each signal's region drawn on it, to check the regions sit on the HUD."""
+    picture = frame.copy()
+    h, w = picture.shape[:2]
+    thick = max(2, h // 400)
+    for signal in signals:
+        x0, y0, x1, y1 = signal.roi
+        corner = (int(x0 * w), int(y0 * h))
+        cv2.rectangle(picture, corner, (int(x1 * w), int(y1 * h)), (0, 255, 255), thick)
+        cv2.putText(picture, signal.event, (corner[0] + 6, corner[1] + 12 * thick), cv2.FONT_HERSHEY_SIMPLEX, thick / 3, (0, 255, 255), thick)
+    return picture
+
+
+def inspect(signals: list[Signal], frame: np.ndarray, out: Path) -> list[str]:
+    """Save the outlined frame and each region; report what the current templates score there."""
+    out.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(out / "frame.png"), outlined(frame, signals))
+    lines = []
+    for signal in signals:
+        region = reference_region(frame, signal)
+        cv2.imwrite(str(out / f"region_{signal.event}.png"), region)
+        if not signal.templates:
+            lines.append(f"{signal.event:<10} region {region.shape[1]}x{region.shape[0]}  no templates yet")
+        else:
+            count, score = find(region, signal)
+            verdict = f"{count} match(es)" if count else "no match"
+            lines.append(f"{signal.event:<10} region {region.shape[1]}x{region.shape[0]}  best score {score:.2f} (needs {signal.threshold:.2f}): {verdict}")
+    return lines
+
+
+def cut_template(frame: np.ndarray, signal: Signal, box: tuple[int, int, int, int], assets: Path) -> Path:
+    """Save the box (x, y, width, height inside the signal's region image) as the next template."""
+    region = reference_region(frame, signal)
+    x, y, w, h = box
+    if min(x, y) < 0 or w < 4 or h < 4 or x + w > region.shape[1] or y + h > region.shape[0]:
+        raise ValueError(f"the box must lie inside the {region.shape[1]}x{region.shape[0]} region and be at least 4x4")
+    assets.mkdir(parents=True, exist_ok=True)
+    number = 1 + len(list(assets.glob(f"{signal.event}_*.png")))
+    while (target := assets / f"{signal.event}_{number}.png").exists():
+        number += 1
+    cv2.imwrite(str(target), region[y : y + h, x : x + w])
+    return target
+
+
 class VisionPlugin(GamePlugin):
-    """Subclass, set `name`, `event_types`, and return your signals from `signals()`."""
+    """Subclass, set `name`, `event_types`, `assets`, and return your signals from `signals()`."""
 
     fps: float = 3.0
+    assets: Path  # folder the template images live in
+    streak_window: float | None = 10.0  # kills this close together make a multi-kill; None = do not derive any
+    streak_ace: int | None = None  # see scoring.Streak before setting this
+
+    def streak(self) -> Streak | None:
+        return Streak(self.streak_window, self.streak_ace) if self.streak_window else None
 
     def __init__(self):
         self._stop = threading.Event()
@@ -170,7 +246,7 @@ class VisionPlugin(GamePlugin):
     def _run(self, signals: list[Signal], emit: Callable[[GameEvent], None]) -> None:
         import mss  # here, not at module import: only needed while a vision game is running
 
-        watcher = Watcher(signals)
+        watcher = Watcher(signals, self.streak())
         with mss.MSS() as screen:
             # ponytail: primary monitor, GDI capture. Fine for borderless/windowed; exclusive
             # fullscreen returns black (skipped above). Switch to DXGI duplication if needed.

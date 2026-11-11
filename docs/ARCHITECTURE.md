@@ -202,7 +202,9 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Capture fallback (black picture) | Works for Game -> Window | Live on the League client; Display Capture untested |
 | League of Legends events | Works | Replay of a real match's event list |
 | CS2 events | Unit-tested | Hand-built payloads only; no real match yet |
-| Valorant events | Not working | Framework only; no template images |
+| Valorant events | Not working | Framework only; no template images. Waits on a real recording |
+| Template calibration (`calibrate`) | Works | Whole loop in tests on a generated video; frame seek and region outlines checked on a real 3440x1440 recording against ffmpeg |
+| Multi-kills for screen-reading plugins | Unit-tested | No calibrated vision plugin exists to produce real kills yet |
 | Settings, Arabic/RTL, colours | Works | Rendered and driven by script; not clicked through by hand |
 | Clip library, tags, favourites, search, match summary | Works | Driven by script on test videos |
 | Trim and export editor, export presets | Works | Real ffmpeg encodes in tests; driven by script, including on a real 17-minute recording; not operated by hand |
@@ -229,6 +231,9 @@ Differences from the plan above:
 - **`core/health.py`** holds the health checks (`gather` reads the machine, `checks` is pure)
   and the diagnostic zip; **`storage/autostart.py`** owns the Run-key entry. See
   [ADR 0003](adr/0003-reliability.md).
+- **`plugins/scoring.py`** derives multi-kills from plain kills for screen-reading plugins.
+  Clutch detection, in the v2 plan, was dropped: CS2's Game State Integration gives a playing
+  client no teammate state, and no other supported game has the concept.
 - **Not built:** audio cue detection, Battle.net/EA scan, per-game resolution/bitrate/encoder,
   OBS chapter markers (recordings are MKV), Dota 2 and Rocket League plugins, an installer
   (the build produces a zip).

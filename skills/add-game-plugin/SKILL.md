@@ -101,13 +101,43 @@ before committing a real capture (see `tests/test_lol_real.py` and its fixture).
 least: a normal kill and death, an event belonging to another player, joining late, the
 game ending normally, and the game process vanishing mid-match.
 
-For vision plugins, calibrate and measure with the offline runner before trusting it live:
+For vision plugins, cut the templates from a real recording, then measure with the offline
+runner before trusting it live. Never draw a template by hand or take one from a wiki image:
+detection compares pixels, and only pixels from the real HUD match.
+
+```
+python -m laqta calibrate <plugin> "<recording.mkv>" --at 12:34
+```
+
+writes `frame.png` (the moment, with each signal's region outlined) and one
+`region_<event>.png` per signal, and prints what the installed templates score there.
+
+1. Pick a moment where the thing is on screen (a kill row, the victory banner). Open
+   `frame.png`: if a region does not sit on the HUD element, fix the region fractions in the
+   plugin and run again. Regions are fractions of the whole screen, so an ultrawide or
+   letterboxed picture needs its own check.
+2. Open `region_<event>.png` in any image viewer and read off the box around the part that
+   appears only for this event (for a killfeed: the part that marks the row as the player's
+   own kill, not the whole row). Keep it small and free of things that change, such as names.
+3. Save it: `python -m laqta calibrate <plugin> "<recording.mkv>" --at 12:34 --cut kill:40,12,36,30`
+   (x, y, width, height inside the region image). It becomes the next `kill_<n>.png` in the
+   plugin's `assets` folder, and the report shows the new score.
+4. Run `calibrate` again at a moment where the thing is *not* on screen. The best score there
+   must be clearly under the threshold; set the signal's `threshold` between the two.
+5. Run the whole recording:
 
 ```
 python -m laqta vision-test <plugin> "<recording.mkv>"
 ```
 
-Report how many real events it caught and how many false ones it raised.
+Report how many real events it caught and how many false ones it raised, against a list of
+moments the player gave you or that you counted by watching.
+
+A vision plugin that only sees single kills gets multi-kills for free: `VisionPlugin` runs
+kills through `plugins/scoring.Streak` (kills within `streak_window` seconds of each other;
+a death or round end resets it). List `"multikill"` in `event_types`. Leave `streak_ace` unset
+unless the plugin also emits round events, or five quick kills in a deathmatch become an "ace".
+Plugins for games whose API already reports multi-kills (CS2, League) do not use it.
 
 ## Step 6: say what is and is not verified
 

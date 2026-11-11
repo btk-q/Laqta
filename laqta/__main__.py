@@ -90,10 +90,58 @@ def vision_test(plugin_name: str, video: str, fps: float) -> int:
         print(f"{plugin_name}: no template images installed yet, nothing to detect")
         return 1
     count = 0
-    for t, event in run_video(signals, video, fps):
+    for t, event in run_video(signals, video, fps, cls().streak()):
         count += 1
         print(f"{int(t // 60):02d}:{t % 60:04.1f}  {event.type:<10} score {event.confidence:.2f}")
     print(f"{count} event(s)")
+    return 0
+
+
+def clock_seconds(text: str) -> float:
+    """"754", "12:34" or "1:02:03" -> seconds."""
+    seconds = 0.0
+    for part in text.split(":"):
+        seconds = seconds * 60 + float(part)
+    return seconds
+
+
+def calibrate(plugin_name: str, video: str, at: str, cut: str | None, out: str | None) -> int:
+    """Look at one moment of a recording the way a vision plugin does, or cut a template from it."""
+    from pathlib import Path
+
+    from .plugins import PLUGINS
+    from .plugins import vision
+
+    cls = PLUGINS.get(plugin_name)
+    if cls is None or not issubclass(cls, vision.VisionPlugin):
+        print(f"{plugin_name!r} is not a vision plugin")
+        return 1
+    signals = cls().signals()
+    if cut and not getattr(cls, "assets", None):
+        print(f"{plugin_name} does not say where its templates live (set `assets` on the plugin class)")
+        return 1
+    try:
+        frame = vision.frame_at(Path(video), clock_seconds(at))
+        if cut:
+            event, _, numbers = cut.partition(":")
+            signal = next((s for s in signals if s.event == event), None)
+            if signal is None:
+                print(f"{plugin_name} has no signal {event!r}; it has: {', '.join(s.event for s in signals)}")
+                return 1
+            box = tuple(int(n) for n in numbers.split(","))
+            if len(box) != 4:
+                raise ValueError("--cut needs event:x,y,width,height")
+            print("template saved:", vision.cut_template(frame, signal, box, cls.assets))
+            signals = cls().signals()  # reload, so the report below includes the new template
+        folder = Path(out or f"calibrate-{plugin_name}").resolve()
+        print(f"frame {frame.shape[1]}x{frame.shape[0]} at {at}")
+        for line in vision.inspect(signals, frame, folder):
+            print(" ", line)
+        print(f"saved frame.png (regions outlined) and region_<event>.png to {folder}")
+        print("Box coordinates for --cut are pixels inside region_<event>.png (x,y,width,height).")
+    except (OSError, ValueError) as e:
+        print(f"FAILED: {e}")
+        return 1
     return 0
 
 
@@ -129,6 +177,12 @@ def main(argv: list[str] | None = None) -> int:
     vision.add_argument("plugin")
     vision.add_argument("video")
     vision.add_argument("--fps", type=float, default=3.0)
+    cal = sub.add_parser("calibrate", help="inspect one moment of a recording as a vision plugin sees it, or cut a template image from it")
+    cal.add_argument("plugin")
+    cal.add_argument("video")
+    cal.add_argument("--at", required=True, help="the moment to look at: seconds, mm:ss or h:mm:ss")
+    cal.add_argument("--cut", help="save a template: event:x,y,width,height inside region_<event>.png")
+    cal.add_argument("--out", help="folder for the pictures (default: ./calibrate-<plugin>)")
     diag = sub.add_parser("diagnose", help="check that everything Laqta needs is in place and save a diagnostic zip")
     diag.add_argument("--out", help="where to write the zip (default: the current folder)")
     args = parser.parse_args(argv)
@@ -136,6 +190,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "obs-check":
         logging.basicConfig(level=logging.INFO, format=fmt)
         return obs_check(args.watch)
+    if args.command == "calibrate":
+        return calibrate(args.plugin, args.video, args.at, args.cut, args.out)
     if args.command == "diagnose":
         return diagnose(args.out)
     if args.command == "vision-test":

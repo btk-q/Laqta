@@ -2,8 +2,10 @@
 
 STATUS: not calibrated. The regions below are first guesses and there are no template
 images yet, so this plugin detects nothing until templates cut from a real recording are
-placed in assets/valorant/. Calibrate with:
+placed in assets/valorant/. Calibrate with (see skills/add-game-plugin):
 
+    python -m laqta calibrate valorant "<recording.mkv>" --at 12:34
+    python -m laqta calibrate valorant "<recording.mkv>" --at 12:34 --cut kill:40,12,36,30
     python -m laqta vision-test valorant "<recording.mkv>"
 
 Signals:
@@ -25,7 +27,8 @@ BANNER = (0.30, 0.10, 0.70, 0.35)  # guess: upper centre
 
 class ValorantPlugin(VisionPlugin):
     name = "valorant"
-    event_types = ("kill", "win", "lose", "match_end")
+    event_types = ("kill", "multikill", "win", "lose", "match_end")
+    assets = ASSETS
 
     def signals(self) -> list[Signal]:
         return [

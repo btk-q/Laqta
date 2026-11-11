@@ -140,7 +140,7 @@ fullscreen, Laqta asks once with a toast, and clicking the toast adds it.
 |---|---|---|
 | League of Legends | Riot's Live Client Data API | Works. Checked against a real match's event list. |
 | Counter-Strike 2 | Valve Game State Integration | Written and unit-tested with hand-built payloads. Not yet run in a real match. |
-| Valorant | Screen analysis | Framework only. It has no template images yet, so it detects nothing. |
+| Valorant | Screen analysis | Framework and calibration tool only. It has no template images yet, so it detects nothing. Needs a real recording. |
 | Everything else | Clip hotkey | Always available. |
 
 The first time CS2 starts with Laqta running, Laqta writes
@@ -162,6 +162,8 @@ worked for that game. You can also force a method per game in **Settings → Gam
 - **AMD and Intel encoders are unverified.** Laqta tries NVENC, AMF, Quick Sync, then x264,
   and uses the first that starts; only NVENC and x264 have been run.
 - **Battle.net and EA libraries** are not scanned.
+- **Clutches are not detected in any game.** CS2 tells a playing client only about its own
+  player, not how many teammates are alive, so a clutch cannot be told from an ordinary round win.
 - **Start with Windows is unverified across a real sign-in.** The entry is written and read
   back correctly; nobody has signed out and in again to watch Laqta start.
 - **The editor shows stills, not moving video.** A fast trim lands on keyframes and can start
@@ -210,6 +212,7 @@ A step-by-step guide for AI coding assistants is in
 ```powershell
 .venv\Scripts\python -m pytest                 # tests; OBS and games are faked
 powershell -File packaging\build.ps1           # builds dist\Laqta\Laqta.exe and a zip
+.venv\Scripts\python -m laqta calibrate valorant "recording.mkv" --at 12:34   # see one moment as a vision plugin does; --cut saves a template
 .venv\Scripts\python -m laqta vision-test valorant "recording.mkv"   # run a vision plugin over a video
 .venv\Scripts\python -m laqta diagnose                                # health checks + diagnostic zip
 ```

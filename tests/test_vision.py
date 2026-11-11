@@ -106,3 +106,92 @@ def test_uncalibrated_valorant_plugin_starts_and_stops_without_a_thread():
     plugin.start(lambda e: None, {"exe": "VALORANT-Win64-Shipping.exe"})
     assert plugin._thread is None
     plugin.stop()
+
+
+# -- multi-kills from plain kills ---------------------------------------------------------------
+
+from laqta.core.events import GameEvent  # noqa: E402
+from laqta.plugins.scoring import Streak  # noqa: E402
+
+
+def streak_types(streak, *events):
+    return [[(e.type, e.data.get("count")) for e in streak.feed(GameEvent(type, t, confidence))] for type, t, confidence in events]
+
+
+def test_kills_close_together_become_a_growing_multikill():
+    out = streak_types(Streak(window=10), ("kill", 0, 1.0), ("kill", 4, 1.0), ("kill", 13, 1.0), ("kill", 40, 1.0), ("kill", 45, 1.0))
+    assert out == [[], [("multikill", 2)], [("multikill", 3)], [], [("multikill", 2)]]
+
+
+def test_dying_or_a_new_round_ends_the_streak():
+    for reset in ("death", "round_win", "round_lose", "match_end"):
+        out = streak_types(Streak(), ("kill", 0, 1.0), (reset, 1, 1.0), ("kill", 2, 1.0), ("assist", 3, 1.0), ("kill", 4, 1.0))
+        assert out == [[], [], [], [], [("multikill", 2)]], reset
+
+
+def test_ace_is_only_claimed_when_asked_for_and_then_starts_over():
+    five = [("kill", t, 1.0) for t in range(5)]
+    assert streak_types(Streak(), *five)[-1] == [("multikill", 5)]
+    out = streak_types(Streak(ace=5), *five, ("kill", 6, 1.0))
+    assert out[4] == [("ace", None)] and out[5] == []
+
+
+def test_a_streak_is_as_sure_as_its_weakest_kill():
+    streak = Streak()
+    streak.feed(GameEvent("kill", 0, 0.9, "vision"))
+    streak.feed(GameEvent("kill", 1, 0.6, "vision"))
+    (third,) = streak.feed(GameEvent("kill", 2, 0.95, "vision"))
+    assert third.confidence == 0.6 and third.source == "vision" and third.t == 2
+
+
+def test_watcher_adds_multikills_when_given_a_streak():
+    w = Watcher([KILL], Streak(window=10))
+    a, b = screen(rows=(0,)), screen(rows=(0, 1))
+    assert feed(w, [screen(), a, a, b, b]) == [[], [], ["kill"], [], ["kill", "multikill"]]
+    assert ValorantPlugin().streak().window == 10 and "multikill" in ValorantPlugin.event_types
+
+
+# -- calibration --------------------------------------------------------------------------------
+
+
+def test_cut_a_template_from_a_recording_and_detect_with_it(tmp_path):
+    """The whole calibration loop: look at a moment, cut the icon out, then find it elsewhere."""
+    path = tmp_path / "match.avi"
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), 30, (1280, 720))  # not the 1080p templates assume
+    for i in range(90):
+        writer.write(screen(rows=(0,) if i >= 30 else (), height=720))
+    writer.release()
+    blank = Signal("kill", ROI, (), threshold=0.6)
+    frame = vision.frame_at(path, 2.0)
+    assert frame.shape[:2] == (720, 1280)
+
+    lines = vision.inspect([blank], frame, tmp_path / "look")
+    assert "no templates yet" in lines[0] and "576x324" in lines[0]  # the region, at 1080p scale
+    assert cv2.imread(str(tmp_path / "look" / "region_kill.png")).shape[:2] == (324, 576)
+    assert cv2.imread(str(tmp_path / "look" / "frame.png")).shape[:2] == (720, 1280)
+
+    # In region_kill.png the icon sits at x 1700-1344=356, y 40.
+    first = vision.cut_template(frame, blank, (356, 40, 24, 24), tmp_path / "assets")
+    second = vision.cut_template(frame, blank, (356, 40, 24, 24), tmp_path / "assets")
+    assert (first.name, second.name) == ("kill_1.png", "kill_2.png")
+    made = Signal("kill", ROI, vision.load_templates(tmp_path / "assets", "kill_*.png"), threshold=0.6)
+    assert "1 match(es)" in vision.inspect([made], frame, tmp_path / "look")[0]
+    assert "no match" in vision.inspect([made], vision.frame_at(path, 0.2), tmp_path / "look")[0]
+    hits = [(round(t, 1), e.type) for t, e in vision.run_video([made], path, fps=6)]
+    assert len(hits) == 1 and 1.0 <= hits[0][0] <= 1.4
+
+
+def test_calibration_refuses_nonsense(tmp_path):
+    frame = screen()
+    for box in ((-1, 0, 10, 10), (0, 0, 2, 2), (570, 0, 24, 24), (0, 310, 24, 24)):
+        with pytest.raises(ValueError):
+            vision.cut_template(frame, KILL, box, tmp_path)
+    assert not list(tmp_path.iterdir())
+    with pytest.raises(OSError):
+        vision.frame_at(tmp_path / "missing.mkv", 1)
+
+
+def test_clock_seconds():
+    from laqta.__main__ import clock_seconds
+
+    assert [clock_seconds(x) for x in ("754", "12:34", "1:02:03.5")] == [754, 754, 3723.5]
