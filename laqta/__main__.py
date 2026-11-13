@@ -145,6 +145,23 @@ def calibrate(plugin_name: str, video: str, at: str, cut: str | None, out: str |
     return 0
 
 
+def voice_check(video: str, track: int) -> int:
+    """List the laughs and shouts the recogniser hears on one audio track of a video."""
+    from pathlib import Path
+
+    from . import voice
+
+    try:
+        moments = voice.analyse(Path(video), f"0:a:{track - 1}")
+    except OSError as e:
+        print(f"FAILED: {e}")
+        return 1
+    for m in moments:
+        print(f"{int(m.offset // 60):02d}:{m.offset % 60:04.1f}  {m.type:<6} score {m.confidence:.2f}")
+    print(f"{len(moments)} moment(s)")
+    return 0
+
+
 def update_now(install: bool, restart: bool) -> int:
     """The updater without the window: for a broken install, and for testing the real thing."""
     import tempfile
@@ -211,6 +228,9 @@ def main(argv: list[str] | None = None) -> int:
     cal.add_argument("--at", required=True, help="the moment to look at: seconds, mm:ss or h:mm:ss")
     cal.add_argument("--cut", help="save a template: event:x,y,width,height inside region_<event>.png")
     cal.add_argument("--out", help="folder for the pictures (default: ./calibrate-<plugin>)")
+    voc = sub.add_parser("voice", help="list the laughs and shouts heard on one audio track of a video")
+    voc.add_argument("video")
+    voc.add_argument("--track", type=int, default=3, help="audio track number (3 = the microphone in Laqta's recordings)")
     upd = sub.add_parser("update", help="check GitHub for a newer Laqta; with --install, download and install it")
     upd.add_argument("--install", action="store_true")
     upd.add_argument("--no-restart", action="store_true", help="do not start Laqta again after installing")
@@ -224,6 +244,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "obs-check":
         logging.basicConfig(level=logging.INFO, format=fmt)
         return obs_check(args.watch)
+    if args.command == "voice":
+        return voice_check(args.video, args.track)
     if args.command == "update":
         return update_now(args.install, not args.no_restart)
     if args.command == "calibrate":

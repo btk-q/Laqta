@@ -2,6 +2,27 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## 0.5.0
+
+**Watch and cut your videos without leaving Laqta, and Laqta now knows a laugh from a shout.**
+
+### New
+- **Video player.** Play opens your video inside Laqta, with each event's symbol on the seek
+  bar: click one to jump to just before it. Space plays and pauses, the arrow keys jump five
+  seconds, F goes full screen. Choose to hear everything, only the game, or only your
+  microphone.
+- **The trim window plays video.** The picture above the filmstrip is now the real video;
+  "Play selection" plays exactly the part you have chosen.
+- **Laughs and shouts are told apart.** Turn on "Find my laughs and shouts" in Settings, Audio
+  (the microphone must be on). When the game closes, a sound recogniser on your PC listens to
+  your microphone track and marks each laugh (pink) and each shout or scream (blue-green).
+  Talking is ignored, even loud. Each laugh still gets its own "Funny" clip.
+- **Health** now checks the video player too.
+
+### Changed
+- The old laugh guess (from loudness alone) is gone; the new recogniser replaces it.
+- The download is about 23 MB bigger, for the player and the recogniser.
+
 ## 0.4.0
 
 **A new look, and Laqta now shows you what happened in every video.**

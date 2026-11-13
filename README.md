@@ -91,12 +91,18 @@ event happened; click a symbol there to open the trim window on that moment.
 **Clips window:** videos are grouped by game and day, newest first. Search by game, tag or event; filter by game, event, date and favourites;
 play, tag, export as MP4, show in folder, or delete to the Recycle Bin.
 
-**Trim and export** opens a filmstrip of the video with two handles and a marker for each
-event. Drag the handles (or use the arrow keys), click a marker to see that moment, or
-double-click it to select a clip around it. Then save a trimmed copy, or export as vertical
-9:16, as a Discord-sized file under 10 MB, or as 1080p 60 MP4, with a progress bar and
-Cancel. "Leave my microphone out" uses the game-sound track. The preview is a still frame,
-not playback.
+**Watching:** Play (or a double-click) opens the video in Laqta's own player, with each event's
+symbol on the seek bar: click a symbol to jump to just before that moment. Space plays and
+pauses, the arrow keys jump five seconds, F goes full screen. Recordings keep the game and your
+microphone on separate tracks; the sound menu lets you hear everything, the game alone or your
+microphone alone. "Open in another player" is still there.
+
+**Trim and export** shows the same player above a filmstrip with two handles and a symbol for
+each event. Drag the handles (or use the arrow keys), click a symbol to jump to it, or
+double-click it to select a clip around it; "Play selection" plays from one handle to the
+other. Then save a trimmed copy, or export as vertical 9:16, as a Discord-sized file under
+10 MB, or as 1080p 60 MP4, with a progress bar and Cancel. "Leave my microphone out" uses the
+game-sound track.
 
 **Highlight reel** joins the best moments of everything currently shown in the Clips window,
 up to one minute, into one MP4 in `Exports`. Use the filters to choose the material, for
@@ -181,13 +187,15 @@ your microphone. Ordinary players use track 1.
   PC. Set how loud counts with the dB box. Unverified with a real voice: it was checked with
   a test tone.
 
-- **Catch funny moments when I laugh** (Settings → Audio, off by default, needs the microphone
-  on): each laugh is marked in the recording, and when the game closes Laqta also saves the
-  minutes leading up to it (5 by default) as a separate clip named "Funny …". Laughs close
-  together become one clip; the full recording is kept. This is approximate: Laqta cannot
-  hear what a sound is, only its rhythm (several loud bursts in a row), so loud fast talking
-  can set it off and a quiet chuckle will not. Unverified with a real laugh: it was checked
-  with a test pattern. In Events only a laugh saves an ordinary short clip.
+- **Find my laughs and shouts** (Settings → Audio, off by default, needs the microphone on):
+  when a game closes, Laqta listens to the microphone track of the recording with a sound
+  recogniser (Google's YAMNet) that runs on this PC, and marks each laugh and each shout or
+  scream. Ordinary talking is ignored, even loud and fast. Around each laugh it also saves the
+  minutes leading up to it (5 by default) as a separate clip named "Funny …". It takes a few
+  seconds per recording and nothing runs while you play. It needs a full recording, so it does
+  not work in Events only. Checked on public-domain laugh and scream recordings and on
+  synthetic speech; not yet on your own voice. `python -m laqta voice <video>` lists what it
+  hears in any video.
 
 ### Picture
 
@@ -244,8 +252,8 @@ worked for that game. You can also force a method per game in **Settings → Gam
   player, not how many teammates are alive, so a clutch cannot be told from an ordinary round win.
 - **Start with Windows is unverified across a real sign-in.** The entry is written and read
   back correctly; nobody has signed out and in again to watch Laqta start.
-- **The editor shows stills, not moving video.** A fast trim lands on keyframes and can start
-  up to two seconds early; tick "Cut on the exact frame" for a slower, exact copy.
+- **A fast trim lands on keyframes** and can start up to two seconds early; tick "Cut on the
+  exact frame" for a slower, exact copy.
 - **OBS crash recovery:** if OBS dies mid-game, Laqta relaunches it and starts a new file. To
   do that unattended it clears OBS's "unclean shutdown" marker, which also skips OBS's
   safe-mode offer on that launch.

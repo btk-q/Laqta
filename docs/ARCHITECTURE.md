@@ -206,12 +206,13 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Valorant events | Not working | Framework only; no template images. Waits on a real recording |
 | Template calibration (`calibrate`) | Works | Whole loop in tests on a generated video; frame seek and region outlines checked on a real 3440x1440 recording against ffmpeg |
 | Shout trigger (microphone loudness) | Works with a test tone | Live on OBS 33: one trigger 0.1 s after a tone turned loud, none for a short click or with the option off; the real microphone reports a level; not tried with a voice |
-| Laugh trigger and "Funny" clips | Works with a test pattern | Live on OBS 33: a 4-per-second burst pattern was detected, a steady tone was not. Cutting clips out of a recording runs on a real file in tests. Never tried with a real laugh, and loud fast speech is expected to trigger it |
+| Laughs and shouts (sound recogniser) | Works on sample recordings | YAMNet over the microphone track after a recording: public-domain laughs found as laughs, the Wilhelm scream and another scream as shouts, calm and fast synthetic speech as neither; end to end on a generated three-track recording; inside the packaged app. Not yet on the owner's own voice |
+| In-app video player | Works | Driven as the real windows on a 3440x1440 60 fps three-track file: plays at full rate, exact frame on seek while paused, sound tracks switch, event symbols jump, "Play selection" stops at the end handle; loads inside the packaged app. Not operated by hand |
 | Event symbols (timeline, cards, side-panel strip) | Works | Rendered on a real recording; clicking a symbol was not exercised by hand |
 | Multi-kills for screen-reading plugins | Unit-tested | No calibrated vision plugin exists to produce real kills yet |
 | Settings, Arabic/RTL, colours | Works | Rendered and driven by script; not clicked through by hand |
 | Clip library, tags, favourites, search, match summary | Works | Driven by script on test videos |
-| Trim and export editor, export presets | Works | Real ffmpeg encodes in tests; driven by script, including on a real 17-minute recording; not operated by hand |
+| Trim and export editor, export presets | Works | Real ffmpeg encodes in tests; driven by script, including on a real 17-minute recording, and with the video player; not operated by hand |
 | Highlight reel | Works | Real join of mixed-size sources in tests; driven by script through the library window |
 | Instant-replay hotkey | Unit-tested | Recorder logic tested; the second global hotkey registers; not pressed in a real game |
 | Disk-space guard | Works | Live on OBS 33 with the free-space figure faked: refused at start, resumed, stopped mid-recording into a playable file. Never run on a disk that was really full |
@@ -240,11 +241,10 @@ Differences from the plan above:
 - **`core/health.py`** holds the health checks (`gather` reads the machine, `checks` is pure)
   and the diagnostic zip; **`storage/autostart.py`** owns the Run-key entry. See
   [ADR 0003](adr/0003-reliability.md).
-- **Laugh trigger:** uses OBS's *magnitude* meter value, not the peak. Measured here: the
-  peak is held across the gaps between bursts, the magnitude drops in them, and values change
-  about ten times a second, so a 4–6 Hz laugh sits near the limit of what the meter can show.
-  It tells "loud and choppy" from "loud and steady"; it cannot tell laughing from loud talk.
-  Doing better needs the audio itself and a classifier (a large new dependency).
+- **Laughs and shouts** are found after the recording, not live: the microphone track is read
+  with ffmpeg and YAMNet (Google, Apache 2.0, the MediaPipe copy in `laqta/voice/`) runs on
+  LiteRT, one thread, only on windows louder than -38 dBFS. Each kind's class scores are
+  summed (a scream is spread over Yell, Screaming and Shout). See [ADR 0006](adr/0006-player-and-voice.md).
 - **Shout trigger:** OBS's volume-meter events (20 a second) are subscribed to only while the
   option is on, and are judged on OBS's event thread by `audio.Shout`; only an actual shout
   reaches the core's inbox, so the core loop is not woken by meters. A muted input reports

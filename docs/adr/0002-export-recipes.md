@@ -17,7 +17,8 @@ header to the copied part, and ffmpeg still exited with success, so failure coul
 be detected. Measured instead: for a cut at 3.3–7.7 s the stream copy is off by more than
 0.3 s; the re-encode is within 0.08 s.
 
-**The scrubber is a filmstrip of stills, not a video player.**
+**The scrubber is a filmstrip of stills, not a video player.** *(Superseded for the preview by
+[ADR 0006](0006-player-and-voice.md): the owner asked for a player. The filmstrip stays as the seek bar.)*
 *Rejected: Qt Multimedia*, which is not in the Qt package Laqta ships and would add about
 150 MB. Measured on a real 17-minute 3440×1440 recording: 24 strip tiles in about 7 s on four
 threads, one preview frame in about 0.5 s. So tiles appear progressively, the preview updates

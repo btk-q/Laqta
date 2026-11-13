@@ -153,6 +153,8 @@ QPushButton#tile:checked {{ background: {c['accent_dim']}; border: 1px solid {c[
 QLabel#tileTitle {{ font-weight: 600; font-size: 14px; background: transparent; }}
 QLabel#tileHint {{ color: {c['muted']}; font-size: 12px; background: transparent; }}
 QLabel#preview {{ background: #000000; border-radius: 6px; }}
+QPushButton#playButton {{ background: {c['accent_fill']}; border-color: {c['accent_fill']}; color: {c['on_accent']}; padding: 0; font-size: 14px; }}
+QPushButton#playButton:hover {{ background: {c['accent_hover']}; }}
 QStackedWidget#detail QLabel#preview {{ background: transparent; }}
 QProgressBar {{ background: {c['panel']}; border: none; border-radius: 4px; }}
 QProgressBar::chunk {{ background: {c['accent']}; border-radius: 4px; }}

@@ -422,7 +422,8 @@ class LibraryWindow(QDialog):
         self.summary = QLabel()
         self.summary.setWordWrap(True)
         self.strip = EventStrip()
-        self.strip.picked.connect(self._trim)
+        self.strip.picked.connect(lambda at: self._play(at=max(0.0, at - 3)))  # a symbol: watch from just before it
+        self.viewer = None  # the player window, made on first use
         self.buttons: list[QPushButton] = []
         made: dict[str, QPushButton] = {}
         for key, handler, name in (
@@ -630,9 +631,18 @@ class LibraryWindow(QDialog):
 
     # -- actions -----------------------------------------------------------------
 
-    def _play(self) -> None:
+    def _play(self, at: float | bool = 0.0) -> None:
         if clip := self.selected():
-            os.startfile(clip.path)
+            try:
+                from .player import PlayerWindow  # imported here: Qt Multimedia loads only when a video is played
+            except ImportError:  # a broken install: still let the video be watched
+                return os.startfile(clip.path)
+
+            if self.viewer is None:
+                self.viewer = PlayerWindow(self)
+                self.viewer.trim.connect(lambda chosen, where: self._trim(where))
+            stats = summary_text(clip).split("     ")
+            self.viewer.show_clip(clip, "     ".join([when_text(clip.when), *stats[1:]]), at if isinstance(at, float) else 0.0)
 
     def _show(self) -> None:
         if clip := self.selected():
@@ -658,6 +668,9 @@ class LibraryWindow(QDialog):
     def _trim(self, at: float | bool | None = None) -> None:
         if clip := self.selected():
             from .editor import EditorDialog  # imported here: the library opens without it
+
+            if self.viewer is not None:
+                self.viewer.player.pause()
 
             # `at`: an event picked on the strip. (A button click passes False, which means "no event".)
             dialog = EditorDialog(clip, self, self.root, at=at if isinstance(at, float) else None)
@@ -740,6 +753,8 @@ class LibraryWindow(QDialog):
 
     def _delete(self) -> None:
         if clip := self.selected():
+            if self.viewer is not None and self.viewer.clip == clip:
+                self.viewer.close()  # the player holds the file open: let go of it first
             # Recycle Bin, so a slip is recoverable and no confirmation dialog is needed.
             if not QFile.moveToTrash(str(clip.path)):
                 return self.status.setText(t("library.failed", error=clip.path.name))

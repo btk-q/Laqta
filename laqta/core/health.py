@@ -61,7 +61,18 @@ def gather(cfg: dict, hotkeys: dict[str, bool] | None = None) -> dict:
         and cfg["mic_device"] not in [device for device, _ in audio.microphones()],
         "hotkeys": hotkeys or {},
         "autostart": autostart.state(),
+        "player": player_works(),
     }
+
+
+def player_works() -> bool:
+    """Can Laqta play video itself? Qt Multimedia must load and find its FFmpeg backend."""
+    try:
+        import PySide6
+        from PySide6 import QtMultimedia  # noqa: F401
+    except ImportError:
+        return False
+    return (Path(PySide6.__file__).parent / "plugins" / "multimedia" / "ffmpegmediaplugin.dll").exists()
 
 
 def checks(facts: dict) -> list[Check]:
@@ -74,6 +85,7 @@ def checks(facts: dict) -> list[Check]:
     if facts["obs"]:
         add("websocket", {"on": "ok", "off": "bad", "unknown": "warn"}[facts["websocket"]])
     add("ffmpeg", "ok" if facts["ffmpeg"] else "warn")
+    add("player", "ok" if facts.get("player", True) else "warn")
     add("folder", "ok" if facts["folder_ok"] else "bad", path=facts["folder"])
     free, limit = facts["free"], facts["min_free"]
     if free is not None:

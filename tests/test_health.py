@@ -13,7 +13,7 @@ from laqta.storage import config
 GOOD = {
     "obs": True, "websocket": "on", "ffmpeg": True, "folder": "D:\\Rec", "folder_ok": True, "free": 200 * GB,
     "min_free": 5 * GB, "encoder": "nvenc", "mic_missing": False, "hotkeys": {"Ctrl+Alt+F9": True, "Ctrl+Alt+F10": True},
-    "autostart": "on",
+    "autostart": "on", "player": True,
 }  # fmt: skip
 
 
@@ -30,7 +30,7 @@ def verdicts(**changes):
 
 def test_a_healthy_machine_is_all_ok():
     assert set(verdicts().values()) == {"ok"}
-    assert list(verdicts()) == ["obs", "websocket", "ffmpeg", "folder", "disk", "encoder", "hotkeys"]
+    assert list(verdicts()) == ["obs", "websocket", "ffmpeg", "player", "folder", "disk", "encoder", "hotkeys"]
 
 
 def test_each_problem_is_found_and_graded():
@@ -137,3 +137,8 @@ def test_machine_secrets_reads_the_token_without_creating_one(tmp_path):
     assert not (tmp_path / "gsi_token.txt").exists()
     (tmp_path / "gsi_token.txt").write_text("abc123", encoding="ascii")
     assert "abc123" in health.machine_secrets(tmp_path)
+
+
+def test_a_missing_video_player_is_reported_and_this_install_has_one():
+    assert {c.key: c.status for c in health.checks({**GOOD, "player": False})}["player"] == "warn"
+    assert health.player_works()

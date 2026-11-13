@@ -1,14 +1,11 @@
-"""Trim and export window: a filmstrip with draggable start/end handles and event markers,
-a still preview of the moment under your hand, and the export presets.
-
-The preview is a still frame, not playback: a video player would add about 150 MB to the app.
-"""
+"""Trim and export window: the video player, a filmstrip with draggable start/end handles and
+event markers under it, and the export presets. The filmstrip is the seek bar."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QPointF, QRectF, QRunnable, Qt, QThreadPool, QTimer, Signal
+from PySide6.QtCore import QObject, QPointF, QRectF, QRunnable, Qt, QThreadPool, Signal
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import QCheckBox, QDialog, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget
 
@@ -16,6 +13,7 @@ from ..i18n import t
 from ..storage import config, export, library
 from ..storage.library import Clip
 from . import icons, theme
+from .player import Player
 
 CACHE = config.DIR / "thumbs"
 MIN_LENGTH = 0.5  # seconds a selection may not go below
@@ -241,9 +239,8 @@ class EditorDialog(QDialog):
         self.info = export.probe(clip.path) or export.Info(clip.seconds or library.duration(clip.path) or 0.0, 1920, 1080, 1)
         self.finished_file: Path | None = None
         self.job: export.Job | None = None
-        self._token = 0
         self.setWindowTitle(f"{t('edit.title')} — {clip.game}")
-        self.resize(900, 640)
+        self.resize(1100, 760)
 
         self.signals = _Signals(self)
         self.signals.still.connect(self._still_ready)
@@ -252,10 +249,8 @@ class EditorDialog(QDialog):
         self.pool = QThreadPool(self)
         self.pool.setMaxThreadCount(4)
 
-        self.preview = QLabel()
-        self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview.setMinimumHeight(300)
-        self.preview.setObjectName("preview")
+        self.player = Player(seekbar=False)  # the filmstrip below is the seek bar
+        self.player.moved.connect(self._played)
         self.timeline = Timeline(self.info.duration, list(clip.events))
         self.timeline.changed.connect(self._selection_changed)
         self.timeline.seek.connect(self._seek)
@@ -263,10 +258,6 @@ class EditorDialog(QDialog):
         self._strip = 0  # counts strip reloads, so tiles for an older zoom are ignored
         self.times = QLabel()
         self.times.setObjectName("muted")
-        self.debounce = QTimer(self)
-        self.debounce.setSingleShot(True)
-        self.debounce.setInterval(160)  # a frame costs ffmpeg about half a second: wait until the hand rests
-        self.debounce.timeout.connect(self._load_preview)
 
         self.exact = QCheckBox(t("edit.exact"))
         self.exact.setToolTip(t("edit.exact_hint"))
@@ -284,6 +275,11 @@ class EditorDialog(QDialog):
         self.zoom.setToolTip(t("edit.zoom_hint"))
         self.zoom.toggled.connect(self.timeline.set_zoom)
         options.addWidget(self.zoom)
+        self.play_sel = QPushButton(t("edit.play_selection"))
+        self.play_sel.setToolTip(t("edit.play_selection_hint"))
+        self.play_sel.clicked.connect(lambda: self.player.play_range(self.timeline.sel.start, self.timeline.sel.end))
+        options.insertWidget(0, self.play_sel)
+        options.insertSpacing(1, 12)
 
         self.buttons: list[QPushButton] = []
         actions = QHBoxLayout()
@@ -317,7 +313,7 @@ class EditorDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 16)
         layout.setSpacing(12)
-        layout.addWidget(self.preview, 1)
+        layout.addWidget(self.player, 1)
         layout.addWidget(self.timeline)
         if self.timeline.markers:  # what each symbol means, and how many of each there are
             legend = QHBoxLayout()
@@ -340,13 +336,12 @@ class EditorDialog(QDialog):
         self._busy(False)
         self._selection_changed()
         self._load_tiles()
-        if at is not None and 0 <= at <= self.info.duration:  # opened on one event: select a clip around it
+        start = 0.0
+        if at is not None and 0 <= at <= self.info.duration:  # opened on one moment: select a clip around it
             self.timeline.sel.around(at)
-            self.timeline.playhead = at
+            self.timeline.playhead = start = at
             self._selection_changed()
-            self._seek(at)
-        else:
-            self._seek(0.0)
+        self.player.load(clip.path, start)
 
     def _load_tiles(self) -> None:
         self._strip += 1
@@ -359,24 +354,16 @@ class EditorDialog(QDialog):
     # -- preview ---------------------------------------------------------------------
 
     def _seek(self, seconds: float) -> None:
-        self._wanted = seconds
-        self.debounce.start()
+        """The timeline was clicked or a handle moved: show that moment."""
+        self.player.seek(seconds)
 
-    def _load_preview(self) -> None:
-        self._token += 1
-        # Ahead of the queued strip tiles: the preview is what the user is waiting for.
-        self.pool.start(_Still(self.clip.path, self._wanted, 960, -self._token, self.signals), 1)
+    def _played(self, seconds: float) -> None:
+        self.timeline.playhead = seconds
+        self.timeline.update()
 
     def _still_ready(self, tag: int, image: str) -> None:
-        if not image:
-            return
-        if tag >= 0:
-            if tag // 1000 == self._strip:
-                self.timeline.set_tile(tag % 1000, QPixmap(image))
-            return
-        if -tag == self._token:  # ignore a frame for a spot the hand has already left
-            self.preview.setPixmap(QPixmap(image).scaled(self.preview.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                                                         Qt.TransformationMode.SmoothTransformation))
+        if image and tag // 1000 == self._strip:  # a strip tile for the zoom level still shown
+            self.timeline.set_tile(tag % 1000, QPixmap(image))
 
     def _selection_changed(self) -> None:
         sel = self.timeline.sel
@@ -421,7 +408,13 @@ class EditorDialog(QDialog):
         size = f"{path.stat().st_size / 1024**2:.1f} MB"
         self.status.setText(t("edit.done", name=path.name, size=size, folder=str(path.parent)))
 
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_Space:  # play and pause from anywhere in the window
+            return self.player.toggle()
+        super().keyPressEvent(event)
+
     def closeEvent(self, event) -> None:
+        self.player.close_media()
         if self.job is not None:
             self.job.cancel()  # do not leave ffmpeg encoding behind a closed window
             self.job.join(15)
