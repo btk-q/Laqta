@@ -43,8 +43,7 @@ DEFAULTS = {
     "mic_volume": 100,  # percent
     "mic_trigger": False,  # mark or clip the moment when the microphone gets loud (needs mic_enabled)
     "mic_trigger_db": -12,  # how loud: peak level in dB below full scale
-    "laugh_trigger": False,  # mark a funny moment when the microphone hears bursts of loud sound (needs mic_enabled)
-    "laugh_db": -18,  # how loud a burst must be
+    "voice_detect": False,  # after a recording, find laughs and shouts on the microphone track (needs mic_enabled)
     "laugh_clip_minutes": 5,  # after a recording, also save this many minutes around each laugh as its own clip; 0 = mark only
     "save_folder": "",  # where recordings go; "" = Videos\\Laqta
     "cleanup_days": 0,  # delete recordings older than this; 0 = never
@@ -92,8 +91,7 @@ def _check(cfg: dict) -> dict:
          "discord_webhook must be empty or a Discord webhook address (https://discord.com/api/webhooks/...)")
     need(isinstance(cfg["mic_trigger"], bool), "mic_trigger must be true or false")
     need(isinstance(cfg["mic_trigger_db"], (int, float)) and -60 <= cfg["mic_trigger_db"] <= 0, "mic_trigger_db must be between -60 and 0")
-    need(isinstance(cfg["laugh_trigger"], bool), "laugh_trigger must be true or false")
-    need(isinstance(cfg["laugh_db"], (int, float)) and -60 <= cfg["laugh_db"] <= 0, "laugh_db must be between -60 and 0")
+    need(isinstance(cfg["voice_detect"], bool), "voice_detect must be true or false")
     need(isinstance(cfg["laugh_clip_minutes"], int) and 0 <= cfg["laugh_clip_minutes"] <= 15, "laugh_clip_minutes must be between 0 and 15")
     need(isinstance(cfg["mic_volume"], int) and 0 <= cfg["mic_volume"] <= 200, "mic_volume must be between 0 and 200")
     for game in cfg["games"]:

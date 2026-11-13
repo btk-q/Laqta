@@ -53,56 +53,6 @@ class Shout:
         return True
 
 
-class Laugh:
-    """Laughter, judged from loudness alone: several short loud bursts in quick succession
-    ("ha-ha-ha-ha"), where a shout is one long one.
-
-    Fed OBS's *magnitude* (average loudness of the last moment), not its peak: measured on
-    OBS 33, the peak value is held across the short gaps between bursts and so shows a laugh
-    as one steady sound, while the magnitude drops in each gap. The values change about ten
-    times a second, so a gap can be caught half-way; hence a burst only ends when the level
-    falls under half the line (hysteresis), not the moment it dips below it.
-
-    ponytail: this cannot hear what a sound is, only its rhythm. Loud, fast talking or
-    coughing can set it off, and a quiet chuckle will not. Recognising laughter properly needs
-    the sound itself and a trained model, which means a large new dependency; do that if this
-    proves too rough in real use.
-    """
-
-    def __init__(self, db: float = -18.0, bursts: int = 4, window: float = 2.5, cooldown: float = 30.0):
-        self.db = db
-        self.bursts, self.window, self.cooldown = bursts, window, cooldown
-        self._loud, self._starts, self._quiet_until = False, [], 0.0
-
-    @property
-    def db(self) -> float:
-        return self._db
-
-    @db.setter
-    def db(self, value: float) -> None:
-        self._db, self.level = value, 10 ** (value / 20)
-
-    def feed(self, magnitude: float, now: float) -> bool:
-        if magnitude >= self.level and not self._loud:
-            self._loud = True
-            self._starts.append(now)  # a burst began
-        elif magnitude < self.level / 2:
-            self._loud = False
-        self._starts = [t for t in self._starts if now - t <= self.window]
-        if len(self._starts) < self.bursts or now < self._quiet_until:
-            return False
-        self._starts, self._quiet_until = [], now + self.cooldown
-        return True
-
-
-def mic_magnitude(meters: dict) -> float:
-    """The microphone's average loudness over the last moment, 0..1 (see Laugh for why not the peak)."""
-    for item in meters.get("inputs") or ():
-        if item.get("inputName") == MIC:
-            return max((ch[0] for ch in item.get("inputLevelsMul") or () if len(ch) > 2), default=0.0)
-    return 0.0
-
-
 def mic_peak(meters: dict) -> float:
     """The microphone's loudest channel in one InputVolumeMeters event, 0..1, before the volume setting."""
     for item in meters.get("inputs") or ():

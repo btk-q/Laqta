@@ -7,19 +7,20 @@ name = "laqta"
 dynamic = ["version"]
 description = "Free, local-only game recorder that drives OBS"
 requires-python = ">=3.11"
-dependencies = ["obsws-python>=1.8", "psutil>=5.9", "PySide6-Essentials>=6.6",
+dependencies = ["obsws-python>=1.8", "psutil>=5.9", "PySide6-Essentials>=6.6", "PySide6-Addons>=6.6", "ai-edge-litert>=2.0",
     "opencv-python-headless>=4.8", "numpy>=1.26", "mss>=10", "tomli-w>=1.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
 [tool.setuptools]
-packages = ["laqta", "laqta.core", "laqta.obs_controller", "laqta.game_detector", "laqta.storage", "laqta.ui", "laqta.plugins"]
+packages = ["laqta", "laqta.core", "laqta.obs_controller", "laqta.game_detector", "laqta.storage", "laqta.ui", "laqta.plugins", "laqta.voice"]
 
 [tool.setuptools.package-data]
 "laqta.game_detector" = ["games.json"]
 "laqta.ui" = ["icon.png", "chevron.png"]
 "laqta.plugins" = ["assets/*/*.png"]
+"laqta.voice" = ["yamnet.tflite"]
 
 [tool.setuptools.dynamic]
 version = { attr = "laqta.__version__" }

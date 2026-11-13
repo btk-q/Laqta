@@ -2,7 +2,7 @@
 apart at a glance on a timeline. Drawn with the painter (no image files, sharp at any size).
 
 Colour groups: green = you scored on someone, red = it went against you, blue = you helped,
-amber = objectives and goals, gold = results, pink = your own voice, accent = your own key.
+amber = objectives and goals, gold = results, pink = your laugh, cyan = your shout, accent = your own key.
 """
 
 from __future__ import annotations
@@ -14,14 +14,14 @@ from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap, QPolygo
 
 from . import theme
 
-GREEN, RED, BLUE, AMBER, GOLD, PINK, GREY = "#2FBF71", "#F0485C", "#4C9BF5", "#F59E0B", "#EAB308", "#EC5FA8", "#7C7A8C"
+GREEN, RED, BLUE, AMBER, GOLD, PINK, GREY, CYAN = "#2FBF71", "#F0485C", "#4C9BF5", "#F59E0B", "#EAB308", "#EC5FA8", "#7C7A8C", "#14B8C4"
 COLORS = {
     "kill": GREEN, "headshot": GREEN, "multikill": GREEN, "ace": GREEN, "first_blood": GREEN, "demolition": GREEN,
     "death": RED, "lose": GREY, "round_lose": GREY,
     "assist": BLUE, "save": BLUE,
     "objective": AMBER, "goal": AMBER,
     "win": GOLD, "round_win": GOLD,
-    "shout": PINK, "laugh": PINK,
+    "shout": CYAN, "laugh": PINK,
 }  # fmt: skip
 
 

@@ -464,12 +464,10 @@ class SettingsWindow(QDialog):
         layout.addLayout(trigger)
         layout.addWidget(_label(t("audio.trigger_hint"), "hint"))
         self.laugh = QCheckBox(t("audio.laugh"))
-        self.laugh.setChecked(self.cfg["laugh_trigger"])
-        self.laugh_db = _spin(self.cfg["laugh_db"], -60, 0)
+        self.laugh.setChecked(self.cfg["voice_detect"])
         self.laugh_minutes = _spin(self.cfg["laugh_clip_minutes"], 0, 15)
         funny = QFormLayout()
         funny.setHorizontalSpacing(20)
-        funny.addRow(t("audio.laugh_level"), self.laugh_db)
         funny.addRow(t("audio.laugh_minutes"), self.laugh_minutes)
         layout.addSpacing(10)
         layout.addWidget(self.laugh)
@@ -483,7 +481,6 @@ class SettingsWindow(QDialog):
             self.mic_trigger.setEnabled(self.mic_enabled.isChecked())  # it reads the microphone track's meter
             self.mic_trigger_db.setEnabled(self.mic_enabled.isChecked() and self.mic_trigger.isChecked())
             self.laugh.setEnabled(self.mic_enabled.isChecked())
-            self.laugh_db.setEnabled(self.mic_enabled.isChecked() and self.laugh.isChecked())
             self.laugh_minutes.setEnabled(self.mic_enabled.isChecked() and self.laugh.isChecked())
 
         self.mic_enabled.toggled.connect(sync)
@@ -842,8 +839,7 @@ class SettingsWindow(QDialog):
             update_check=self.update_check.isChecked(),
             discord_webhook=webhook,
             mic_trigger_db=self.mic_trigger_db.value(),
-            laugh_trigger=self.laugh.isChecked(),
-            laugh_db=self.laugh_db.value(),
+            voice_detect=self.laugh.isChecked(),
             laugh_clip_minutes=self.laugh_minutes.value(),
             save_folder="" if Path(self.save_folder.text()) == clips.DEFAULT_ROOT else self.save_folder.text(),
         )
