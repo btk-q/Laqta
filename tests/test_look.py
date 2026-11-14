@@ -85,3 +85,24 @@ def test_video_presets():
     assert preset_of({**config.DEFAULTS, "bitrate": 12000}) == "custom"
     for preset in VIDEO_PRESETS.values():
         config._check({**config.DEFAULTS, **preset})  # every preset is a valid setting
+
+
+def test_a_games_icon_is_read_from_its_program_file_and_kept(tmp_path, monkeypatch):
+    import os
+    import sys
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+
+    from laqta.ui import gameicons
+
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    monkeypatch.setattr(gameicons, "CACHE", tmp_path / "icons")
+    gameicons._memory.clear()
+    assert gameicons.get("SomeGame.exe") is None
+    made = gameicons.extract("SomeGame.exe", __import__("pathlib").Path(sys.executable))  # any real program file has an icon
+    assert made is not None and not made.isNull() and (tmp_path / "icons" / "somegame.exe.png").exists()
+    gameicons._memory.clear()
+    assert gameicons.get("somegame.EXE") is not None  # found again from disk, whatever the letter case
+    assert gameicons.blank().width() == gameicons.SIZE
+    gameicons._memory.clear()

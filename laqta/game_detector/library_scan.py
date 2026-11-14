@@ -1,6 +1,6 @@
 """Find installed games by reading the launchers' own files and registry keys.
 
-Covered: Steam, Epic Games, GOG. Battle.net and EA keep their install lists in formats that
+Covered: Steam, Epic Games, GOG and Riot. Battle.net and EA keep their install lists in formats that
 need per-launcher parsers; games from those are picked up by the "looks like a game" prompt
 or added by hand.
 """
@@ -114,10 +114,84 @@ def scan_gog() -> list[dict]:
     return games
 
 
+RIOT = Path(os.environ.get("ProgramData", r"C:\ProgramData")) / "Riot Games" / "RiotClientInstalls.json"
+
+
+def riot_folders(installs: Path | None = None) -> list[Path]:
+    """Where Riot's games are installed, from the Riot Client's own list."""
+    try:
+        data = json.loads((installs or RIOT).read_text(encoding="utf-8", errors="replace"))
+        return [Path(folder) for folder in data.get("associated_client", {}) if Path(folder).is_dir()]
+    except (OSError, ValueError, AttributeError):
+        return []
+
+
+def scan_riot(installs: Path | None = None) -> list[dict]:
+    games = []
+    for folder in riot_folders(installs):
+        # ".../League of Legends/" is the game; ".../2XKO/Live/" and ".../LoR/live/Game/" name it higher up.
+        named = next((p for p in (folder, *folder.parents) if p.name.lower() not in ("live", "game")), folder)
+        exe = main_exe(folder, named.name)
+        if exe:
+            games.append({"exe": exe, "name": named.name})
+    return games
+
+
+def _exes_under(folder: Path, depth: int) -> dict[str, Path]:
+    found: dict[str, Path] = {}
+    try:
+        for level in range(1, depth + 1):
+            for path in folder.glob("/".join(["*"] * (level - 1) + ["*.exe"])):
+                found.setdefault(path.name.lower(), path)  # the copy nearest the top wins
+    except OSError:
+        pass
+    return found
+
+
+def program_files() -> dict[str, Path]:
+    """Every program file in the installed games' folders: {name in lower case: full path}.
+    Used to find a game's own icon. Reads folders only; no process is touched. Takes a second
+    or two on a large library, so call it off the GUI thread."""
+    found: dict[str, Path] = {}
+    for library in _steam_libraries():
+        try:
+            folders = [p for p in (library / "steamapps" / "common").iterdir() if p.is_dir()]
+        except OSError:
+            continue
+        for folder in folders:
+            for name, path in _exes_under(folder, 4).items():
+                found.setdefault(name, path)
+    for folder in riot_folders():
+        for name, path in _exes_under(folder, 5).items():  # Valorant's is five folders down
+            found.setdefault(name, path)
+    manifests = Path(os.environ.get("ProgramData", r"C:\ProgramData")) / "Epic/EpicGamesLauncher/Data/Manifests"
+    for item in manifests.glob("*.item"):
+        try:
+            data = json.loads(item.read_text(encoding="utf-8", errors="replace"))
+            path = Path(data["InstallLocation"]) / data["LaunchExecutable"]
+            if path.is_file():
+                found.setdefault(path.name.lower(), path)
+        except (OSError, ValueError, KeyError):
+            continue
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\GOG.com\Games") as root:
+            for i in range(winreg.QueryInfoKey(root)[0]):
+                try:
+                    with winreg.OpenKey(root, winreg.EnumKey(root, i)) as game:
+                        path = Path(winreg.QueryValueEx(game, "exe")[0])
+                        if path.is_file():
+                            found.setdefault(path.name.lower(), path)
+                except OSError:
+                    continue
+    except OSError:
+        pass
+    return found
+
+
 def scan(known: set[str]) -> list[dict]:
     """Installed games not already in `known` (lower-case exe names), one entry per exe."""
     found: dict[str, dict] = {}
-    for scanner in (scan_steam, scan_epic, scan_gog):
+    for scanner in (scan_steam, scan_epic, scan_gog, scan_riot):
         try:
             for game in scanner():
                 key = game["exe"].lower()

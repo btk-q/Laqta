@@ -98,6 +98,10 @@ for a laugh, and so on). They appear on the trim window's timeline with a legend
 on each clip's tags, and on a strip in the side panel that shows where in the video each
 event happened; click a symbol there to open the trim window on that moment.
 
+**One window:** Laqta has two views, **Clips** and **Settings**, switched at the top. Settings you are
+in the middle of changing stay as they are while you look at your clips, until you press Save
+changes or Cancel. Each game shows its own icon, read from the game's program file on your PC.
+
 **Clips window:** videos are grouped by game and day, newest first. Search by game, tag or event; filter by game, event, date and favourites;
 play, tag, export as MP4, show in folder, or delete to the Recycle Bin.
 

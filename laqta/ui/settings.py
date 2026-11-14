@@ -22,7 +22,7 @@ from ..obs_controller.capture import KINDS
 from ..plugins import PLUGINS
 from ..storage import autostart, clips, config
 from ..storage.clips import usable_folder
-from . import icons, theme
+from . import gameicons, icons, theme
 
 # -- config edits (no Qt: unit-tested) ------------------------------------------------
 
@@ -664,6 +664,9 @@ class SettingsWindow(QDialog):
         self.game_list.setObjectName("rail")
         self.game_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.game_list.setTextElideMode(Qt.TextElideMode.ElideMiddle)
+        self.game_list.setIconSize(QSize(22, 22))
+        self.icon_finder = gameicons.Finder(self)
+        self.icon_finder.done.connect(lambda: self._fill_games(self._current_game()))
         self.game_list.currentItemChanged.connect(lambda *_: self._game_chosen())
         self.scan_result = _label("", "hint")
         self.scan_result.setContentsMargins(16, 4, 12, 0)
@@ -686,12 +689,18 @@ class SettingsWindow(QDialog):
         for key, game in sorted(games.items(), key=lambda kv: (kv[1].get("name") or kv[0]).lower()):
             name = game.get("name") or game["exe"]
             item = QListWidgetItem(f"{name} ({game['exe']})" if names.count(name) > 1 else name)  # e.g. two Apex exes
+            item.setIcon(QIcon(gameicons.get(game["exe"]) or gameicons.blank()))  # a blank keeps the names in one column
             item.setData(Qt.ItemDataRole.UserRole, key)
             self.game_list.addItem(item)
             if key == (select or "").lower():
                 self.game_list.setCurrentItem(item)
         self.game_list.blockSignals(False)
+        self.icon_finder.find([g["exe"] for g in games.values()])  # for games with no picture yet
         self._show_game()
+
+    def _current_game(self) -> str | None:
+        item = self.game_list.currentItem()
+        return item.data(Qt.ItemDataRole.UserRole) if item else None
 
     def _clear_detail(self) -> None:
         while self.detail.count():

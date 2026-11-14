@@ -222,6 +222,8 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Post to Discord | Unit-tested | Request built and checked against a stand-in; the window flow (confirm, too big, offline) driven by script; never uploaded to a real channel |
 | Corner note window | Works on the desktop | On the real desktop: shown without taking the foreground window, click-through and topmost styles set. Not seen over a game |
 | Main window on start, second launch re-opens it | Works | Driven as the real app: opens, closes to the tray, re-opened by a second launch |
+| One window (clips and settings views) | Works | Driven as the real app: save, cancel, edits kept while switching views, Settings from the tray, rebuilt on a language change |
+| Game icons | Works | Read from this PC's real installs (Steam and Riot): six games found in half a second; Epic and GOG paths untested here |
 | First-run setup screen | Works with a made-up empty PC | Every step and button driven by script with the installs faked; the WebSocket switch tested on a copy of OBS's real settings file. Never run on a PC that really lacks OBS or ffmpeg |
 | Pre-publish smoke test | Works | Run on the packaged app: 5 of 5 passes; it caught a genuinely broken build during development |
 | Update rollback | Works | For real, on a test copy: a deliberately broken build was undone after 45 s and the old version restarted; a good build was kept after about 12 s |

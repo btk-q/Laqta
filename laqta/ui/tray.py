@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from .. import __version__, i18n
 from ..core.app import Core
+from ..game_detector.detector import load_games
 from ..i18n import t
 from ..storage import clips, config, update
 from . import theme
@@ -192,7 +193,8 @@ class TrayApp:
             self.library.showNormal()
             self.library.raise_()
             return self.library.activateWindow()
-        self.library = window = LibraryWindow(webhook=self.cfg["discord_webhook"], settings_factory=self._make_settings)
+        self.library = window = LibraryWindow(webhook=self.cfg["discord_webhook"], settings_factory=self._make_settings,
+                                              games=load_games(self.cfg["games"], self.cfg["default_mode"]))
         window.finished.connect(lambda _: self._library_closed(window))
         self._on_state(self.state)  # so the new window shows what is happening right now
         window.show()

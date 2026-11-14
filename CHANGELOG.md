@@ -2,6 +2,17 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## 0.6.0
+
+**One window, and every game has its picture.**
+
+### New
+- **Clips and Settings in one window.** Switch between them at the top. Settings you are in
+  the middle of changing wait for you while you look at your clips.
+- **Game icons.** Each game shows its own icon in the clips headings and in "My games".
+- **Riot games in "Add a game".** Games installed through the Riot Client (League, 2XKO,
+  Legends of Runeterra and others) are now found, alongside Steam, Epic and GOG.
+
 ## 0.5.1
 
 **Easier to set up, and updates that cannot leave you with a broken Laqta.**

@@ -15,10 +15,11 @@ from PySide6.QtWidgets import (
     QButtonGroup, QFrame, QGridLayout, QListWidgetItem, QScrollArea, QMessageBox, QPushButton, QStackedWidget, QStyle, QStyledItemDelegate, QVBoxLayout, QWidget,
 )  # fmt: skip
 
+from ..game_detector.detector import load_games
 from ..i18n import is_rtl, t
 from ..storage import clips, config, highlights, library, share
 from ..storage.library import Clip
-from . import icons, theme
+from . import gameicons, icons, theme
 
 THUMB = QSize(256, 144)
 HEADING_ROLE = Qt.ItemDataRole.UserRole + 1  # (game, day) on the grid's heading rows
@@ -166,6 +167,13 @@ class Card(QStyledItemDelegate):
         name = QFont(option.font)
         name.setPixelSize(16)
         name.setWeight(QFont.Weight.DemiBold)
+        picture = index.data(Qt.ItemDataRole.DecorationRole)
+        if isinstance(picture, QPixmap) and not picture.isNull():  # the game's own icon, before its name
+            side = 24
+            x = box.right() - side if lead == Qt.AlignmentFlag.AlignRight else box.x()
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            painter.drawPixmap(QRectF(x, box.center().y() - side / 2, side, side).toRect(), picture)
+            box = box.adjusted(0, 0, -(side + 8), 0) if lead == Qt.AlignmentFlag.AlignRight else box.adjusted(side + 8, 0, 0, 0)
         painter.setFont(name)
         painter.setPen(QColor(c["text"]))
         painter.drawText(box, lead | Qt.AlignmentFlag.AlignVCenter, game)
@@ -316,7 +324,7 @@ class LibraryWindow(QDialog):
     PREVIEW = QSize(308, 173)
 
     def __init__(self, parent: QWidget | None = None, root: Path | None = None, webhook: str = "", on_settings=None,
-                 settings_factory=None):
+                 settings_factory=None, games: dict | None = None):
         super().__init__(parent)
         self.root = root or clips.ROOT
         self.webhook = webhook  # "" = sharing to Discord is not set up, and the button is not shown
@@ -325,6 +333,10 @@ class LibraryWindow(QDialog):
         self.thumbs: dict[str, str] = {}  # video -> its thumbnail file, for the side panel
         self.settings_factory = settings_factory  # makes the settings view; with it, this is the one main window
         self.embedded = None  # the settings view while it is open (edits live in it until Save or Cancel)
+        # Game name -> program name, to put each game's own icon beside its name.
+        self.exe_of = {(g.get("name") or g["exe"]).casefold(): g["exe"] for g in (games or load_games([], "session")).values()}
+        self.icon_finder = gameicons.Finder(self)
+        self.icon_finder.done.connect(lambda: self.reload(self.selected().path if self.selected() else None))
         self.setWindowTitle(t("library.title"))
         self.setWindowFlags(Qt.WindowType.Window)  # a real window: minimise, maximise, its own taskbar button
         self.resize(1280, 830)
@@ -605,10 +617,13 @@ class LibraryWindow(QDialog):
 
         self.grid.clear()
         self.items.clear()
+        self.icon_finder.find([self.exe_of[c.game.casefold()] for c in self.clips if c.game.casefold() in self.exe_of])
         for game, day, members in grouped(self.clips):
             heading = QListWidgetItem()
             heading.setFlags(Qt.ItemFlag.NoItemFlags)  # not a video: cannot be selected
             heading.setData(HEADING_ROLE, (game, day_text(day)))
+            if (exe := self.exe_of.get(game.casefold())) and (picture := gameicons.get(exe)):
+                heading.setData(Qt.ItemDataRole.DecorationRole, picture)
             self.grid.addItem(heading)
             for clip in members:
                 item = QListWidgetItem(QIcon(placeholder(clip.game)), caption(clip))
