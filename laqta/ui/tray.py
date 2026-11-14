@@ -277,6 +277,10 @@ SHOW = "Laqta.ShowWindow"  # a named Windows event: a second launch sets it, the
 
 
 def run(cfg: dict, show: bool = True) -> int:
+    # Every part of the app has loaded by now: the updater waits for this mark before it discards
+    # the previous version. (Before the single-instance check, so a copy that is already running
+    # cannot make a good update look like a failed one.)
+    update.mark_started()
     # One instance only: two would fight over OBS and the hotkey.
     kernel32 = ctypes.windll.kernel32
     mutex = kernel32.CreateMutexW(None, False, MUTEX)
@@ -300,6 +304,9 @@ def run(cfg: dict, show: bool = True) -> int:
     heartbeat = QTimer()
     heartbeat.timeout.connect(lambda: kernel32.WaitForSingleObject(wake, 0) == 0 and tray.open_library())
     heartbeat.start(500)
+    undone = update.failed_version()
+    if undone and update.newer(undone):
+        tray.toast(t("update.undone", version=undone))
     tray.first_run()
     if show:
         tray.open_library()
@@ -308,6 +315,8 @@ def run(cfg: dict, show: bool = True) -> int:
 
     tray.core.start()
     code = app.exec()
+    if tray.library is not None:
+        tray.library.close()  # also closes the video player and lets go of its file, before Qt shuts down
     tray.core.quit()
     tray.core.join(timeout=10)
     for key in (tray.hotkey, tray.replay_key):

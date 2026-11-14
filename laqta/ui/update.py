@@ -110,7 +110,7 @@ class UpdateDialog(QDialog):
         if not path:
             return self._fail(why)
         try:
-            update.install(Path(path), update.app_dir())
+            update.install(Path(path), update.app_dir(), version=self.release.version)
         except OSError as e:
             return self._fail(str(e))
         self.accept()  # the caller quits Laqta; the waiting script swaps the files and starts it again

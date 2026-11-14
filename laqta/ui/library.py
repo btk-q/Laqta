@@ -518,6 +518,11 @@ class LibraryWindow(QDialog):
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self, self._delete)
         self.reload()
 
+    def closeEvent(self, event) -> None:
+        if self.viewer is not None:
+            self.viewer.close()  # stops playback and releases the file
+        super().closeEvent(event)
+
     def set_state(self, text: str, kind: str) -> None:
         """What Laqta is doing right now: "idle", "busy" (getting ready, or a problem) or "rec"."""
         color = {"idle": theme.current["muted"], "busy": theme.STATUS["warn"], "rec": theme.REC}[kind]

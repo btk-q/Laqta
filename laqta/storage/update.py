@@ -65,15 +65,17 @@ def from_api(data: dict) -> Release | None:
     return None
 
 
-def check(opener: Callable = urllib.request.urlopen, current: str = __version__) -> Release | None:
+def check(opener: Callable = urllib.request.urlopen, current: str = __version__, skip: str | None = None) -> Release | None:
     """The newer release, if there is one. None when up to date, offline, or anything is odd:
-    a failed check must never stop Laqta from starting."""
+    a failed check must never stop Laqta from starting. A version whose update was already
+    tried and undone on this PC is not offered again; the one after it is."""
+    skip = failed_version() if skip is None else skip
     try:
         with opener(urllib.request.Request(API, headers=HEADERS), timeout=8) as response:
             release = from_api(json.loads(response.read()))
     except (OSError, ValueError):  # URLError is an OSError
         return None
-    return release if release and newer(release.version, current) else None
+    return release if release and newer(release.version, current) and release.version != skip else None
 
 
 def download(release: Release, folder: Path, progress: Callable[[float], None] = lambda fraction: None,
@@ -115,19 +117,90 @@ def unpack(archive: Path, folder: Path) -> Path:
     return found
 
 
-def swap_script(new: Path, app: Path, pid: int, restart: bool = True, work: Path | None = None, archive: Path | None = None) -> str:
+STARTED, FAILED = "started.txt", "update-failed.txt"  # in the settings folder; see swap_script
+PROOF_SECONDS = 45  # how long a new version gets to show that it starts
+
+
+def state_dir() -> Path:
+    from . import config
+
+    return config.DIR
+
+
+def mark_started(folder: Path | None = None) -> None:
+    """Called once Laqta is up: the proof the updater's script waits for before it throws the
+    previous version away."""
+    try:
+        # With a line ending: the script's `findstr /x` does not match a last line that has none
+        # (found by running a real update, which was wrongly undone).
+        (folder or state_dir()).joinpath(STARTED).write_bytes(__version__.encode("ascii") + b"\r\n")
+    except OSError:
+        pass
+
+
+def failed_version(folder: Path | None = None) -> str:
+    """The version whose update was undone because it did not start ("" if none)."""
+    try:
+        return (folder or state_dir()).joinpath(FAILED).read_text(encoding="ascii").strip()
+    except OSError:
+        return ""
+
+
+def swap_script(new: Path, app: Path, pid: int, restart: bool = True, work: Path | None = None, archive: Path | None = None,
+                version: str = "", state: Path | None = None) -> str:
     """A batch file that waits for this Laqta to close, replaces its files and starts it again.
-    It removes only the app's own `_internal` folder: whatever else sits beside Laqta.exe
-    (the user may have unpacked it straight onto the Desktop) is never deleted."""
+
+    The previous version is kept beside the new one until the new one proves it starts (it
+    writes its version into started.txt). If that does not happen within PROOF_SECONDS, the
+    script stops the new one, puts the previous version back, starts it, and records the
+    failed version so it is not offered again.
+
+    Only the app's own files are touched: whatever else sits beside Laqta.exe (the user may
+    have unpacked it straight onto the Desktop) is never deleted."""
+    state = state or state_dir()
+    verify = restart and bool(version)
+    # ponytail: a folder name containing an apostrophe breaks the PowerShell line that starts
+    # the new version; it then counts as "did not start" and the old version is restored.
     lines = [
         "@echo off",
         "chcp 65001 >nul",  # the file is UTF-8: folder names are not always ASCII
+        f'set "APP={app}"',
+        f'set "STATE={state}"',
         ":wait",
         # ping as a one-second pause: `timeout` refuses to run without a console
         f'tasklist /FI "PID eq {pid}" 2>nul | find "{pid}" >nul && (ping -n 2 127.0.0.1 >nul & goto wait)',
-        f'if exist "{app}\\_internal\\base_library.zip" rmdir /s /q "{app}\\_internal"',
-        f'robocopy "{new}" "{app}" /E /R:5 /W:1 /NFL /NDL /NJH /NJS >nul',
-        f'start "" "{app}\\Laqta.exe"' if restart else "rem no restart",
+        'if exist "%APP%\\_internal.old" rmdir /s /q "%APP%\\_internal.old"',
+        'if exist "%APP%\\_internal\\base_library.zip" ren "%APP%\\_internal" _internal.old',
+        'copy /y "%APP%\\Laqta.exe" "%APP%\\Laqta.exe.old" >nul',
+        f'robocopy "{new}" "%APP%" /E /R:5 /W:1 /NFL /NDL /NJH /NJS >nul',
+    ]
+    if verify:
+        lines += [
+            'del /q "%STATE%\\' + STARTED + '" 2>nul',
+            "set NEWPID=0",
+            'for /f "usebackq" %%p in (`powershell -NoProfile -Command "(Start-Process -FilePath \'%APP%\\Laqta.exe\' -PassThru).Id"`) do set NEWPID=%%p',
+            "set /a TRIES=0",
+            ":proof",
+            f'findstr /x /c:"{version}" "%STATE%\\{STARTED}" >nul 2>&1 && goto good',
+            "set /a TRIES+=1",
+            f"if %TRIES% lss {PROOF_SECONDS} (ping -n 2 127.0.0.1 >nul & goto proof)",
+            "rem The new version did not start: put the previous one back.",
+            "taskkill /F /T /PID %NEWPID% >nul 2>&1",
+            'rmdir /s /q "%APP%\\_internal"',
+            'ren "%APP%\\_internal.old" _internal',
+            'copy /y "%APP%\\Laqta.exe.old" "%APP%\\Laqta.exe" >nul',
+            'del /q "%APP%\\Laqta.exe.old"',
+            f'>"%STATE%\\{FAILED}" echo {version}',
+            'start "" "%APP%\\Laqta.exe"',
+            "goto clean",
+            ":good",
+        ]
+    elif restart:
+        lines.append('start "" "%APP%\\Laqta.exe"')
+    lines += [
+        'if exist "%APP%\\_internal.old" rmdir /s /q "%APP%\\_internal.old"',
+        'del /q "%APP%\\Laqta.exe.old" 2>nul',
+        ":clean",
         f'rmdir /s /q "{work or new.parent}"',
         f'del /q "{archive}"' if archive else "rem nothing downloaded to remove",
         '(goto) 2>nul & del "%~f0"',
@@ -145,13 +218,14 @@ def writable(folder: Path) -> bool:
         return False
 
 
-def install(archive: Path, app: Path, restart: bool = True) -> None:
-    """Unpack next to the temp files and start the swap. The caller must now quit Laqta."""
+def install(archive: Path, app: Path, restart: bool = True, version: str = "", keep_archive: bool = False) -> None:
+    """Unpack next to the temp files and start the swap. The caller must now quit Laqta.
+    `version` is what the new copy will report; with it, a copy that fails to start is undone."""
     if not writable(app):
         raise OSError(f"Laqta cannot write to its own folder ({app}). Move it somewhere like Documents, or update by hand.")
     work = Path(tempfile.mkdtemp(prefix="laqta-update-"))
     new = unpack(archive, work / "new")
     script = work.parent / f"{work.name}.cmd"
-    script.write_text(swap_script(new, app, os.getpid(), restart, work, archive), encoding="utf-8")
+    script.write_text(swap_script(new, app, os.getpid(), restart, work, None if keep_archive else archive, version), encoding="utf-8")
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     subprocess.Popen(["cmd", "/c", str(script)], creationflags=flags, close_fds=True, cwd=str(work.parent))

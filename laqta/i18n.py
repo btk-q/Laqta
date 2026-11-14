@@ -185,6 +185,7 @@ STRINGS: dict[str, tuple[str, str]] = {
     "update.downloading": ("Downloading…", "جارٍ التنزيل…"),
     "update.failed": ("The update did not work: {error}", "لم ينجح التحديث: {error}"),
     "update.from_source": ("this copy runs from source code, so update it with git. The download page has been opened in your browser", "هذه النسخة تعمل من الشيفرة المصدرية، فحدّثها عبر git. فُتحت صفحة التنزيل في متصفحك"),
+    "update.undone": ("The update to Laqta {version} did not start, so the previous version was put back. That update will not be offered again; the next one will.", "لم يبدأ تحديث لقطة {version}، فأُعيد الإصدار السابق. لن يُعرض ذلك التحديث مرة أخرى؛ وسيُعرض التالي."),
     "update.none": ("Laqta {version} is the latest version.", "لقطة {version} هو أحدث إصدار."),
     "menu.update": ("Check for updates", "ابحث عن تحديثات"),
     "share.update": ("Check for a new version when Laqta starts", "ابحث عن إصدار جديد عند تشغيل لقطة"),

@@ -95,16 +95,57 @@ def test_unpack_finds_the_app_and_refuses_a_zip_without_it(tmp_path):
         update.unpack(release_zip(tmp_path / "b.zip", exe=False), tmp_path / "out2")
 
 
+NEW, APP = Path(r"C:\Temp\laqta-update-1\new\Laqta"), Path(r"C:\Users\x\Desktop")
+WORK, STATE = Path(r"C:\Temp\laqta-update-1"), Path(r"C:\Users\x\AppData\Roaming\Laqta")
+
+
+def script(**kw):
+    return update.swap_script(NEW, APP, 4321, work=WORK, state=STATE, **kw).splitlines()
+
+
 def test_the_swap_script_waits_then_replaces_only_laqtas_own_files():
-    script = update.swap_script(Path(r"C:\Temp\laqta-update-1\new\Laqta"), Path(r"C:\Users\x\Desktop"), 4321, work=Path(r"C:\Temp\laqta-update-1"))
-    lines = script.splitlines()
+    lines = script(version="0.9.0")
+    text = "\n".join(lines)
+    assert r'set "APP=C:\Users\x\Desktop"' in lines
     assert lines.index(next(l for l in lines if "PID eq 4321" in l)) < lines.index(next(l for l in lines if "robocopy" in l))
-    removed = [l for l in lines if "rmdir" in l]
-    assert removed == [r'if exist "C:\Users\x\Desktop\_internal\base_library.zip" rmdir /s /q "C:\Users\x\Desktop\_internal"',
-                       r'rmdir /s /q "C:\Temp\laqta-update-1"']  # never the folder Laqta.exe sits in
-    assert "/MIR" not in script and "/PURGE" not in script and "timeout" not in script
-    assert r'start "" "C:\Users\x\Desktop\Laqta.exe"' in script
-    assert "start" not in update.swap_script(Path("n/Laqta"), Path("a"), 1, restart=False).replace("restart", "")
+    # Every delete names one of Laqta's own things: its _internal folder (or the kept copy of it),
+    # its exe's kept copy, the marker file, or the temp folder. Never the folder Laqta.exe sits in.
+    for line in lines:
+        if line.startswith(("rmdir", "del ")) or " rmdir " in line:
+            assert any(part in line for part in (r"\_internal", "Laqta.exe.old", "started.txt", "laqta-update-1", "%~f0")), line
+    assert "/MIR" not in text and "/PURGE" not in text and "timeout" not in text
+
+
+def test_the_previous_version_is_kept_until_the_new_one_proves_it_starts():
+    lines = script(version="0.9.0")
+    keep = lines.index(r'if exist "%APP%\_internal\base_library.zip" ren "%APP%\_internal" _internal.old')
+    copy = lines.index(next(l for l in lines if l.startswith("robocopy")))
+    proof = lines.index(next(l for l in lines if 'findstr /x /c:"0.9.0"' in l))
+    undo = lines.index(r'ren "%APP%\_internal.old" _internal')
+    good = lines.index(":good")
+    assert keep < copy < proof < undo < good
+    assert r'copy /y "%APP%\Laqta.exe.old" "%APP%\Laqta.exe" >nul' in lines[undo:good]  # the old exe comes back too
+    assert r'>"%STATE%\update-failed.txt" echo 0.9.0' in lines[undo:good]  # and the bad version is remembered
+    assert any("taskkill /F /T /PID %NEWPID%" in l for l in lines[proof:undo])  # only the copy it started, by its id
+    assert r'if exist "%APP%\_internal.old" rmdir /s /q "%APP%\_internal.old"' in lines[good:]  # thrown away only on success
+
+
+def test_without_a_restart_or_a_version_there_is_nothing_to_wait_for():
+    for kw in ({"restart": False, "version": "0.9.0"}, {"version": ""}):
+        text = "\n".join(script(**kw))
+        assert "findstr" not in text and "taskkill" not in text
+    assert r'start "" "%APP%\Laqta.exe"' in script(version="") and not any(l.startswith("start") for l in script(restart=False))
+
+
+def test_started_and_failed_markers_and_a_failed_version_is_not_offered_again(tmp_path):
+    assert update.failed_version(tmp_path) == ""
+    update.mark_started(tmp_path)
+    assert (tmp_path / "started.txt").read_bytes() == update.__version__.encode() + b"\r\n"  # findstr /x needs the line ending
+    (tmp_path / "update-failed.txt").write_text("0.9.0\n")
+    assert update.failed_version(tmp_path) == "0.9.0"
+    assert update.check(serving(api()), current="0.2.0", skip="0.9.0") is None
+    newer = api(tag="v0.9.1", name="Laqta-0.9.1-win64.zip", url=URL.replace("0.9.0", "0.9.1"))
+    assert update.check(serving(newer), current="0.2.0", skip="0.9.0").version == "0.9.1"
 
 
 def test_install_refuses_a_folder_it_cannot_write_to(tmp_path, monkeypatch):
@@ -119,8 +160,8 @@ def test_install_refuses_a_folder_it_cannot_write_to(tmp_path, monkeypatch):
     app.mkdir()
     update.install(release_zip(tmp_path / "a.zip"), app)
     assert len(started) == 1 and started[0][0][:2] == ["cmd", "/c"] and Path(started[0][0][2]).read_text(encoding="utf-8").startswith("@echo off")
-    script = Path(started[0][0][2]).read_text(encoding="utf-8")
-    assert f'del /q "{tmp_path / "a.zip"}"' in script  # the 94 MB download is not left behind
+    text = Path(started[0][0][2]).read_text(encoding="utf-8")
+    assert f'del /q "{tmp_path / "a.zip"}"' in text  # the download is not left behind
 
 
 def test_running_from_source_has_no_exe_to_replace():

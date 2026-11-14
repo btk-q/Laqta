@@ -26,6 +26,10 @@ powershell -NoProfile -File packaging\build.ps1
 if ($LASTEXITCODE -ne 0) { throw "Build failed; nothing was published." }
 $zip = "dist\Laqta-$version-win64.zip"
 
+# The packaged app itself must start and load every part before anything is published.
+& $py packaging\smoke.py (Join-Path $env:TEMP "laqta-build\dist\Laqta")
+if ($LASTEXITCODE -ne 0) { throw "The packaged app failed its smoke test; nothing was published." }
+
 & $py packaging/notes.py $version $zip $file  # again, now with the zip's hash
 
 git push origin HEAD

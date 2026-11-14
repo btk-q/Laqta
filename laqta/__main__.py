@@ -162,13 +162,93 @@ def voice_check(video: str, track: int) -> int:
     return 0
 
 
-def update_now(install: bool, restart: bool) -> int:
+def selftest(out: str | None) -> int:
+    """Start everything the app is made of without showing it: every window, the video player,
+    the sound recogniser, the bundled data. Run on the packaged app before a release, where a
+    missing file would otherwise only show up on a friend's PC. Exit code 0 = all of it loaded."""
+    import os
+    import tempfile
+    import traceback
+    from pathlib import Path
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    steps: list[str] = []
+    try:
+        from PySide6.QtWidgets import QApplication
+
+        from . import voice
+        from .core import app as _core, health  # noqa: F401  (imports every plugin, and OpenCV with them)
+        from .game_detector.detector import load_games
+        from .storage import update
+        from .ui import icons, theme
+        from .ui.editor import Timeline
+        from .ui.library import LibraryWindow
+        from .ui.player import Player
+        from .ui.settings import SettingsWindow
+        from .ui.setup import SetupDialog
+        from .ui.update import UpdateDialog
+
+        qt = QApplication.instance() or QApplication([])
+        theme.apply(qt)
+        steps.append(f"games: {len(load_games([], 'session'))}")
+        cfg = dict(config.DEFAULTS)
+        # Everything built here is kept until the end: a video player thrown away the moment it is
+        # made is destroyed while its own threads are still starting, which crashed one run in six.
+        keep: list = [LibraryWindow(root=Path(tempfile.mkdtemp()), on_settings=lambda: None)]
+        steps.append("clips window")
+        window = SettingsWindow(cfg)
+        keep.append(window)
+        steps.append(f"settings: {window.pages.count()} pages, {window.game_list.count()} games")
+        keep += [SetupDialog(cfg), UpdateDialog(update.Release("9.9.9", "notes", update.DOWNLOADS + "x.zip", 1, "0" * 64)),
+                 Timeline(60.0, [{"type": "kill", "offset": 5.0}]), icons.pixmap("kill"), Player()]
+        keep[2].timer.stop()
+        steps.append("setup, update, timeline, player")
+        if not health.player_works():
+            raise RuntimeError("the video player's FFmpeg backend is missing")
+        steps.append(f"sound recogniser: {len(voice.labels())} classes")
+        import numpy as np
+
+        voice.Classifier().scores(np.zeros(voice.WINDOW, np.float32))
+        steps.append("recogniser ran")
+        code = 0
+    except Exception:
+        steps.append(traceback.format_exc())
+        code = 1
+    report = f"laqta {__version__} selftest {'OK' if code == 0 else 'FAILED'}\n" + "\n".join(steps)
+    if out:
+        Path(out).write_text(report, encoding="utf-8")
+    print(report)
+    sys.stdout.flush()
+    # Leave at once, without the usual shutdown: destroying a dozen half-used Qt windows and a
+    # media player in whatever order Python picks at exit is not what is being tested, and
+    # os._exit hung there. (The real app closes its player before quitting; see ui.tray.run.)
+    import ctypes
+
+    ctypes.windll.kernel32.TerminateProcess(ctypes.c_void_p(-1), code)  # -1 = this process (as a full-width handle)
+    return code
+
+
+def update_now(install: bool, restart: bool, source: str | None = None) -> int:
     """The updater without the window: for a broken install, and for testing the real thing."""
+    import re
     import tempfile
     from pathlib import Path
 
     from .storage import update
 
+    if source:  # a zip already on this PC (sent by a friend, or a test build)
+        app = update.app_dir()
+        if app is None:
+            print("This copy runs from source: update it with git.")
+            return 1
+        named = re.search(r"Laqta-([\d.]+)-win64", Path(source).name)
+        try:
+            update.install(Path(source), app, restart, version=named.group(1) if named else "", keep_archive=True)
+        except OSError as e:
+            print(f"FAILED: {e}")
+            return 1
+        print("unpacked; the files are swapped as soon as this program exits")
+        return 0
     release = update.check()
     if release is None:
         print(f"laqta {__version__} is the latest version (or GitHub could not be reached)")
@@ -181,7 +261,7 @@ def update_now(install: bool, restart: bool) -> int:
         print("This copy runs from source: update it with git.")
         return 1
     try:
-        update.install(update.download(release, Path(tempfile.gettempdir()) / "laqta-download"), app, restart)
+        update.install(update.download(release, Path(tempfile.gettempdir()) / "laqta-download"), app, restart, version=release.version)
     except OSError as e:
         print(f"FAILED: {e}")
         return 1
@@ -234,6 +314,9 @@ def main(argv: list[str] | None = None) -> int:
     upd = sub.add_parser("update", help="check GitHub for a newer Laqta; with --install, download and install it")
     upd.add_argument("--install", action="store_true")
     upd.add_argument("--no-restart", action="store_true", help="do not start Laqta again after installing")
+    upd.add_argument("--from", dest="source", help="install this Laqta zip instead of asking GitHub")
+    test = sub.add_parser("selftest", help="load every part of the app without showing it; used on the packaged app before a release")
+    test.add_argument("--out", help="also write the report to this file")
     diag = sub.add_parser("diagnose", help="check that everything Laqta needs is in place and save a diagnostic zip")
     diag.add_argument("--out", help="where to write the zip (default: the current folder)")
     args = parser.parse_args(argv)
@@ -247,7 +330,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "voice":
         return voice_check(args.video, args.track)
     if args.command == "update":
-        return update_now(args.install, not args.no_restart)
+        return update_now(args.install, not args.no_restart, args.source)
+    if args.command == "selftest":
+        return selftest(args.out)
     if args.command == "calibrate":
         return calibrate(args.plugin, args.video, args.at, args.cut, args.out)
     if args.command == "diagnose":
