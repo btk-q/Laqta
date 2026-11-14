@@ -197,16 +197,16 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Per-game video settings, second monitor | Works | Live on OBS 33: sizes, fps, bitrate, x264, portrait second monitor; not yet in a real game |
 | Skipped-frames report | Works | A real League practice game (3440x1440, 60 fps, 12 Mbit) logged 0.3 % skipped, down from 4.3 % before the lighter preset; the over-2 % toast itself has not fired for real |
 | Microphone track, game-only audio | Works against ordinary apps | Live with test tones; not yet in a real game |
-| Events Only + clip hotkey | Works | Live with a stand-in process; not yet in a real game |
+| Events Only + clip hotkey | Works | In real Rocket League play: 351 clips saved in one evening (most of them wrongly, see the shout row); the hotkey itself not confirmed there |
 | Hybrid and Full Match | Unit-tested | Not yet run in a real game |
-| Capture fallback (black picture) | Works for Game -> Window | Live on the League client; Display Capture untested |
+| Capture fallback (black picture) | Works, was too eager | Real play: Deadlock and The Outlast Trials settled on window capture; Rocket League's black intro pushed it to whole-screen capture, which was then remembered. Now waits 20 s per method, announces whole-screen capture and never starts there |
 | League of Legends events | Works | Replay of a real match's event list; and live in a Practice Tool game recorded in Full session: match start, a dragon, the win and match end all landed in the recording's marks |
 | CS2 events | Unit-tested | Hand-built payloads only; no real match yet |
-| Rocket League events | Unit-tested | Hand-built messages from the published format; the real settings file on this PC was read and edited correctly; no real match yet |
+| Rocket League events | Works in real matches | The owner's evening: connected to the real Stats API, 41 match starts, 14 goals, 15 saves, 12 demolitions, 24 assists, 12 wins, 5 losses logged. Not compared event by event with the footage; no raw capture kept as a fixture yet |
 | Valorant events | Not working | Framework only; no template images. Waits on a real recording |
 | Template calibration (`calibrate`) | Works | Whole loop in tests on a generated video; frame seek and region outlines checked on a real 3440x1440 recording against ffmpeg |
-| Shout trigger (microphone loudness) | Works with a test tone | Live on OBS 33: one trigger 0.1 s after a tone turned loud, none for a short click or with the option off; the real microphone reports a level; not tried with a voice |
-| Laughs and shouts (sound recogniser) | Works on sample recordings | YAMNet over the microphone track after a recording: public-domain laughs found as laughs, the Wilhelm scream and another scream as shouts, calm and fast synthetic speech as neither; end to end on a generated three-track recording; inside the packaged app. Not yet on the owner's own voice |
+| Loudness as a shout trigger | Failed in real use, demoted | 297 of 351 clips in one evening were ordinary speech into a loud microphone (recogniser on 47 of them: speech 43, laugh 4, shout 0; microphone peaks above full scale). Loudness now only nominates a moment in Events only and the recogniser decides |
+| Laughs and shouts (sound recogniser) | Works on samples and on the owner's speech | Public-domain laughs as laughs, screams as shouts, synthetic speech as neither; on 47 of the owner's real clips it called loud talking speech every time and found 4 laughs. Its judging of nominated clips is tested end to end on generated clips; not yet run during real play |
 | In-app video player | Works | Driven as the real windows on a 3440x1440 60 fps three-track file: plays at full rate, exact frame on seek while paused, sound tracks switch, event symbols jump, "Play selection" stops at the end handle; loads inside the packaged app. Not operated by hand |
 | Event symbols (timeline, cards, side-panel strip) | Works | Rendered on a real recording; clicking a symbol was not exercised by hand |
 | Multi-kills for screen-reading plugins | Unit-tested | No calibrated vision plugin exists to produce real kills yet |
@@ -251,12 +251,10 @@ Differences from the plan above:
   with ffmpeg and YAMNet (Google, Apache 2.0, the MediaPipe copy in `laqta/voice/`) runs on
   LiteRT, one thread, only on windows louder than -38 dBFS. Each kind's class scores are
   summed (a scream is spread over Yell, Screaming and Shout). See [ADR 0006](adr/0006-player-and-voice.md).
-- **Shout trigger:** OBS's volume-meter events (20 a second) are subscribed to only while the
-  option is on, and are judged on OBS's event thread by `audio.Shout`; only an actual shout
-  reaches the core's inbox, so the core loop is not woken by meters. A muted input reports
-  zero, which is why the trigger needs the microphone turned on.
-- **`storage/share.py`** is the only code that sends anything off the PC; see
-  [ADR 0004](adr/0004-sharing.md). **`ui/toast.py`** is the corner note.
+- **Loudness nominates, the recogniser decides.** OBS's volume-meter events are judged on OBS's
+  event thread by `audio.Shout`, only while an Events-only game is running. A nominated clip
+  is listened to by `voice` on its own thread and deleted unless a laugh or shout is in it;
+  a clip that also has a game event or a hotkey press is always kept.
 - **`plugins/scoring.py`** derives multi-kills from plain kills for screen-reading plugins.
   Clutch detection, in the v2 plan, was dropped: CS2's Game State Integration gives a playing
   client no teammate state, and no other supported game has the concept.

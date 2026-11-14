@@ -201,22 +201,17 @@ your microphone. Ordinary players use track 1.
 - **Game sound only** is a per-game option in **Settings → Games**. It keeps voice chat and
   music off track 2 and out of the mix.
 - MP4 exports carry track 1 only.
-- **Mark the moment when I shout** (Settings → Audio, off by default, needs the microphone
-  on): when the microphone stays loud for a moment, Laqta saves a clip in Events only or adds
-  a mark to the recording in the other modes, at most once every 10 seconds. It only compares the
-  loudness figure OBS already measures; it does not listen to words, and nothing leaves the
-  PC. Set how loud counts with the dB box. Unverified with a real voice: it was checked with
-  a test tone.
-
-- **Find my laughs and shouts** (Settings → Audio, off by default, needs the microphone on):
-  when a game closes, Laqta listens to the microphone track of the recording with a sound
-  recogniser (Google's YAMNet) that runs on this PC, and marks each laugh and each shout or
-  scream. Ordinary talking is ignored, even loud and fast. Around each laugh it also saves the
-  minutes leading up to it (5 by default) as a separate clip named "Funny …". It takes a few
-  seconds per recording and nothing runs while you play. It needs a full recording, so it does
-  not work in Events only. Checked on public-domain laugh and scream recordings and on
-  synthetic speech; not yet on your own voice. `python -m laqta voice <video>` lists what it
-  hears in any video.
+- **Find my laughs and shouts** (Settings → Audio, off by default, needs the microphone on): a
+  sound recogniser (Google's YAMNet) that runs on this PC listens to your microphone track
+  and marks each laugh and each shout or scream. Ordinary talking is ignored, however loud.
+  - In **Full session** and **Full match** it listens when the game closes, and around each
+    laugh also saves the minutes leading up to it (5 by default) as a separate clip named
+    "Funny …".
+  - In **Events only** there is no recording to listen to, so a loud moment saves a clip and
+    the recogniser listens to that clip: it is kept only if a laugh or a shout is really in it.
+  Loudness alone decides nothing. (An earlier version let it, and in one evening of real play
+  it saved 297 "shout" clips of ordinary talking into a loud microphone.)
+  `python -m laqta voice <video>` lists what the recogniser hears in any video.
 
 ### Picture
 
@@ -237,7 +232,7 @@ fullscreen, Laqta asks once with a toast, and clicking the toast adds it.
 |---|---|---|
 | League of Legends | Riot's Live Client Data API | Works. Checked against a real match's event list. |
 | Counter-Strike 2 | Valve Game State Integration | Written and unit-tested with hand-built payloads. Not yet run in a real match. |
-| Rocket League | The game's own Stats API | Written from the published format and unit-tested with hand-built messages. Not yet run in a real match. Goals, assists, saves, demolitions, win or loss, match start and end. |
+| Rocket League | The game's own Stats API | Works in real matches: one evening of play gave match starts and ends, goals, assists, saves, demolitions and results. Not yet checked event by event against what happened on screen. |
 | Valorant | Screen analysis | Framework and calibration tool only. It has no template images yet, so it detects nothing. Needs a real recording. |
 | Everything else | Clip hotkey | Always available. |
 
@@ -250,6 +245,11 @@ type your in-game name in **Settings → Games → Rocket League**.
 
 The first time CS2 starts with Laqta running, Laqta writes
 `gamestate_integration_laqta.cfg` into CS2's `cfg` folder and asks you to restart CS2 once.
+
+If a game's own picture stays black for 20 seconds, Laqta tries the next way of capturing it:
+the game, then its window, then the whole screen. Whole-screen capture records everything on
+that screen, so Laqta tells you when it falls back to it, and starts from the game's own
+window again next time.
 
 ## If the recording is black
 

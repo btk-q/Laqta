@@ -2,6 +2,22 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## 0.6.1
+
+**Fixes from a real evening of play.**
+
+### Fixed
+- **No more clips of you just talking.** Loudness alone used to decide what a "shout" was,
+  and with a loud microphone it saved a clip every few seconds. Now the sound recogniser
+  listens to every such clip and keeps it only if a laugh or a shout is really in it.
+- **One switch instead of three.** "Find my laughs and shouts" (Settings, Audio) now covers
+  everything; if you had the old shout or laugh switch on, it is turned on for you.
+- **Laqta no longer ends up recording your whole screen.** It waits longer before giving up
+  on a game's own picture, tells you if it does fall back to the whole screen, and tries the
+  game's own window again next time.
+- **Clips window is fast with hundreds of videos.** Pictures are made for what is on screen
+  first.
+
 ## 0.6.0
 
 **One window, and every game has its picture.**

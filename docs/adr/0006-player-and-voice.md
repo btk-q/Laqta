@@ -45,3 +45,21 @@ them honestly without many real recordings).
 - Detection has not yet been tried on the owner's own voice or with game sound bleeding into
   the microphone. `laqta voice <video>` lists what it hears, for checking.
 - Test audio lives in `tests/fixtures/voice/` with its sources.
+
+## Addendum, 2026-11-15: what one evening of real play showed
+
+The owner played Rocket League in Events only with the old loudness trigger on. It fired 368
+times; 297 of the 351 clips saved (11.6 GB) had no other cause. The recogniser, run on 47 of
+them, heard speech in every one, a laugh in 4 and a shout in none. The microphone's peak
+level sat above full scale (median 1.33), so no loudness line could have worked.
+
+**Decision:** loudness never decides. In the recording modes nothing is marked live; the
+recogniser listens afterwards. In Events only, loudness nominates a moment (0.3 s sustained,
+at most twice a minute), the clip is saved, and the recogniser listens to it: no laugh or
+shout and no other event, and the clip is deleted before the user is told about it.
+*Rejected: listening live*, which needs the audio itself during play (a new capture path and
+constant CPU), *and dropping the feature in Events only*, which is the mode the owner uses
+for this game.
+
+The three settings (`mic_trigger`, `laugh_trigger`, `voice_detect`) are now one,
+`voice_detect`; whoever had an old one on is moved over once.

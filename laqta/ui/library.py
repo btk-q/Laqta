@@ -7,7 +7,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import QFile, QMimeData, QObject, QPointF, QRectF, QRunnable, QSize, Qt, QThreadPool, QUrl, Signal
+from PySide6.QtCore import QFile, QMimeData, QObject, QPointF, QRectF, QRunnable, QSize, Qt, QThreadPool, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QProgressDialog,
@@ -426,6 +426,8 @@ class LibraryWindow(QDialog):
         self.grid.setMovement(QListView.Movement.Static)
         self.grid.setMouseTracking(True)  # for the hover highlight
         self.grid.itemSelectionChanged.connect(self._selection_changed)
+        self.grid.verticalScrollBar().valueChanged.connect(lambda _: self._want_thumbnails())
+        self._asked: set[str] = set()  # videos whose picture has been asked for in this window
         self.grid.itemDoubleClicked.connect(lambda _: self._play())
         self.empty = QLabel()
         self.empty.setObjectName("empty")
@@ -631,7 +633,6 @@ class LibraryWindow(QDialog):
                 item.setToolTip(str(clip.path))
                 self.grid.addItem(item)
                 self.items[str(clip.path)] = item
-                self.pool.start(_Thumbnailer(clip.path, self.signals))
                 if select is not None and clip.path == select:
                     self.grid.setCurrentItem(item)
         self._filter()
@@ -670,6 +671,21 @@ class LibraryWindow(QDialog):
         self.empty.setVisible(shown == 0)
         self.empty.setText(t("library.no_match" if self.clips else "library.empty"))
         self._selection_changed()
+        QTimer.singleShot(0, self._want_thumbnails)  # once the grid has laid itself out
+
+    def _want_thumbnails(self) -> None:
+        """Make pictures only for the videos on screen (and a screenful either side). With hundreds
+        of videos, making them all at once left the ones being looked at waiting behind the rest."""
+        view = self.grid.viewport().rect()
+        near = view.adjusted(0, -view.height(), 0, view.height())
+        for path, item in self.items.items():
+            if path not in self._asked and not item.isHidden() and near.intersects(self.grid.visualItemRect(item)):
+                self._asked.add(path)
+                self.pool.start(_Thumbnailer(Path(path), self.signals))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._want_thumbnails()
 
     def selected(self) -> Clip | None:
         items = self.grid.selectedItems()
