@@ -213,18 +213,22 @@ def moment_spans(offsets: list[float], duration: float, before: float, after: fl
     return [(s, e) for s, e in spans if e - s >= 1.0]
 
 
-def cut_moments(path: Path, kind: str, before: float, after: float, label: str) -> list[Path]:
-    """After a recording ends: save a separate clip around each event of `kind` (for example
-    every laugh, with the minutes that led up to it). The recording itself is kept whole."""
+def cut_moments(path: Path, kind: str | tuple[str, ...], before: float, after: float, label: str) -> list[Path]:
+    """After a recording ends: save a separate clip around each event of `kind` (one type or
+    several; for example every laugh, with the minutes that led up to it). The recording itself
+    is kept whole. A clip already cut for the same spot is left alone."""
+    kinds = (kind,) if isinstance(kind, str) else tuple(kind)
     meta = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
     duration = float(meta.get("seconds") or 0)
-    offsets = [e["offset"] for e in meta.get("events", []) if e.get("type") == kind]
+    offsets = [e["offset"] for e in meta.get("events", []) if e.get("type") in kinds]
     made = []
     for start, end in moment_spans(offsets, duration, before, after):
         if end - start >= 0.9 * duration:
             continue  # the "clip" would be the whole recording again
-        cut = trim(path, start, end)
         named = path.with_name(f"{label} {path.stem} {int(start // 60):02d}m{int(start % 60):02d}s{path.suffix}")
+        if named.exists():
+            continue
+        cut = trim(path, start, end)
         os.replace(cut, named)
         note = json.loads(cut.with_suffix(".json").read_text(encoding="utf-8"))
         note["kind"] = "clip"

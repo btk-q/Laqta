@@ -377,6 +377,24 @@ class SettingsWindow(QDialog):
         layout.addWidget(self.custom_video)
         self.custom_video.setVisible(current == "custom")
         layout.addSpacing(6)
+        # Which events also become their own clip after a recording.
+        offered = ("ace", "multikill", "kill", "headshot", "first_blood", "objective", "goal", "save", "win")
+        self.auto_clips: dict[str, QPushButton] = {}
+        chosen = set(self.cfg["auto_clips"])
+        grid = QGridLayout()
+        grid.setSpacing(8)
+        for i, kind in enumerate(offered):
+            box = self.auto_clips[kind] = QPushButton(t(f"event.{kind}"))
+            box.setObjectName("tile")
+            box.setCheckable(True)
+            box.setIcon(QIcon(icons.pixmap(kind, 18)))
+            box.setIconSize(QSize(18, 18))
+            box.setChecked(kind in chosen)
+            grid.addWidget(box, i // 3, i % 3)
+        layout.addWidget(_label(t("rec.auto_clips")))
+        layout.addLayout(grid)
+        layout.addWidget(_label(t("rec.auto_clips_hint"), "hint"))
+        layout.addSpacing(6)
         form.addRow(t("rec.pre"), self.pre)
         form.addRow(t("rec.post"), self.post)
         form.addRow(t("rec.max_clip"), self.max_clip)
@@ -848,6 +866,8 @@ class SettingsWindow(QDialog):
             discord_webhook=webhook,
             mic_trigger_db=self.mic_trigger_db.value(),
             voice_detect=self.laugh.isChecked(),
+            # Types not offered as tiles (set by hand in the file) are kept.
+            auto_clips=[k for k in self.cfg["auto_clips"] if k not in self.auto_clips] + [k for k, box in self.auto_clips.items() if box.isChecked()],
             laugh_clip_minutes=self.laugh_minutes.value(),
             save_folder="" if Path(self.save_folder.text()) == clips.DEFAULT_ROOT else self.save_folder.text(),
         )

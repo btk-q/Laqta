@@ -13,6 +13,14 @@ around kills and other events.
 
 ![The Laqta window: your clips, what happened in each, and what Laqta is doing right now](docs/screenshots/main.png)
 
+## First start
+
+If OBS Studio, its connection to Laqta, or ffmpeg is missing, Laqta opens a setup screen with
+one button per step: **Install OBS** and **Install ffmpeg** run winget (Microsoft's own
+installer) in a window you can watch, and **Turn it on** switches on OBS's WebSocket server
+for you. On a PC without winget the buttons open the download pages instead. The screen is
+also under **Settings → Health → Open setup…**.
+
 ## What you need
 
 - Windows 10 or 11
@@ -43,7 +51,9 @@ protected your PC" notice the first time, because the app is not code-signed: ch
 **Updates:** at start Laqta asks GitHub whether a newer version exists. If there is one it
 shows the patch notes and installs it with one click (the update is needed to keep using
 Laqta; if it fails you can carry on with the old version). It waits until no game is being
-recorded. The download is used only if its SHA-256 matches the one GitHub lists. This is one
+recorded. The previous version is kept until the new one has started; if the new one does not
+start within 45 seconds, Laqta puts the previous version back by itself and does not offer
+that update again. The download is used only if its SHA-256 matches the one GitHub lists. This is one
 anonymous request and sends nothing about you; turn it off in **Settings → Sharing and
 updates**, after which Laqta never goes online by itself.
 
@@ -162,6 +172,13 @@ it has no event detection, because the game offers no official data feed).
 
 Each game's page shows the recording mode as three choices and, for games with event
 detection, one tile per event with its symbol: switch off the ones you do not want marked.
+
+### Clips of your best moments
+
+**Settings → Recording → Also save a clip of each**: when a game closes, Laqta cuts a short
+clip around every event of the kinds you switch on (aces and multi-kills by default), using
+the "seconds before" and "seconds after" settings. The full recording is kept, and events
+close together share one clip. It needs a game with event detection.
 
 ### Video quality
 
@@ -299,7 +316,8 @@ A step-by-step guide for AI coding assistants is in
 2. Add a `## <number>` section at the top of `CHANGELOG.md`: these are the patch notes shown
    in everyone's update window.
 3. Commit, then run `powershell -File packaging\release.ps1`. It runs the tests, builds the
-   zip and creates the GitHub release. Every copy of Laqta offers the update at its next start.
+   zip, starts the packaged app and checks that every window, the video player and the sound
+   recogniser load (nothing is published if that fails), and creates the GitHub release. Every copy of Laqta offers the update at its next start.
 
 ## Development
 

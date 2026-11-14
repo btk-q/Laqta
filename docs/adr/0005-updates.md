@@ -46,3 +46,25 @@ Windows" uses.
   version's section of `CHANGELOG.md` as the patch notes.
 - Friends must keep Laqta in a folder they can write to, or the update says so and stops.
 - Copies running from source are told to use git.
+
+## Addendum, 2026-11-14: proving a release before and after it ships
+
+Two failures in one week (a packaged build missing files, and an install damaged by a failed
+build) showed that the code tests say nothing about the packaged app.
+
+**Before publishing:** `laqta selftest` runs inside the packaged exe and builds every window,
+the video player and the sound recogniser without showing them. `packaging/smoke.py` runs it,
+plus the version, the health check and the recogniser on a real recording; `release.ps1`
+refuses to publish if any of it fails.
+
+**After installing:** the swap script renames the old `_internal` folder and exe instead of
+deleting them, starts the new version, and waits up to 45 seconds for it to write its version
+into `started.txt`. If that never appears it stops the new copy (by process id), restores the
+old files, starts the old version and records the failed version in `update-failed.txt`;
+`update.check` then skips that version. *Rejected: trusting the exit code* (a crashed GUI app
+shows an error box and stays alive) *and keeping a second full copy elsewhere* (a rename on
+the same drive is instant and needs no extra space).
+
+Found while testing it for real: `findstr /x` does not match a last line with no line ending,
+so the mark is written with one; and the mark is written before the single-instance check, so
+an already running copy cannot make a good update look failed.

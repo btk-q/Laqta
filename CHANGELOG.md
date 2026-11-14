@@ -2,6 +2,23 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## 0.5.1
+
+**Easier to set up, and updates that cannot leave you with a broken Laqta.**
+
+### New
+- **Setup screen.** On a PC that is missing OBS, its connection to Laqta, or ffmpeg, Laqta
+  now shows three steps with a button for each: it can install OBS and ffmpeg for you and
+  switch on the OBS connection. Also under Settings, Health, "Open setup".
+- **Clips of your best moments.** After a game, Laqta also saves a short clip around each ace
+  and multi-kill. Choose which events in Settings, Recording, "Also save a clip of each".
+- **Safer updates.** If a new version does not start, Laqta puts the previous one back by
+  itself within a minute.
+
+### Fixed
+- ffmpeg installed while Laqta is running is now found without restarting Laqta.
+- The video player is closed properly when Laqta quits.
+
 ## 0.5.0
 
 **Watch and cut your videos without leaving Laqta, and Laqta now knows a laugh from a shout.**

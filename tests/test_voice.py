@@ -118,3 +118,29 @@ def test_funny_moments_are_cut_out_of_a_real_recording_and_the_recording_is_kept
     note = json.loads(made.with_suffix(".json").read_text())
     assert note["kind"] == "clip" and [(e["type"], e["offset"]) for e in note["events"]] == [("kill", 6.0), ("laugh", 10.0), ("laugh", 14.0)]
     assert library.cut_moments(path, "laugh", before=270, after=30, label="Funny") == []
+
+
+@needs_ffmpeg
+def test_chosen_event_types_get_their_own_clips_once(tmp_path):
+    folder = tmp_path / "Game" / "2026-11-14"
+    folder.mkdir(parents=True)
+    path = folder / "2026-11-14 10-00-00.mkv"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=duration=120:size=320x180:rate=30", "-g", "30",
+                    "-pix_fmt", "yuv420p", str(path)], check=True)
+    events = [{"type": "kill", "offset": 10.0}, {"type": "multikill", "offset": 30.0}, {"type": "ace", "offset": 36.0}, {"type": "ace", "offset": 100.0}]
+    path.with_suffix(".json").write_text(json.dumps({"kind": "recording", "game": "Game", "seconds": 120.0, "events": events}))
+    made = library.cut_moments(path, ("ace", "multikill"), before=15, after=5, label="Clip")
+    assert [m.name for m in made] == ["Clip 2026-11-14 10-00-00 00m15s.mkv", "Clip 2026-11-14 10-00-00 01m25s.mkv"]  # 30 and 36 share one
+    first = json.loads(made[0].with_suffix(".json").read_text())
+    assert first["kind"] == "clip" and [e["type"] for e in first["events"]] == ["multikill", "ace"]
+    assert library.duration(made[0]) == pytest.approx(26.0, abs=1.5)
+    assert library.cut_moments(path, ("ace", "multikill"), before=15, after=5, label="Clip") == []  # run again: nothing is cut twice
+    assert library.cut_moments(path, (), before=15, after=5, label="Clip") == []
+
+
+def test_auto_clips_setting():
+    assert config.DEFAULTS["auto_clips"] == ["ace", "multikill"]
+    config._check({**config.DEFAULTS, "auto_clips": []})
+    for bad in ("ace", [1], None):
+        with pytest.raises(ValueError):
+            config._check({**config.DEFAULTS, "auto_clips": bad})

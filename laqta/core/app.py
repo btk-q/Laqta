@@ -194,13 +194,30 @@ class Core(threading.Thread):
         except OSError:
             log.exception("could not write event marks for %s", path)
         self.notify(t("toast.recording_saved", name=path.name))
-        if self.cfg["voice_detect"] and self.cfg["mic_enabled"]:
-            # Its own thread: listening through a long recording takes seconds, and the core
-            # must stay free for the next game. It only touches this recording's files.
-            minutes = self.cfg["laugh_clip_minutes"]
-            threading.Thread(target=self._voice, args=(path, minutes), name="laqta-voice", daemon=True).start()
+        listen = self.cfg["voice_detect"] and self.cfg["mic_enabled"]
+        wanted = tuple(self.cfg["auto_clips"])
+        if listen or wanted:
+            # Its own thread: cutting clips and listening through a long recording take seconds, and
+            # the core must stay free for the next game. It only touches this recording's files.
+            cfg = self.cfg
+            args = (path, wanted, cfg["pre_seconds"], cfg["post_seconds"], cfg["laugh_clip_minutes"] if listen else None)
+            threading.Thread(target=self._after_recording, args=args, name="laqta-after", daemon=True).start()
         self._report_skipped(time.monotonic() - start)
         self._cleanup()
+
+    def _after_recording(self, path: Path, wanted: tuple, before: float, after: float, minutes: int | None) -> None:
+        """Clips for the chosen event types, then laughs and shouts. One after the other: both
+        rewrite this recording's event file."""
+        if minutes is not None:
+            self._voice(path, minutes)
+        if wanted:
+            try:
+                made = library.cut_moments(path, wanted, before=before, after=after, label=t("card.clip"))
+                log.info("auto clips: %d cut from %s", len(made), path.name)
+                if made:
+                    self.notify(t("toast.auto_clips", count=len(made)))
+            except Exception:
+                log.exception("could not cut event clips out of %s", path)
 
     def _voice(self, path: Path, minutes: int) -> None:
         try:

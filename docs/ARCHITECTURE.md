@@ -222,6 +222,10 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Post to Discord | Unit-tested | Request built and checked against a stand-in; the window flow (confirm, too big, offline) driven by script; never uploaded to a real channel |
 | Corner note window | Works on the desktop | On the real desktop: shown without taking the foreground window, click-through and topmost styles set. Not seen over a game |
 | Main window on start, second launch re-opens it | Works | Driven as the real app: opens, closes to the tray, re-opened by a second launch |
+| First-run setup screen | Works with a made-up empty PC | Every step and button driven by script with the installs faked; the WebSocket switch tested on a copy of OBS's real settings file. Never run on a PC that really lacks OBS or ffmpeg |
+| Pre-publish smoke test | Works | Run on the packaged app: 5 of 5 passes; it caught a genuinely broken build during development |
+| Update rollback | Works | For real, on a test copy: a deliberately broken build was undone after 45 s and the old version restarted; a good build was kept after about 12 s |
+| Automatic clips per event | Works on a test recording | Real ffmpeg cut in tests; not yet seen after a real match |
 | Self-update from GitHub releases | see ADR 0005 | Check, hash-verified download and file swap described there with what was run for real |
 | Library scan | Steam, Epic, GOG | Steam checked on a real library; Epic and GOG from fixtures |
 | Unknown-fullscreen prompt | Unit-tested | Has not fired for real |
