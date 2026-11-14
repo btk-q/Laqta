@@ -69,7 +69,7 @@ class Core(threading.Thread):
         clips.set_root(cfg["save_folder"])
         self.on_state, self.notify, self.on_prompt = on_state, notify, on_prompt
         self.detector = Detector(load_games(cfg["games"], cfg["default_mode"]), asked=cfg["asked"])
-        self.shout = Shout(cfg["mic_trigger_db"])
+        self.shout = Shout(cfg["mic_trigger_db"], sustain=6, cooldown=30.0)  # 0.3 s of loudness, at most twice a minute
         self.obs = Obs(4455, "", on_event=lambda name, data: self.inbox.put(("obs", name, data)), on_meters=self._meters)
         self.obs.meters = self._wants_meters(cfg)
         self.recorder = Recorder(
@@ -111,14 +111,24 @@ class Core(threading.Thread):
         self.inbox.put(("config", copy.deepcopy(cfg)))
 
     def _meters(self, data: dict) -> None:
-        """OBS's event thread, 20 times a second while the shout trigger is on: only a comparison here."""
-        now, peak, cfg = time.monotonic(), mic_peak(data), self.cfg
-        if cfg["mic_trigger"] and self.shout.feed(peak, now):
+        """OBS's event thread, 20 times a second: only a comparison here.
+
+        Loudness cannot tell a shout from talking into a loud microphone (measured on real play:
+        297 "shouts" in one evening, none of them a shout). So it only *nominates* a moment, and
+        only in Events only, where there is no recording to listen to afterwards; the sound
+        recogniser then listens to the saved clip and throws it away unless it hears a laugh or
+        a shout (see _judge_clip). In the recording modes nothing is marked live at all: the
+        recogniser listens to the whole recording when the game closes."""
+        game = self.recorder.game
+        if game is None or game.get("mode") != "events" or not self.cfg["voice_detect"]:
+            return
+        now = time.monotonic()
+        if self.shout.feed(mic_peak(data), now):
             self.inbox.put(("event", GameEvent("shout", now, confidence=0.7, source="audio")))
 
     @staticmethod
     def _wants_meters(cfg: dict) -> bool:
-        return bool(cfg["mic_trigger"] and cfg["mic_enabled"])
+        return bool(cfg["voice_detect"] and cfg["mic_enabled"])
 
     # Core thread ---------------------------------------------------------------
 
@@ -185,8 +195,30 @@ class Core(threading.Thread):
             clips.finish_clip(path, game, events, keep, pre)
         except Exception:
             log.exception("could not trim or describe %s; the full replay is kept", path)
-        self.notify(t("toast.clip_saved", name=path.name))
+        if any(e.type == "shout" and e.source == "audio" for e in events):
+            # Nominated by loudness: let the recogniser listen before anyone is told about it.
+            only = all(e.type == "shout" and e.source == "audio" for e in events)
+            threading.Thread(target=self._judge_clip, args=(path, only), name="laqta-judge", daemon=True).start()
+        else:
+            self.notify(t("toast.clip_saved", name=path.name))
         self._cleanup()
+
+    def _judge_clip(self, path: Path, only: bool) -> None:
+        """A clip that loudness nominated: keep it only if a laugh or a shout is really in it.
+        `only`: nothing else (a goal, a hotkey) asked for this clip, so without one it goes."""
+        try:
+            from .. import voice
+
+            moments = voice.analyse(path)
+            if not moments and only:
+                path.unlink(missing_ok=True)
+                path.with_suffix(".json").unlink(missing_ok=True)
+                return log.info("voice: %s was only loud talking; clip discarded", path.name)
+            voice.mark(path, moments)  # the loudness guess is replaced by what was heard (or just removed)
+            log.info("voice: kept %s (%s)", path.name, ", ".join(m.type for m in moments) or "its other events")
+            self.notify(t("toast.clip_saved", name=path.name))
+        except Exception:
+            log.exception("could not listen to %s; the clip is kept", path)
 
     def _on_recording(self, path: Path, game: dict, marks: list[GameEvent], start: float) -> None:
         try:

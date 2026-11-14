@@ -41,10 +41,9 @@ DEFAULTS = {
     "mic_enabled": False,  # record the microphone on its own audio track
     "mic_device": "default",
     "mic_volume": 100,  # percent
-    "mic_trigger": False,  # mark or clip the moment when the microphone gets loud (needs mic_enabled)
-    "mic_trigger_db": -12,  # how loud: peak level in dB below full scale
+    "mic_trigger_db": -12,  # Events only: how loud the microphone must get before a clip is saved for the recogniser to judge
     "auto_clips": ["ace", "multikill"],  # after a recording, also save a short clip around each event of these types
-    "voice_detect": False,  # after a recording, find laughs and shouts on the microphone track (needs mic_enabled)
+    "voice_detect": False,  # find laughs and shouts on the microphone track with the sound recogniser (needs mic_enabled)
     "laugh_clip_minutes": 5,  # after a recording, also save this many minutes around each laugh as its own clip; 0 = mark only
     "save_folder": "",  # where recordings go; "" = Videos\\Laqta
     "cleanup_days": 0,  # delete recordings older than this; 0 = never
@@ -92,7 +91,6 @@ def _check(cfg: dict) -> dict:
     need(isinstance(cfg["setup_done"], bool), "setup_done must be true or false")
     need(cfg["discord_webhook"] == "" or (isinstance(cfg["discord_webhook"], str) and WEBHOOK.fullmatch(cfg["discord_webhook"])),
          "discord_webhook must be empty or a Discord webhook address (https://discord.com/api/webhooks/...)")
-    need(isinstance(cfg["mic_trigger"], bool), "mic_trigger must be true or false")
     need(isinstance(cfg["mic_trigger_db"], (int, float)) and -60 <= cfg["mic_trigger_db"] <= 0, "mic_trigger_db must be between -60 and 0")
     need(isinstance(cfg["voice_detect"], bool), "voice_detect must be true or false")
     need(isinstance(cfg["auto_clips"], list) and all(isinstance(kind, str) for kind in cfg["auto_clips"]), "auto_clips must be a list of event names")

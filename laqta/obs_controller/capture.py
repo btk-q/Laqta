@@ -20,7 +20,10 @@ from .client import Obs, ObsError
 log = logging.getLogger(__name__)
 
 KINDS = ("game_capture", "window_capture", "monitor_capture")
-BLANK_CHECKS = 2  # consecutive black screenshots before stepping down
+# Consecutive black screenshots (4 s apart) before stepping down to the next method. Five, not two:
+# Rocket League's own black intro lasted longer than 8 s and pushed it all the way to recording
+# the whole screen, chat windows included.
+BLANK_CHECKS = 5
 MATCH_EXE = 2  # OBS window "priority": match by executable
 
 
@@ -87,6 +90,8 @@ class Capture:
         `monitor` is the one the game is on (from OBS's monitor list), for Display Capture."""
         self.game, self._blank, self.monitor = game, 0, monitor
         kind = game.get("capture") or self._remembered().get(game["exe"].lower())
+        if kind == KINDS[-1] and not game.get("capture"):
+            kind = KINDS[1]  # whole-screen capture is a last resort for one session, never where the next one starts
         self.kind = kind if kind in KINDS else KINDS[0]
         self._applied = self._apply()
 
@@ -123,7 +128,7 @@ class Capture:
             return True
         if not is_blank(self.obs, self.kind):
             remembered = self._remembered()
-            if remembered.get(self.game["exe"].lower()) != self.kind:
+            if self.kind != KINDS[-1] and remembered.get(self.game["exe"].lower()) != self.kind:
                 remembered[self.game["exe"].lower()] = self.kind
                 self.store.parent.mkdir(parents=True, exist_ok=True)
                 self.store.write_text(json.dumps(remembered, indent=2), encoding="utf-8")
@@ -136,5 +141,7 @@ class Capture:
             return False
         self.kind, self._blank = KINDS[KINDS.index(self.kind) + 1], 0
         log.warning("black picture, switching %s to %s", self.game["exe"], self.kind)
+        if self.kind == KINDS[-1]:  # the user should know other windows on that screen are now in the video
+            self.notify(t("toast.whole_screen", game=self.game.get("name") or self.game["exe"]))
         self._applied = self._apply()
         return True

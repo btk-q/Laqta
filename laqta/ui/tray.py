@@ -64,6 +64,11 @@ def status_text(s: dict) -> str:
 class TrayApp:
     def __init__(self, app: QApplication, cfg: dict):
         self.app, self.cfg = app, cfg
+        if cfg.pop("mic_trigger", False) | cfg.pop("laugh_trigger", False):
+            # The two old loudness switches became one, judged by the sound recogniser. Whoever
+            # had either on wanted laughs and shouts found: carry that over, once.
+            cfg["voice_detect"] = True
+            config.save(cfg)
         self.state = {"state": "idle", "game": None, "mode": None, "recording": False, "obs": False, "error": None}
         self.pending: dict | None = None  # unknown app the last toast asked about
         self.settings: SettingsWindow | None = None

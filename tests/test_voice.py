@@ -144,3 +144,56 @@ def test_auto_clips_setting():
     for bad in ("ace", [1], None):
         with pytest.raises(ValueError):
             config._check({**config.DEFAULTS, "auto_clips": bad})
+
+
+class _Core:
+    """Just enough of the core to run its clip judging."""
+
+    def __init__(self):
+        self.toasts = []
+        self.notify = self.toasts.append
+
+    from laqta.core.app import Core as _real
+    _judge_clip = _real._judge_clip
+
+
+def _clip(tmp_path, sound: str, events):
+    """A saved clip whose microphone track (track 3) is one of the sample recordings."""
+    path = tmp_path / f"Replay {sound}.mkv"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=duration=6:size=320x180:rate=30",
+                    "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-i", str(FIX / f"{sound}.ogg"),
+                    "-map", "0", "-map", "1", "-map", "2", "-map", "3", "-t", "6", "-pix_fmt", "yuv420p", "-c:a", "aac", str(path)], check=True)
+    path.with_suffix(".json").write_text(json.dumps({"kind": "clip", "game": "Rocket League", "seconds": 6.0, "events": events}))
+    return path
+
+
+LOUD = {"type": "shout", "source": "audio", "confidence": 0.7, "offset": 3.0}  # what the loudness trigger writes
+
+
+@needs_ffmpeg
+def test_a_clip_saved_for_loudness_is_thrown_away_when_it_was_only_talking(tmp_path):
+    """Real play produced 297 such clips in one evening; the recogniser found a shout in none of those sampled."""
+    core = _Core()
+    path = _clip(tmp_path, "speech", [LOUD])
+    core._judge_clip(path, True)
+    assert not path.exists() and not path.with_suffix(".json").exists() and core.toasts == []
+
+
+@needs_ffmpeg
+def test_a_clip_with_a_real_laugh_or_scream_is_kept_and_says_which(tmp_path):
+    for sound, kind in (("laugh", "laugh"), ("scream", "shout")):
+        core = _Core()
+        path = _clip(tmp_path, sound, [LOUD])
+        core._judge_clip(path, True)
+        events = json.loads(path.with_suffix(".json").read_text())["events"]
+        assert path.exists() and {e["type"] for e in events} == {kind} and all(e["source"] == "voice" for e in events), sound
+        assert len(core.toasts) == 1
+
+
+@needs_ffmpeg
+def test_a_goal_clip_survives_loud_talking_and_just_loses_the_false_shout(tmp_path):
+    core = _Core()
+    goal = {"type": "goal", "source": "api", "confidence": 1.0, "offset": 2.0}
+    path = _clip(tmp_path, "speech", [goal, LOUD])
+    core._judge_clip(path, False)
+    assert path.exists() and json.loads(path.with_suffix(".json").read_text())["events"] == [goal] and len(core.toasts) == 1

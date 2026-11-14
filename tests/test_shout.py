@@ -78,7 +78,7 @@ def test_meter_events_stay_off_the_core_inbox_and_a_bad_handler_cannot_kill_the_
 
 
 def test_trigger_is_off_by_default_and_checked():
-    assert config.DEFAULTS["mic_trigger"] is False
-    for bad in ({"mic_trigger": "yes"}, {"mic_trigger_db": 5}):
+    assert "mic_trigger" not in config.DEFAULTS  # loudness no longer decides anything on its own
+    for bad in ({"mic_trigger_db": 5}, {"voice_detect": "yes"}):
         with pytest.raises(ValueError):
             config._check({**config.DEFAULTS, **bad})

@@ -471,16 +471,7 @@ class SettingsWindow(QDialog):
         layout.addWidget(_label(t("audio.privacy"), "hint"))
         layout.addLayout(form)
         layout.addWidget(_label(t("audio.tracks"), "hint"))
-        self.mic_trigger = QCheckBox(t("audio.trigger"))
-        self.mic_trigger.setChecked(self.cfg["mic_trigger"])
-        self.mic_trigger_db = _spin(self.cfg["mic_trigger_db"], -60, 0)
-        trigger = QFormLayout()
-        trigger.setHorizontalSpacing(20)
-        trigger.addRow(t("audio.trigger_level"), self.mic_trigger_db)
         layout.addSpacing(10)
-        layout.addWidget(self.mic_trigger)
-        layout.addLayout(trigger)
-        layout.addWidget(_label(t("audio.trigger_hint"), "hint"))
         self.laugh = QCheckBox(t("audio.laugh"))
         self.laugh.setChecked(self.cfg["voice_detect"])
         self.laugh_minutes = _spin(self.cfg["laugh_clip_minutes"], 0, 15)
@@ -496,13 +487,10 @@ class SettingsWindow(QDialog):
         def sync() -> None:
             self.mic_device.setEnabled(self.mic_enabled.isChecked())
             self.mic_volume.setEnabled(self.mic_enabled.isChecked())
-            self.mic_trigger.setEnabled(self.mic_enabled.isChecked())  # it reads the microphone track's meter
-            self.mic_trigger_db.setEnabled(self.mic_enabled.isChecked() and self.mic_trigger.isChecked())
             self.laugh.setEnabled(self.mic_enabled.isChecked())
             self.laugh_minutes.setEnabled(self.mic_enabled.isChecked() and self.laugh.isChecked())
 
         self.mic_enabled.toggled.connect(sync)
-        self.mic_trigger.toggled.connect(sync)
         self.laugh.toggled.connect(sync)
         sync()
         return page
@@ -869,11 +857,9 @@ class SettingsWindow(QDialog):
             mic_enabled=self.mic_enabled.isChecked(),
             mic_device=self.mic_device.currentData(),
             mic_volume=self.mic_volume.value(),
-            mic_trigger=self.mic_trigger.isChecked(),
             toast_window=self.toast_window.isChecked(),
             update_check=self.update_check.isChecked(),
             discord_webhook=webhook,
-            mic_trigger_db=self.mic_trigger_db.value(),
             voice_detect=self.laugh.isChecked(),
             # Types not offered as tiles (set by hand in the file) are kept.
             auto_clips=[k for k in self.cfg["auto_clips"] if k not in self.auto_clips] + [k for k, box in self.auto_clips.items() if box.isChecked()],

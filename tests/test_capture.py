@@ -1,7 +1,7 @@
 import base64
 import json
 
-from laqta.obs_controller.capture import Capture, source
+from laqta.obs_controller.capture import Capture, source, BLANK_CHECKS
 from laqta.obs_controller.client import ObsError
 
 WINDOW = "League of Legends (TM) Client:RiotWindowClass:League of Legends.exe"
@@ -41,7 +41,7 @@ class FakeObs:
         return [k.removeprefix("Laqta ") for k, on in self.enabled.items() if on]
 
 
-def run(cap, max_checks=12):
+def run(cap, max_checks=40):
     for n in range(max_checks):
         if not cap.check():
             return n + 1
@@ -55,7 +55,7 @@ def test_blocked_game_capture_falls_back_and_is_remembered(tmp_path):
     assert obs.active() == ["game_capture"]
     assert obs.settings[source("game_capture")] == {"window": WINDOW, "priority": 2, "capture_mode": "window"}
 
-    assert run(cap) == 3  # two black looks, then one good look at window capture
+    assert run(cap) == BLANK_CHECKS + 1  # patient: five black looks (20 s), then one good look at window capture
     assert obs.active() == ["window_capture"] and obs.settings[source("window_capture")]["method"] == 2
     assert json.loads(store.read_text()) == {"league of legends.exe": "window_capture"} and not toasts
 
@@ -83,7 +83,28 @@ def test_falls_through_to_display_capture_and_reports_total_failure(tmp_path):
     cap = Capture(FakeObs(working=()), "Laqta", tmp_path / "d.json", toasts.append)
     cap.start(GAME)
     run(cap)
-    assert len(toasts) == 1 and "black" in toasts[0] and not (tmp_path / "d.json").exists()
+    assert len(toasts) == 2 and "whole screen" in toasts[0] and "black" in toasts[1] and not (tmp_path / "d.json").exists()
+
+
+def test_whole_screen_capture_is_announced_and_never_becomes_where_the_next_session_starts(tmp_path):
+    """Found in real play: Rocket League's black intro pushed it to whole-screen capture, which was then
+    remembered, so every later session recorded the desktop, chat windows included."""
+    store, toasts = tmp_path / "capture.json", []
+    obs = FakeObs(working=("monitor_capture",))
+    cap = Capture(obs, "Laqta", store, toasts.append)
+    cap.start(GAME)
+    run(cap)
+    assert obs.active() == ["monitor_capture"] and len(toasts) == 1 and "whole screen" in toasts[0]
+    assert not store.exists()  # not remembered
+    store.write_text(json.dumps({"league of legends.exe": "monitor_capture"}))  # a file written by the older version
+    obs2 = FakeObs()
+    cap2 = Capture(obs2, "Laqta", store, toasts.append)
+    cap2.start(GAME)
+    assert obs2.active() == ["window_capture"]  # tries the game's own window again
+    chosen = FakeObs(working=("monitor_capture",))
+    cap3 = Capture(chosen, "Laqta", store, toasts.append)
+    cap3.start({**GAME, "capture": "monitor_capture"})  # unless the user chose whole-screen capture for this game
+    assert chosen.active() == ["monitor_capture"]
 
 
 def test_waits_for_the_game_window_to_appear(tmp_path):
