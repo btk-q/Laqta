@@ -12,7 +12,7 @@ from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QKeySequence, Q
 from PySide6.QtWidgets import (
     QProgressDialog,
     QCheckBox, QComboBox, QDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
-    QFrame, QGridLayout, QListWidgetItem, QScrollArea, QMessageBox, QPushButton, QStackedWidget, QStyle, QStyledItemDelegate, QVBoxLayout, QWidget,
+    QButtonGroup, QFrame, QGridLayout, QListWidgetItem, QScrollArea, QMessageBox, QPushButton, QStackedWidget, QStyle, QStyledItemDelegate, QVBoxLayout, QWidget,
 )  # fmt: skip
 
 from ..i18n import is_rtl, t
@@ -315,13 +315,16 @@ class EventStrip(QWidget):
 class LibraryWindow(QDialog):
     PREVIEW = QSize(308, 173)
 
-    def __init__(self, parent: QWidget | None = None, root: Path | None = None, webhook: str = "", on_settings=None):
+    def __init__(self, parent: QWidget | None = None, root: Path | None = None, webhook: str = "", on_settings=None,
+                 settings_factory=None):
         super().__init__(parent)
         self.root = root or clips.ROOT
         self.webhook = webhook  # "" = sharing to Discord is not set up, and the button is not shown
         self.clips: list[Clip] = []
         self.items: dict[str, QListWidgetItem] = {}
         self.thumbs: dict[str, str] = {}  # video -> its thumbnail file, for the side panel
+        self.settings_factory = settings_factory  # makes the settings view; with it, this is the one main window
+        self.embedded = None  # the settings view while it is open (edits live in it until Save or Cancel)
         self.setWindowTitle(t("library.title"))
         self.setWindowFlags(Qt.WindowType.Window)  # a real window: minimise, maximise, its own taskbar button
         self.resize(1280, 830)
@@ -355,10 +358,21 @@ class LibraryWindow(QDialog):
         top.setSpacing(12)
         top.addWidget(logo)
         top.addWidget(brand)
-        top.addSpacing(10)
-        top.addWidget(pill)
+        top.addSpacing(14)
+        self.nav: dict[str, QPushButton] = {}
+        if settings_factory:  # two views in one window: your clips, and the settings
+            group = QButtonGroup(self)
+            for name, label, slot in (("clips", "menu.library", self.show_clips), ("settings", "library.settings", self.show_settings)):
+                button = self.nav[name] = QPushButton(t(label))
+                button.setObjectName("nav")
+                button.setCheckable(True)
+                button.clicked.connect(slot)
+                group.addButton(button)
+                top.addWidget(button)
+            self.nav["clips"].setChecked(True)
         top.addStretch(1)
-        if on_settings:
+        top.addWidget(pill)
+        if on_settings and not settings_factory:
             settings = QPushButton(t("library.settings"))
             settings.clicked.connect(on_settings)
             top.addWidget(settings)
@@ -507,16 +521,58 @@ class LibraryWindow(QDialog):
         bottom.addWidget(self.status, 1)
         bottom.addWidget(self.reel)
 
+        clips_page = QWidget()
+        clips_page.setObjectName("page")
+        inside = QVBoxLayout(clips_page)
+        inside.setContentsMargins(0, 0, 0, 0)
+        inside.setSpacing(0)
+        inside.addLayout(filters)
+        inside.addLayout(body, 1)
+        inside.addWidget(footer)
+        self.settings_page = QWidget()
+        self.settings_page.setObjectName("page")
+        self.settings_box = QVBoxLayout(self.settings_page)
+        self.settings_box.setContentsMargins(0, 0, 0, 0)
+        self.views = QStackedWidget()
+        self.views.addWidget(clips_page)
+        self.views.addWidget(self.settings_page)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(header)
-        layout.addLayout(filters)
-        layout.addLayout(body, 1)
-        layout.addWidget(footer)
+        layout.addWidget(self.views, 1)
         QShortcut(QKeySequence(Qt.Key.Key_F5), self, self.reload)
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self, self._delete)
         self.reload()
+
+    # -- the two views -------------------------------------------------------------------
+
+    def show_clips(self) -> None:
+        self.views.setCurrentIndex(0)
+        if self.nav:
+            self.nav["clips"].setChecked(True)
+
+    def show_settings(self) -> None:
+        """Open the settings inside this window. Edits stay in the view (also while you look at
+        your clips) until Save changes or Cancel."""
+        if not self.settings_factory:
+            return
+        if self.embedded is None:
+            self.embedded = view = self.settings_factory()
+            view.setWindowFlags(Qt.WindowType.Widget)  # a part of this window, not a window of its own
+            view.finished.connect(self._settings_finished)
+            self.settings_box.addWidget(view)
+            view.show()
+        self.views.setCurrentIndex(1)
+        self.nav["settings"].setChecked(True)
+
+    def _settings_finished(self, result: int) -> None:
+        view, self.embedded = self.embedded, None
+        if view is not None:
+            self.settings_box.removeWidget(view)
+            view.deleteLater()
+        self.show_clips()
+        self.status.setText(t("library.saved") if result else "")
 
     def closeEvent(self, event) -> None:
         if self.viewer is not None:

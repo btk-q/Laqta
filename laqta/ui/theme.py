@@ -87,6 +87,9 @@ QWidget#header {{ background: {c['panel']}; border-bottom: 1px solid {c['line']}
 QWidget#footer {{ background: {c['panel']}; border-top: 1px solid {c['line']}; }}
 QWidget#header QLabel, QWidget#footer QLabel, QWidget#pill QLabel {{ background: transparent; }}
 QLabel#brand {{ font-size: 20px; font-weight: 700; }}
+QPushButton#nav {{ background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 7px 16px; font-size: 14px; color: {c['muted']}; }}
+QPushButton#nav:hover {{ color: {c['text']}; }}
+QPushButton#nav:checked {{ background: {c['accent_dim']}; border-color: {c['accent']}; color: {c['text']}; }}
 QWidget#pill {{ background: {c['ink']}; border: 1px solid {c['line']}; border-radius: 16px; }}
 QLabel#state {{ font-size: 13px; }}
 QStackedWidget#detail, QStackedWidget#detail > QWidget, QWidget#detailBody, QStackedWidget#detail QScrollArea {{ background: {c['panel']}; }}

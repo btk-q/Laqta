@@ -192,13 +192,16 @@ class TrayApp:
             self.library.showNormal()
             self.library.raise_()
             return self.library.activateWindow()
-        self.library = window = LibraryWindow(webhook=self.cfg["discord_webhook"], on_settings=self.open_settings)
+        self.library = window = LibraryWindow(webhook=self.cfg["discord_webhook"], settings_factory=self._make_settings)
         window.finished.connect(lambda _: self._library_closed(window))
         self._on_state(self.state)  # so the new window shows what is happening right now
         window.show()
 
     def _library_closed(self, window: LibraryWindow) -> None:
         self.library = None
+        if self.settings is not None:  # closed with the settings open and unsaved: the same as Cancel
+            self.settings = None
+            theme.apply(self.app, self.cfg["accent"])
         window.deleteLater()
         if not self._hinted:  # once per run: closing the window does not stop Laqta
             self._hinted = True
@@ -245,17 +248,18 @@ class TrayApp:
             self.app.quit()
 
     def open_settings(self) -> None:
-        if self.settings is not None:
-            self.settings.raise_()
-            return self.settings.activateWindow()
+        """Settings live inside the main window: bring it up on its settings view."""
+        self.open_library()
+        self.library.show_settings()
+
+    def _make_settings(self) -> SettingsWindow:
         keys = {self.cfg[name]: bool(key and key.registered) for name, key in (('hotkey', self.hotkey), ('replay_hotkey', self.replay_key))}
         self.settings = window = SettingsWindow(self.cfg, hotkeys=keys)
         window.finished.connect(lambda result: self._settings_closed(window, result))
-        window.show()
+        return window
 
     def _settings_closed(self, window: SettingsWindow, result: int) -> None:
         self.settings = None
-        window.deleteLater()
         if not result:
             return theme.apply(self.app, self.cfg["accent"])  # undo any colour preview
         old, self.cfg = self.cfg, window.cfg
@@ -267,6 +271,9 @@ class TrayApp:
         keys = ("hotkey", "replay_hotkey", "replay_seconds")
         if self.cfg["language"] != old["language"] or any(self.cfg[k] != old[k] for k in keys):
             self._apply_language()
+        if self.cfg["language"] != old["language"] and self.library is not None:
+            # The main window's words are set when it is built: rebuild it in the new language.
+            QTimer.singleShot(0, lambda: (self.library.close(), self.open_library()))
         if any(self.cfg[k] != old[k] for k in keys[:2]):
             self._bind_hotkey()
         theme.apply(self.app, self.cfg["accent"])
