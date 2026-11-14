@@ -119,7 +119,9 @@ def find(samples: Iterator[np.ndarray], classifier: Classifier | None = None) ->
 def read(path: Path, stream: str = MIC_TRACK, chunk_seconds: float = 10.0) -> Iterator[np.ndarray]:
     """One audio track of a video as 16 kHz mono float samples, a chunk at a time (a long
     recording never sits in memory whole)."""
-    exe = shutil.which("ffmpeg")
+    from ..storage import tools
+
+    exe = tools.which("ffmpeg")
     if exe is None:
         raise OSError("ffmpeg was not found")
     process = subprocess.Popen(

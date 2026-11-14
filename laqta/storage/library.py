@@ -13,7 +13,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import clips
+from . import clips, tools
 
 log = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ def summary(clip: Clip) -> dict | None:
 
 
 def _run(*args: str, tool: str = "ffmpeg", timeout: float = 120) -> subprocess.CompletedProcess:
-    exe = shutil.which(tool)
+    exe = tools.which(tool)
     if exe is None:
         raise OSError(f"{tool} was not found. Install ffmpeg to use this.")
     return subprocess.run([exe, *args], capture_output=True, timeout=timeout, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

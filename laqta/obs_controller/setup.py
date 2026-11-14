@@ -32,10 +32,25 @@ class ObsBusy(Exception):
 
 
 def ws_settings(path: Path = WS_CONFIG) -> tuple[int, str, bool]:
-    """(port, password, enabled) as OBS itself stores them. Read-only: we never edit this file."""
+    """(port, password, enabled) as OBS itself stores them."""
     cfg = json.loads(path.read_text(encoding="utf-8"))
     password = cfg.get("server_password", "") if cfg.get("auth_required", True) else ""
     return int(cfg.get("server_port", 4455)), password, bool(cfg.get("server_enabled"))
+
+
+def enable_ws(path: Path = WS_CONFIG, running=None) -> bool:
+    """Switch OBS's WebSocket server on in OBS's own settings file: the one edit Laqta makes
+    there, only when the user presses the button for it, and only this one value. Returns
+    False without touching the file while OBS is running (OBS would write its own copy back
+    when it closes). Raises OSError if OBS has never been started (no file yet)."""
+    if (running or obs_running)():
+        return False
+    cfg = json.loads(path.read_text(encoding="utf-8"))
+    cfg["server_enabled"] = True
+    tmp = path.with_suffix(".laqta-tmp")
+    tmp.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+    os.replace(tmp, path)
+    return True
 
 
 def obs_exe() -> Path | None:

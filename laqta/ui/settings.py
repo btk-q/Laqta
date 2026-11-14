@@ -526,12 +526,14 @@ class SettingsWindow(QDialog):
         holder.setObjectName("page")
         holder.setLayout(self.health_rows)
         layout.addWidget(holder)
-        again, save = QPushButton(t("health.again")), QPushButton(t("health.zip"))
+        again, save, fix = QPushButton(t("health.again")), QPushButton(t("health.zip")), QPushButton(t("health.setup"))
         again.clicked.connect(self._fill_health)
+        fix.clicked.connect(self._open_setup)
         save.clicked.connect(self._save_zip)
         row = QHBoxLayout()
         row.setSpacing(10)
         row.addWidget(again)
+        row.addWidget(fix)
         row.addWidget(save)
         row.addStretch(1)
         layout.addSpacing(6)
@@ -574,6 +576,12 @@ class SettingsWindow(QDialog):
             row.setObjectName("page")
             row.setLayout(line)
             self.health_rows.addWidget(row)
+
+    def _open_setup(self) -> None:
+        from .setup import SetupDialog
+
+        SetupDialog(self.cfg, self).exec()
+        self._fill_health()
 
     def _save_zip(self) -> None:
         import datetime

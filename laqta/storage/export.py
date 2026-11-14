@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from . import clips
+from . import clips, tools
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class Info:
 
 
 def probe(path: Path) -> Info | None:
-    exe = shutil.which("ffprobe")
+    exe = tools.which("ffprobe")
     if exe is None:
         return None
     try:
@@ -52,7 +52,7 @@ def probe(path: Path) -> Info | None:
 
 def frame(path: Path, t: float, width: int, cache: Path) -> Path | None:
     """One still from `path` at `t` seconds, `width` pixels wide, cached on disk."""
-    exe = shutil.which("ffmpeg")
+    exe = tools.which("ffmpeg")
     try:
         stat = path.stat()
     except OSError:
@@ -185,7 +185,7 @@ class Job:
 
     def _encode(self, safety: float) -> str:
         """Run ffmpeg once. Returns "" on success, else what went wrong."""
-        exe = shutil.which("ffmpeg")
+        exe = tools.which("ffmpeg")
         if exe is None:
             return "ffmpeg was not found. Install ffmpeg to use this."
         args = self._args(safety)

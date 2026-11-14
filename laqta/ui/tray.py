@@ -204,6 +204,18 @@ class TrayApp:
             self._hinted = True
             self.toast(t("library.tray_hint"))
 
+    def first_run(self) -> None:
+        """Once: if OBS, its connection or ffmpeg is missing, show the setup screen before anything else."""
+        if self.cfg["setup_done"]:
+            return
+        from ..core import health
+        from . import setup as setup_screen
+
+        if setup_screen.needed(health.gather(self.cfg)):
+            setup_screen.SetupDialog(self.cfg).exec()
+        self.cfg["setup_done"] = True
+        self._save()
+
     # -- updates --------------------------------------------------------------------------
 
     def check_update(self, asked: bool = False) -> None:
@@ -288,6 +300,7 @@ def run(cfg: dict, show: bool = True) -> int:
     heartbeat = QTimer()
     heartbeat.timeout.connect(lambda: kernel32.WaitForSingleObject(wake, 0) == 0 and tray.open_library())
     heartbeat.start(500)
+    tray.first_run()
     if show:
         tray.open_library()
     if cfg["update_check"]:

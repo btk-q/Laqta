@@ -23,7 +23,7 @@ import tomli_w
 from .. import __version__
 from ..i18n import t
 from ..obs_controller import audio, encoders, setup
-from ..storage import autostart, clips, config
+from ..storage import autostart, clips, config, tools
 from .recorder import GB
 
 REMOVED = "<removed>"
@@ -51,7 +51,7 @@ def gather(cfg: dict, hotkeys: dict[str, bool] | None = None) -> dict:
     return {
         "obs": setup.obs_exe() is not None,
         "websocket": websocket,
-        "ffmpeg": shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None,
+        "ffmpeg": tools.which("ffmpeg") is not None and tools.which("ffprobe") is not None,
         "folder": str(clips.ROOT),
         "folder_ok": clips.usable_folder(clips.ROOT),
         "free": clips.free_bytes(),

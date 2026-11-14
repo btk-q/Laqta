@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 
 from ..core.events import GameEvent
+from . import tools
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ def game_dir(game: dict, root: Path | None = None) -> Path:
 def finish_clip(path: Path, game: dict, events: list[GameEvent], keep: float, pre: float) -> Path:
     """OBS saved the whole replay buffer; keep only the last `keep` seconds and describe it.
     `pre` is how long before the first event the kept part starts (for event offsets)."""
-    ffmpeg = shutil.which("ffmpeg")
+    ffmpeg = tools.which("ffmpeg")
     if ffmpeg:
         tmp = path.with_name(path.stem + ".trim" + path.suffix)
         # Stream copy: instant and lossless, but the cut lands on the keyframe before the
