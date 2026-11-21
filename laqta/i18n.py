@@ -184,6 +184,13 @@ STRINGS: dict[str, tuple[str, str]] = {
     "setup.done": ("Start using Laqta", "ابدأ استخدام لقطة"),
     "setup.later": ("Continue without recording", "تابع بدون تسجيل"),
     "health.setup": ("Open setup…", "افتح الإعداد…"),
+    # something broke
+    "problem.title": ("Laqta ran into a problem", "واجه لقطة مشكلة"),
+    "problem.text": ("Something went wrong inside Laqta. It is still running and recording should carry on, but if the problem comes back, save the diagnostic file and send it to whoever gave you Laqta.", "حدث خطأ داخل لقطة. ما زال يعمل ويُفترض أن يستمر التسجيل، لكن إذا عادت المشكلة فاحفظ ملف التشخيص وأرسله لمن أعطاك لقطة."),
+    "problem.fatal": ("Laqta could not start. Save the diagnostic file and send it to whoever gave you Laqta; downloading Laqta again often fixes this.", "تعذّر تشغيل لقطة. احفظ ملف التشخيص وأرسله لمن أعطاك لقطة؛ وكثيرًا ما يحل ذلك تنزيل لقطة من جديد."),
+    "problem.save": ("Save diagnostic file…", "احفظ ملف التشخيص…"),
+    "problem.continue": ("Keep going", "تابع"),
+    "problem.close": ("Close", "إغلاق"),
     # updates
     "update.title": ("Laqta update", "تحديث لقطة"),
     "update.heading": ("Laqta {new} is ready (you have {old})", "لقطة {new} جاهز (لديك {old})"),

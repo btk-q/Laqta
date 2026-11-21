@@ -315,6 +315,9 @@ def run(cfg: dict, show: bool = True) -> int:
     app.setFont(QFont("Segoe UI", 10))  # has Arabic glyphs; Windows substitutes Segoe UI Arabic shapes
     theme.apply(app, cfg["accent"])
     tray = TrayApp(app, cfg)
+    from . import problem
+
+    problem.install(lambda fn: QTimer.singleShot(0, fn))  # QTimer from any thread lands on the GUI thread
 
     # Ctrl+C in a terminal: Qt's loop never returns to Python on its own, so the handler
     # would not run. A no-op timer gives the interpreter a turn twice a second.

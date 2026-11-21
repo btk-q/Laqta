@@ -341,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
         return vision_test(args.plugin, args.video, args.fps)
 
     config.DIR.mkdir(parents=True, exist_ok=True)
-    log_file = logging.handlers.RotatingFileHandler(config.DIR / "laqta.log", maxBytes=1_000_000, backupCount=2, encoding="utf-8")
+    log_file = logging.handlers.RotatingFileHandler(config.DIR / "laqta.log", maxBytes=5_000_000, backupCount=2, encoding="utf-8")  # a long evening fits
     # The packaged app has no console: sys.stderr is None there.
     handlers = [log_file, *([logging.StreamHandler()] if sys.stderr else [])]
     logging.basicConfig(level=logging.INFO, format=fmt, handlers=handlers)
@@ -352,9 +352,16 @@ def main(argv: list[str] | None = None) -> int:
 
         ctypes.windll.user32.MessageBoxW(None, f"{config.PATH}\n\n{e}", "Laqta: settings file problem", 0x10)
         return 1
-    from .ui import tray  # imported late so obs-check works without Qt
+    try:
+        from .ui import tray  # imported late so obs-check works without Qt
 
-    return tray.run(cfg, show=not args.tray)
+        return tray.run(cfg, show=not args.tray)
+    except Exception as error:  # Laqta could not start: say so plainly, not with a raw error box
+        logging.getLogger("laqta").exception("Laqta could not start")
+        from .ui import problem
+
+        problem.show(error, fatal=True)
+        return 1
 
 
 if __name__ == "__main__":
