@@ -17,7 +17,7 @@ from ..core import health
 from ..core.recorder import BOUNDARIES, MODES
 from ..game_detector import library_scan
 from ..game_detector.detector import GAMES_JSON, NOT_GAMES, load_games, processes
-from ..i18n import LANGUAGES, t
+from ..i18n import LANGUAGES, isolate, t
 from ..obs_controller import audio, encoders
 from ..obs_controller.capture import KINDS
 from ..plugins import PLUGINS
@@ -76,7 +76,7 @@ def _label(text: str, name: str = "") -> QLabel:
     label = QLabel(text)
     label.setObjectName(name)
     label.setWordWrap(True)
-    return label
+    return theme.lead(label)
 
 
 def _combo(options: list[tuple[str, object]], current) -> QComboBox:
@@ -736,7 +736,7 @@ class SettingsWindow(QDialog):
         names = [g.get("name") or g["exe"] for g in games.values()]
         for key, game in sorted(games.items(), key=lambda kv: (kv[1].get("name") or kv[0]).lower()):
             name = game.get("name") or game["exe"]
-            item = QListWidgetItem(f"{name} ({game['exe']})" if names.count(name) > 1 else name)  # e.g. two Apex exes
+            item = QListWidgetItem(isolate(f"{name} ({game['exe']})") if names.count(name) > 1 else name)  # e.g. two Apex exes
             item.setIcon(QIcon(gameicons.get(game["exe"]) or gameicons.blank()))  # a blank keeps the names in one column
             item.setData(Qt.ItemDataRole.UserRole, key)
             self.game_list.addItem(item)

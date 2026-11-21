@@ -42,6 +42,19 @@ def contrast(a: str, b: str) -> float:
     return (hi + 0.05) / (lo + 0.05)
 
 
+def lead(label):
+    """Align a label to the start of the line in the interface's language. In Arabic a label whose
+    text is Latin (a game's name, a file name) would otherwise sit at the left edge, because Qt
+    takes the direction from the text, not from the window."""
+    from PySide6.QtCore import Qt
+
+    from ..i18n import is_rtl
+
+    if is_rtl():
+        label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute | Qt.AlignmentFlag.AlignVCenter)
+    return label
+
+
 def palette(accent: str = DEFAULT_ACCENT) -> dict[str, str]:
     """Every colour the UI uses, derived from the accent's hue so surfaces never clash with it."""
     accent = accent if is_color(accent) else DEFAULT_ACCENT
@@ -76,7 +89,10 @@ current = palette()  # what is on screen now; widgets that paint by hand read th
 
 
 def qss(accent: str = DEFAULT_ACCENT) -> str:
+    from ..i18n import is_rtl
+
     c = palette(accent)
+    start = "right" if is_rtl() else "left"  # stylesheets have no "start": pick the side for the language
     return f"""
 * {{ color: {c['text']}; font-size: 13px; }}
 QDialog, QWidget#page, QStackedWidget {{ background: {c['ink']}; }}
@@ -151,7 +167,7 @@ QLabel#badge_bad {{ color: {STATUS['bad']}; }}
 QLabel#checkTitle {{ font-weight: 600; }}
 QLabel#toast {{ background: {c['panel']}; border: 1px solid {c['accent']}; padding: 12px 16px; font-size: 14px; }}
 QTextBrowser {{ background: {c['panel']}; border: 1px solid {c['line']}; border-radius: 6px; padding: 8px; }}
-QPushButton#tile {{ text-align: left; padding: 9px 12px; }}
+QPushButton#tile {{ text-align: {start}; padding: 9px 12px; }}
 QPushButton#tile:checked {{ background: {c['accent_dim']}; border: 1px solid {c['accent']}; }}
 QLabel#tileTitle {{ font-weight: 600; font-size: 14px; background: transparent; }}
 QLabel#tileHint {{ color: {c['muted']}; font-size: 12px; background: transparent; }}

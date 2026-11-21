@@ -104,6 +104,7 @@ class TrayApp:
 
     def _apply_language(self) -> None:
         i18n.set_language(self.cfg["language"])
+        theme.apply(self.app, self.cfg["accent"])  # some styles depend on the reading direction
         self.app.setLayoutDirection(Qt.LayoutDirection.RightToLeft if i18n.is_rtl() else Qt.LayoutDirection.LeftToRight)
         self.menu.clear()
         self.status = self.menu.addAction("")

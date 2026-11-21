@@ -445,7 +445,7 @@ class LibraryWindow(QDialog):
         self.title.setWordWrap(True)
         if is_rtl():  # a game's name is usually Latin text, which Qt would otherwise push to the left edge
             self.title.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute | Qt.AlignmentFlag.AlignVCenter)
-        self.about = QLabel()
+        self.about = theme.lead(QLabel())
         self.about.setObjectName("muted")
         self.about.setWordWrap(True)
         self.summary = QLabel()

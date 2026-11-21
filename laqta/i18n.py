@@ -9,6 +9,7 @@ from __future__ import annotations
 LANGUAGES = {"en": "English", "ar": "العربية"}
 RTL = {"ar"}
 _lang = "en"
+_ARABIC = __import__("re").compile(r"[؀-ۿ]")  # the first character is Arabic
 
 # key: (English, Arabic)
 STRINGS: dict[str, tuple[str, str]] = {
@@ -418,4 +419,16 @@ def t(key: str, **values) -> str:
     if row is None:
         return key
     text = row[list(LANGUAGES).index(_lang)]
-    return text.format(**values) if values else text
+    text = text.format(**values) if values else text
+    if _lang in RTL and text and not _ARABIC.match(text):
+        # A right-to-left sentence that happens to start with Latin or a number ("1080p, 60 ...")
+        # would be laid out left to right. An invisible right-to-left mark in front fixes the
+        # reading direction. (Only when needed: these strings also become file names.)
+        text = "‏" + text
+    return text
+
+
+def isolate(text: str) -> str:
+    """Wrap a name that may mix scripts (a game's name with its program file in brackets) so the
+    brackets stay put inside right-to-left text."""
+    return f"⁨{text}⁩" if _lang in RTL else text

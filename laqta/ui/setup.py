@@ -12,6 +12,7 @@ from ..core import health
 from ..i18n import t
 from ..obs_controller import setup as obs_setup
 from ..storage import tools
+from . import theme
 
 STEPS = ("obs", "websocket", "ffmpeg")
 
@@ -48,12 +49,12 @@ class SetupDialog(QDialog):
         layout.addWidget(intro)
         self.rows: dict[str, tuple[QLabel, QLabel, QPushButton]] = {}
         for step in STEPS:
-            badge, text, button = QLabel(), QLabel(), QPushButton()
+            badge, text, button = QLabel(), theme.lead(QLabel()), QPushButton()
             badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
             badge.setFixedWidth(76)
             text.setWordWrap(True)
             button.clicked.connect(lambda _=False, s=step: self._act(s))
-            title = QLabel(t(f"setup.{step}"))
+            title = theme.lead(QLabel(t(f"setup.{step}")))
             title.setObjectName("checkTitle")
             words = QVBoxLayout()
             words.setSpacing(2)

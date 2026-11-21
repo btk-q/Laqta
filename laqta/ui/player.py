@@ -303,9 +303,9 @@ class PlayerWindow(QDialog):
         self.setWindowFlags(Qt.WindowType.Window)
         self.resize(1100, 700)
         self.clip: Clip | None = None
-        self.title = QLabel()
+        self.title = theme.lead(QLabel())
         self.title.setObjectName("heading")
-        self.about = QLabel()
+        self.about = theme.lead(QLabel())
         self.about.setObjectName("muted")
         self.player = Player()
         trim, folder, outside = QPushButton(t("library.trim")), QPushButton(t("library.show")), QPushButton(t("player.outside"))

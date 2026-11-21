@@ -74,3 +74,15 @@ def test_add_a_game_offers_installed_games_then_running_programs_without_known_o
 
 def test_deadlock_is_a_built_in_game():
     assert "deadlock.exe" in builtin_exes()
+
+
+def test_arabic_lines_that_start_with_latin_read_right_to_left_and_file_names_stay_clean():
+    try:
+        i18n.set_language("ar")
+        assert i18n.t("preset.balanced.hint").startswith("‏")  # starts with "1080p"
+        assert not i18n.t("clip.funny").startswith("‏") and not i18n.t("card.clip").startswith("‏")  # used in file names
+        assert i18n.isolate("Apex Legends (r5apex.exe)") == "⁨Apex Legends (r5apex.exe)⁩"
+        i18n.set_language("en")
+        assert not i18n.t("preset.balanced.hint").startswith("‏") and i18n.isolate("x") == "x"
+    finally:
+        i18n.set_language("en")
