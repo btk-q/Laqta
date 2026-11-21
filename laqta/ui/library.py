@@ -771,6 +771,7 @@ class LibraryWindow(QDialog):
             if self.viewer is None:
                 self.viewer = PlayerWindow(self)
                 self.viewer.trim.connect(lambda chosen, where: self._trim(where))
+                self.viewer.marks_changed.connect(lambda chosen: self.reload(chosen.path))
             stats = summary_text(clip).split("     ")
             self.viewer.show_clip(clip, "     ".join([when_text(clip.when), *stats[1:]]), at if isinstance(at, float) else 0.0)
 

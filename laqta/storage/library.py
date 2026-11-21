@@ -120,6 +120,23 @@ def set_meta(path: Path, **fields) -> None:
     tmp.replace(sidecar)  # never leave half a file where the event marks were
 
 
+def add_mark(path: Path, offset: float, kind: str = "manual") -> list[dict]:
+    """Add one event mark to a video's sidecar (for example a moment marked while watching).
+    Returns the video's events, in time order."""
+    sidecar = path.with_suffix(".json")
+    try:
+        meta = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        meta = {"game": path.parents[1].name, "events": []}
+    events = [e for e in meta.get("events", []) if not (e.get("type") == kind and abs(e.get("offset", -99) - offset) < 1.0)]
+    events.append({"type": kind, "source": "manual", "confidence": 1.0, "offset": round(max(0.0, offset), 2)})
+    meta["events"] = sorted(events, key=lambda e: e.get("offset", 0))
+    tmp = sidecar.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    tmp.replace(sidecar)
+    return meta["events"]
+
+
 def usage(clips: list[Clip]) -> list[tuple[str, int, int]]:
     """Space taken per game, biggest first: (game, bytes, number of videos)."""
     per: dict[str, list[int]] = {}

@@ -22,8 +22,28 @@ from . import icons, theme
 
 BOUNDARIES = ("match_start", "match_end")
 STEP = 5.0  # seconds the arrow keys jump
-VOLUME = [0.8]  # shared by every player while Laqta runs: change it once, it stays
-# ponytail: the volume is not remembered between runs; keep it in config.toml if people ask.
+FRAME = 1 / 60  # one step with , and . (Laqta records at 60 frames a second by default)
+SPEEDS = (0.25, 0.5, 1.0, 1.5, 2.0)
+
+
+def _volume_file() -> Path:
+    from ..storage import config
+
+    return config.DIR / "player.json"
+
+
+def _load_volume() -> float:
+    """The volume the player had last time. Kept in its own small file, not config.toml: the
+    player writes it whenever the slider moves, and must not race the settings window."""
+    import json
+
+    try:
+        return max(0.0, min(1.0, float(json.loads(_volume_file().read_text(encoding="utf-8"))["volume"])))
+    except (OSError, ValueError, KeyError, TypeError):
+        return 0.8
+
+
+VOLUME = [_load_volume()]  # shared by every player while Laqta runs
 
 
 def stamp(seconds: float) -> str:
@@ -132,6 +152,7 @@ class Player(QWidget):
     pauses, the arrow keys jump five seconds, F or a double-click goes full screen."""
 
     moved = Signal(float)  # the position changed (playing or a jump), in seconds
+    mark_requested = Signal(float)  # M was pressed at this moment
     stopped = Signal()  # reached the end, or the end of "play from here to there"
 
     def __init__(self, seekbar: bool = True):
@@ -165,6 +186,13 @@ class Player(QWidget):
         self.volume.setFixedWidth(90)
         self.volume.setAccessibleName(t("player.volume"))
         self.volume.valueChanged.connect(self._set_volume)
+        self.speed = QComboBox()
+        for speed in SPEEDS:
+            self.speed.addItem(f"{speed:g}×", speed)
+        self.speed.setCurrentIndex(SPEEDS.index(1.0))
+        self.speed.setToolTip(t("player.speed"))
+        self.speed.setAccessibleName(t("player.speed"))
+        self.speed.currentIndexChanged.connect(lambda _: self.player.setPlaybackRate(self.speed.currentData()))
         full = QPushButton(t("player.full"))
         full.clicked.connect(self.full_screen)
 
@@ -183,6 +211,7 @@ class Player(QWidget):
         speaker.setPixmap(glyph("speaker", theme.current["muted"]).pixmap(16, 16))
         row.addWidget(speaker)
         row.addWidget(self.volume)
+        row.addWidget(self.speed)
         row.addWidget(full)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -242,8 +271,19 @@ class Player(QWidget):
         self.video.setFullScreen(not self.video.isFullScreen())
 
     def _set_volume(self, value: int) -> None:
+        import json
+
         VOLUME[0] = value / 100
         self.audio.setVolume(VOLUME[0])
+        try:
+            _volume_file().write_text(json.dumps({"volume": VOLUME[0]}), encoding="utf-8")
+        except OSError:
+            pass  # remembered for this run anyway
+
+    def step(self, frames: int) -> None:
+        """Pause and move one frame (or several) back or forward, to find the exact moment."""
+        self.player.pause()
+        self.seek(self.seconds() + frames * FRAME)
 
     # -- feedback -----------------------------------------------------------------------
 
@@ -281,6 +321,10 @@ class Player(QWidget):
             self.toggle()
         elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right):
             self.seek(self.seconds() + (STEP if key == Qt.Key.Key_Right else -STEP))
+        elif key in (Qt.Key.Key_Comma, Qt.Key.Key_Period):  # , and . step one frame, as in most video players
+            self.step(1 if key == Qt.Key.Key_Period else -1)
+        elif key == Qt.Key.Key_M:
+            self.mark_requested.emit(self.seconds())
         elif key == Qt.Key.Key_F:
             self.full_screen()
         elif key == Qt.Key.Key_Escape and self.video.isFullScreen():
@@ -309,6 +353,12 @@ class PlayerWindow(QDialog):
         self.about.setObjectName("muted")
         self.player = Player()
         trim, folder, outside = QPushButton(t("library.trim")), QPushButton(t("library.show")), QPushButton(t("player.outside"))
+        mark = QPushButton(t("player.mark"))
+        mark.setToolTip(t("player.mark_hint"))
+        mark.clicked.connect(lambda: self._mark(self.player.seconds()))
+        self.player.mark_requested.connect(self._mark)
+        self.marked = QLabel()
+        self.marked.setObjectName("muted")
         trim.setObjectName("primary")
         trim.clicked.connect(lambda: self.clip and (self.player.pause(), self.trim.emit(self.clip, self.player.seconds())))
         folder.clicked.connect(lambda: self.clip and subprocess.Popen(["explorer", "/select,", str(self.clip.path)]))
@@ -316,7 +366,9 @@ class PlayerWindow(QDialog):
         buttons = QHBoxLayout()
         buttons.setSpacing(10)
         buttons.addWidget(trim)
+        buttons.addWidget(mark)
         buttons.addWidget(folder)
+        buttons.addWidget(self.marked)
         buttons.addStretch(1)
         buttons.addWidget(outside)
         layout = QVBoxLayout(self)
@@ -328,8 +380,29 @@ class PlayerWindow(QDialog):
         layout.addLayout(buttons)
         QShortcut(QKeySequence(Qt.Key.Key_Space), self, self.player.toggle)
 
+    marks_changed = Signal(object)  # the clip whose marks changed, so the clips window can refresh
+
+    def _mark(self, seconds: float) -> None:
+        """Mark this moment in the video, like the hotkey does during play."""
+        if self.clip is None:
+            return
+        from dataclasses import replace
+
+        from ..storage import library
+
+        try:
+            events = library.add_mark(self.clip.path, seconds)
+        except OSError as e:
+            return self.marked.setText(t("library.failed", error=e))
+        self.clip = replace(self.clip, events=tuple(events))
+        if self.player.bar:
+            self.player.bar.set_events(self.clip.events)
+        self.marked.setText(t("player.marked", at=stamp(seconds)))
+        self.marks_changed.emit(self.clip)
+
     def show_clip(self, clip: Clip, about: str = "", at: float = 0.0) -> None:
         self.clip = clip
+        self.marked.setText("")
         self.setWindowTitle(f"{clip.game} — {clip.path.name}")
         self.title.setText(clip.game)
         self.about.setText(about)
