@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 DISCORD_LIMIT = 10 * 1024 * 1024  # bytes a free Discord upload may be
-PRESETS = ("exact", "vertical", "discord", "1080p60")
+PRESETS = ("exact", "vertical", "discord", "1080p60", "cutout")
 
 
 @dataclass(frozen=True)
@@ -88,6 +88,8 @@ def output_path(src: Path, preset: str, start: float, end: float, root: Path | N
     span = f"{int(start)}-{int(end)}"
     if preset == "exact":  # a trimmed copy stays in the library, next to its source
         return src.with_name(f"{src.stem} trim {span}{src.suffix}")
+    if preset == "cutout":  # so does a copy with a part taken out
+        return src.with_name(f"{src.stem} without {span}{src.suffix}")
     folder = (root or clips.ROOT) / "Exports"
     return folder / f"{src.parents[1].name} {src.stem} {span} {preset}.mp4"
 
@@ -99,6 +101,8 @@ def command(src: Path, out: Path, preset: str, start: float, end: float, info: I
         raise ValueError(f"unknown preset {preset!r}")
     if not 0 <= start < end:
         raise ValueError("The end must be after the start.")
+    if preset == "cutout":
+        return cutout_command(src, out, start, end, info)
     head = ["-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-ss", f"{start:.3f}", "-to", f"{end:.3f}", "-i", str(src)]
     # Track 1 is the full mix. Track 2 is the game alone: use it to leave the microphone out.
     audio = "0:a:1" if without_mic and info.audio_tracks >= 2 else "0:a:0?"
@@ -118,6 +122,33 @@ def command(src: Path, out: Path, preset: str, start: float, end: float, info: I
     scale = "scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2,fps=60"
     return [*head, "-map", "0:v:0", "-map", audio, "-vf", scale, *x264, "-crf", "20", "-c:a", "aac", "-b:a", "160k",
             "-movflags", "+faststart", str(out)]
+
+
+def kept(start: float, end: float, duration: float) -> list[tuple[float, float]]:
+    """The parts left when [start, end] is taken out of a video `duration` long. Pure."""
+    return [(a, b) for a, b in ((0.0, start), (end, duration)) if b - a > 0.05]
+
+
+def cutout_command(src: Path, out: Path, start: float, end: float, info: Info) -> list[str]:
+    """The whole video without seconds [start, end]: what is left on either side is joined and
+    re-encoded, every audio track kept (a stream copy cannot join at an exact frame)."""
+    parts = kept(start, end, info.duration)
+    if not parts:
+        raise ValueError("That would take out the whole video.")
+    tracks = info.audio_tracks
+    graph, joined = [], ""
+    for n, (a, b) in enumerate(parts):
+        span = f"start={a:.3f}" + (f":end={b:.3f}" if b < info.duration else "")
+        graph.append(f"[0:v:0]trim={span},setpts=PTS-STARTPTS[v{n}]")
+        joined += f"[v{n}]"
+        for k in range(tracks):
+            graph.append(f"[0:a:{k}]atrim={span},asetpts=PTS-STARTPTS[a{n}_{k}]")
+            joined += f"[a{n}_{k}]"
+    outs = "[v]" + "".join(f"[o{k}]" for k in range(tracks))
+    graph.append(f"{joined}concat=n={len(parts)}:v=1:a={tracks}{outs}")
+    maps = ["-map", "[v]", *[x for k in range(tracks) for x in ("-map", f"[o{k}]")]]
+    return ["-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", str(src), "-filter_complex", ";".join(graph), *maps,
+            "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-crf", "18", "-c:a", "aac", "-b:a", "192k", str(out)]
 
 
 def progress_seconds(line: str) -> float | None:
@@ -196,7 +227,8 @@ class Job:
         errors: list[bytes] = []
         drain = threading.Thread(target=lambda: errors.append(process.stderr.read()), daemon=True)
         drain.start()  # a full stderr pipe would stall ffmpeg
-        length = max(self.end_s - self.start_s, 0.001)
+        # The output's length: the selection, or for a cut-out everything but the selection.
+        length = max(self.info.duration - (self.end_s - self.start_s) if self.preset == "cutout" else self.end_s - self.start_s, 0.001)
         for raw in process.stdout:
             done = progress_seconds(raw.decode(errors="replace"))
             if done is not None:
@@ -221,7 +253,7 @@ class Job:
                 problem = "This clip is too long to fit in 10 MB. Trim it shorter."
             if not problem:
                 self.work.replace(self.out)
-                if self.preset == "exact":
+                if self.preset in ("exact", "cutout"):
                     self._carry_marks()
         except (OSError, ValueError) as e:
             problem = str(e)
@@ -238,7 +270,13 @@ class Job:
             meta = json.loads(self.src.with_suffix(".json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return
-        meta["seconds"] = round(self.end_s - self.start_s, 2)
-        meta["events"] = [{**e, "offset": round(e["offset"] - self.start_s, 2)} for e in meta.get("events", [])
-                          if self.start_s <= e.get("offset", -1) <= self.end_s]
+        if self.preset == "cutout":  # marks before the gap stay, marks after it move up, marks in it go
+            gap = self.end_s - self.start_s
+            meta["seconds"] = round(self.info.duration - gap, 2)
+            meta["events"] = [{**e, "offset": round(e["offset"] - (gap if e["offset"] > self.end_s else 0), 2)}
+                              for e in meta.get("events", []) if not self.start_s <= e.get("offset", -1) <= self.end_s]
+        else:
+            meta["seconds"] = round(self.end_s - self.start_s, 2)
+            meta["events"] = [{**e, "offset": round(e["offset"] - self.start_s, 2)} for e in meta.get("events", [])
+                              if self.start_s <= e.get("offset", -1) <= self.end_s]
         self.out.with_suffix(".json").write_text(json.dumps(meta, indent=2), encoding="utf-8")

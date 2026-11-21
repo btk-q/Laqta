@@ -24,7 +24,7 @@ def after(argv, flag):
 
 
 def test_every_preset_cuts_the_asked_range_and_reports_progress():
-    for preset in export.PRESETS:
+    for preset in (p for p in export.PRESETS if p != "cutout"):
         a = args(preset)
         assert (after(a, "-ss"), after(a, "-to")) == ("2.000", "12.000")
         assert a.index("-ss") < a.index("-i")  # seek before decoding, or long recordings crawl
@@ -244,3 +244,33 @@ def test_real_presets_produce_the_promised_shapes(real_video):
     assert hd.width == 1920 and hd.height <= 1080 and hd.height % 2 == 0
     _, _, game_only = real(root, path, "1080p60", 4, 8, without_mic=True)
     assert game_only.audio_tracks == 1
+
+
+
+def test_the_parts_kept_around_a_cut():
+    assert export.kept(10, 20, 60) == [(0.0, 10), (20, 60)]
+    assert export.kept(0, 20, 60) == [(20, 60)] and export.kept(40, 60, 60) == [(0.0, 40)]
+    assert export.kept(0, 60, 60) == []
+    with pytest.raises(ValueError):
+        export.cutout_command(SRC, Path("o.mkv"), 0, 20, Info(20.0, 1920, 1080, 3))
+
+
+def test_a_cut_out_keeps_every_audio_track_and_joins_the_two_sides():
+    a = export.command(SRC, Path("o.mkv"), "cutout", 5.0, 9.0, INFO)
+    graph = after(a, "-filter_complex")
+    assert graph.count("]trim=") == 2 and graph.count("]atrim=") == 6  # two sides, three audio tracks each
+    assert "concat=n=2:v=1:a=3[v][o0][o1][o2]" in graph and a.count("-map") == 4
+    assert "-ss" not in a  # the whole file is read
+    assert export.output_path(SRC, "cutout", 5, 9) == SRC.with_name("Replay 1 without 5-9.mkv")
+
+
+@needs_ffmpeg
+def test_real_cut_out_is_the_right_length_keeps_the_tracks_and_moves_the_marks(real_video):
+    root, path = real_video
+    path.with_suffix(".json").write_text(json.dumps({"game": "Test Game", "seconds": 12.0,
+        "events": [{"type": "kill", "offset": 2.0}, {"type": "death", "offset": 5.0}, {"type": "ace", "offset": 10.0}]}))
+    out, progress, info = real(root, path, "cutout", 4.0, 7.5)
+    assert info.duration == pytest.approx(8.5, abs=0.15) and info.audio_tracks == 2
+    assert progress[-1] == 1.0
+    events = json.loads(out.with_suffix(".json").read_text())["events"]
+    assert [(e["type"], e["offset"]) for e in events] == [("kill", 2.0), ("ace", 6.5)]  # the death was in the part taken out

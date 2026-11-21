@@ -394,6 +394,8 @@ STRINGS: dict[str, tuple[str, str]] = {
     "edit.no_mic": ("Leave my microphone out", "استبعد ميكروفوني"),
     "edit.no_mic_hint": ("Uses the game-sound track. Available when the recording has separate tracks.", "يستخدم مسار صوت اللعبة. متاح حين يحتوي التسجيل على مسارات منفصلة."),
     "edit.save_copy": ("Save trimmed copy", "احفظ نسخة مقصوصة"),
+    "edit.cutout": ("Save without this part", "احفظ بدون هذا الجزء"),
+    "edit.cutout_hint": ("Saves a copy of the whole video with the part between the handles taken out, for example a loading screen or a long wait. The original is kept.", "يحفظ نسخة من الفيديو كله بعد حذف الجزء الواقع بين المقبضين، مثل شاشة تحميل أو انتظار طويل. الأصل يبقى كما هو."),
     "edit.vertical": ("Vertical 9:16", "عمودي 9:16"),
     "edit.discord": ("Discord, under 10 MB", "ديسكورد، أقل من 10 ميغابايت"),
     "edit.hd": ("1080p 60 MP4", "MP4 بدقة 1080p 60"),

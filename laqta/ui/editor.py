@@ -284,10 +284,12 @@ class EditorDialog(QDialog):
         self.buttons: list[QPushButton] = []
         actions = QHBoxLayout()
         actions.setSpacing(10)
-        for key, preset, name in (("edit.save_copy", "trim", "primary"), ("edit.vertical", "vertical", ""),
+        for key, preset, name in (("edit.save_copy", "trim", "primary"), ("edit.cutout", "cutout", ""), ("edit.vertical", "vertical", ""),
                                   ("edit.discord", "discord", ""), ("edit.hd", "1080p60", "")):
             button = QPushButton(t(key))
             button.setObjectName(name)
+            if preset == "cutout":
+                button.setToolTip(t("edit.cutout_hint"))
             button.clicked.connect(lambda _=False, p=preset: self._run(p))
             self.buttons.append(button)
             actions.addWidget(button)
