@@ -2,6 +2,16 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## 0.8.1
+
+### New
+- **Sort your videos** newest first, oldest first, biggest first or longest first (the menu at
+  the end of the filter row). Sorting by size makes it easy to see what to delete.
+
+### Fixed
+- Video pictures no longer disappear from the clips window after you favourite, delete or
+  sort videos.
+
 ## 0.8.0
 
 ### New

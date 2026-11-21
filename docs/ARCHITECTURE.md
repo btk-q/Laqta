@@ -13,6 +13,12 @@ source or a live run. Each is proven in the milestone named before anything is b
 
 ## 1. Layout
 
+*(The tree below is the original plan. Since then the UI has grown: `ui/cards.py` holds how one
+video is drawn (card, event strip, the words under it), `ui/settings_parts.py` the pieces of the
+settings window that stand alone, and `ui/player.py`, `ui/setup.py`, `ui/update.py`,
+`ui/problem.py`, `ui/gameicons.py`, `ui/icons.py` are one window or one job each.)*
+
+
 ```
 laqta/
   __main__.py          entry: load config, start core thread, run Qt; `obs-check` subcommand

@@ -105,7 +105,8 @@ event happened; click a symbol there to open the trim window on that moment.
 in the middle of changing stay as they are while you look at your clips, until you press Save
 changes or Cancel. Each game shows its own icon, read from the game's program file on your PC.
 
-**Clips window:** videos are grouped by game and day, newest first. Ctrl-click or Shift-click to
+**Clips window:** videos are grouped by game and day, newest first; sort them oldest first, biggest
+first or longest first instead. Ctrl-click or Shift-click to
 select several and favourite, export, delete them, or make a highlight reel from just those.
 **Settings → Storage** shows how much space each game's videos take. Search by game, tag or event; filter by game, event, date and favourites;
 play, tag, export as MP4, show in folder, or delete to the Recycle Bin.
