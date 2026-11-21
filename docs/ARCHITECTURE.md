@@ -228,6 +228,9 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Storage page | Works | Rendered on the owner's real library (36 GB over two games) |
 | Start/stop recording hotkey | Unit-tested | The decision of what to record and the press-again-to-stop logic tested; the foreground window read live; no hand-started recording made yet |
 | Laughs and shouts in real play | Works | The owner's sessions on 0.6.1: laughs found in League and Pummel Party (59 in one 90-minute party game), clips cut around them; no false shout clips reported |
+| Problem message instead of raw error boxes | Works | Rendered; hooks tested with errors on the GUI and a background thread (shown once, all logged) |
+| Player speed, frame steps, marks while watching, remembered volume | Works | Driven on a 60 fps test video: 2x played 4 s in 2 s, one step moved 16 ms, M wrote a mark to the file |
+| League champion and mode on cards | Unit-tested | From Riot's documented playerlist and gamestats shapes; LAQTA_LOL_DUMP saves the real answers to check against; not yet seen in a real match |
 | First-run setup screen | Works with a made-up empty PC | Every step and button driven by script with the installs faked; the WebSocket switch tested on a copy of OBS's real settings file. Never run on a PC that really lacks OBS or ffmpeg |
 | Pre-publish smoke test | Works | Run on the packaged app: 5 of 5 passes; it caught a genuinely broken build during development |
 | Update rollback | Works | For real, on a test copy: a deliberately broken build was undone after 45 s and the old version restarted; a good build was kept after about 12 s |

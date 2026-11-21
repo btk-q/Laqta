@@ -110,8 +110,9 @@ select several and favourite, export, delete them, or make a highlight reel from
 **Settings → Storage** shows how much space each game's videos take. Search by game, tag or event; filter by game, event, date and favourites;
 play, tag, export as MP4, show in folder, or delete to the Recycle Bin.
 
-**Watching:** Play (or a double-click) opens the video in Laqta's own player, with each event's
-symbol on the seek bar: click a symbol to jump to just before that moment. Space plays and
+**Watching:** Play (or a double-click) opens the video in Laqta's own player, with playback
+speed, one-frame steps (`,` and `.`) and **Mark this moment** (M) for adding your own marks.
+Each event's symbol is on the seek bar: click a symbol to jump to just before that moment. Space plays and
 pauses, the arrow keys jump five seconds, F goes full screen. Recordings keep the game and your
 microphone on separate tracks; the sound menu lets you hear everything, the game alone or your
 microphone alone. "Open in another player" is still there.
@@ -235,7 +236,7 @@ fullscreen, Laqta asks once with a toast, and clicking the toast adds it.
 
 | Game | How | State |
 |---|---|---|
-| League of Legends | Riot's Live Client Data API | Works. Checked against a real match's event list. |
+| League of Legends | Riot's Live Client Data API | Works. Checked against a real match's event list. | Also notes the champion and game mode of each match (written from Riot's documentation; not yet seen in a real match).
 | Counter-Strike 2 | Valve Game State Integration | Written and unit-tested with hand-built payloads. Not yet run in a real match. |
 | Rocket League | The game's own Stats API | Works in real matches: one evening of play gave match starts and ends, goals, assists, saves, demolitions and results. Not yet checked event by event against what happened on screen. |
 | Valorant | Screen analysis | Framework and calibration tool only. It has no template images yet, so it detects nothing. Needs a real recording. |

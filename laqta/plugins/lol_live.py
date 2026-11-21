@@ -91,6 +91,35 @@ class Tracker:
         return [GameEvent("match_end", now)] if ended else []
 
 
+# Riot's names for game modes (gamestats.gameMode), as players know them.
+MODES = {
+    "CLASSIC": "Summoner's Rift", "ARAM": "ARAM", "CHERRY": "Arena", "URF": "URF", "ARURF": "ARURF",
+    "ONEFORALL": "One for All", "NEXUSBLITZ": "Nexus Blitz", "STRAWBERRY": "Swarm", "PRACTICETOOL": "Practice Tool",
+    "TUTORIAL": "Tutorial", "ULTBOOK": "Ultimate Spellbook",
+}  # fmt: skip
+
+
+def match_details(players, stats, me: str) -> dict:
+    """Champion, team and game mode of this match for the local player, from the playerlist and
+    gamestats answers. Pure; whatever is missing is simply left out."""
+    found: dict = {}
+    me = _name(me)
+    for player in players if isinstance(players, list) else ():
+        if not isinstance(player, dict):
+            continue
+        names = {_name(player.get(key)) for key in ("riotIdGameName", "riotId", "summonerName")}
+        if me and me in names:
+            if player.get("championName"):
+                found["champion"] = str(player["championName"])
+            if player.get("team"):
+                found["team"] = str(player["team"])
+            break
+    mode = stats.get("gameMode") if isinstance(stats, dict) else None
+    if mode:
+        found["mode"] = MODES.get(str(mode).upper(), str(mode).title())
+    return found
+
+
 # -- plugin -----------------------------------------------------------------------
 
 
@@ -135,7 +164,18 @@ class LolPlugin(GamePlugin):
             me = self._fetch("activeplayername")
             if not isinstance(me, str) or not me:
                 return [], None  # still on the loading screen
-        return tracker.update(data.get("Events") or [], me, now), me
+        events = tracker.update(data.get("Events") or [], me, now)
+        if any(e.type == "match_start" for e in events):
+            # Asked once a match: which champion, which mode. Kept on the match_start mark, so a
+            # recording can say "Ahri, Summoner's Rift" without another request later.
+            players, stats = self._fetch("playerlist"), self._fetch("gamestats")
+            if dump := os.environ.get("LAQTA_LOL_DUMP"):  # keep these answers too, to check the format against
+                with open(dump + ".details.json", "w", encoding="utf-8") as f:
+                    json.dump({"playerlist": players, "gamestats": stats, "me": me}, f, indent=1)
+            details = match_details(players, stats, me)
+            events = [GameEvent(e.type, e.t, e.confidence, e.source, {**e.data, **details}) if e.type == "match_start" else e
+                      for e in events]
+        return events, me
 
     def _run(self, emit: Callable[[GameEvent], None]) -> None:
         tracker, me = Tracker(), None

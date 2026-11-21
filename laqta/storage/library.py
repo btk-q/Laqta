@@ -147,6 +147,11 @@ def usage(clips: list[Clip]) -> list[tuple[str, int, int]]:
     return sorted(((game, size, count) for game, (size, count) in per.items()), key=lambda row: -row[1])
 
 
+def match_info(clip: Clip) -> dict:
+    """Champion and mode a plugin noted at the start of the match (League), if any."""
+    return next((dict(e.get("data") or {}) for e in clip.events if e.get("type") == "match_start" and e.get("data")), {})
+
+
 def summary(clip: Clip) -> dict | None:
     """Kills / deaths / assists and the result, for a video whose plugin reported events."""
     counted = [e["type"] for e in clip.events]

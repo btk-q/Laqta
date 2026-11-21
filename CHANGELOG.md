@@ -2,6 +2,17 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## 0.8.0
+
+### New
+- **The player got faster to use.** Choose the playback speed, step one frame at a time with
+  `,` and `.`, and press **Mark this moment** (or M) to add your own mark while watching; it
+  shows on the seek bar and in the trim window. The volume you set is remembered.
+- **League cards name your champion**, and the side panel shows the champion and game mode
+  (Summoner's Rift, ARAM, Arena and so on) for matches recorded from now on.
+- **A clear message when something goes wrong**, with a "Save diagnostic file" button,
+  instead of a box full of code.
+
 ## 0.7.0
 
 ### New

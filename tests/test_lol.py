@@ -123,3 +123,53 @@ def test_plugin_thread_starts_and_stops_cleanly():
     plugin.stop()
     plugin.stop()
     assert seen == []
+
+
+# Shapes from Riot's Live Client Data documentation (playerlist, gamestats). Not yet compared
+# with a real answer: LAQTA_LOL_DUMP now also saves these, to check against.
+PLAYERS = [
+    {"championName": "Ahri", "riotId": "Riot Tuxedo#EUW", "riotIdGameName": "Riot Tuxedo", "summonerName": "Riot Tuxedo#EUW",
+     "team": "ORDER", "scores": {"kills": 0, "deaths": 0, "assists": 0}},
+    {"championName": "Garen", "riotId": "Enemy#NA1", "riotIdGameName": "Enemy", "team": "CHAOS"},
+]
+
+
+def test_match_details_for_the_local_player():
+    from laqta.plugins.lol_live import match_details
+
+    assert match_details(PLAYERS, {"gameMode": "CLASSIC", "gameTime": 12.5}, "Riot Tuxedo#EUW") == {
+        "champion": "Ahri", "team": "ORDER", "mode": "Summoner's Rift"}
+    assert match_details(PLAYERS, {"gameMode": "ARAM"}, "Enemy")["champion"] == "Garen"
+    assert match_details(PLAYERS, {"gameMode": "NEWMODE"}, "nobody") == {"mode": "Newmode"}
+    assert match_details(None, None, "x") == {} and match_details("oops", [], "x") == {}
+
+
+def test_match_start_carries_the_details_and_they_are_asked_for_once():
+    from laqta.plugins.lol_live import LolPlugin, Tracker
+
+    asked = []
+    answers = {"eventdata": {"Events": [{"EventID": 0, "EventName": "GameStart", "EventTime": 0.0}]},
+               "activeplayername": "Riot Tuxedo#EUW", "playerlist": PLAYERS, "gamestats": {"gameMode": "CHERRY"}}
+
+    def fetch(path):
+        asked.append(path)
+        return answers[path]
+
+    plugin, tracker = LolPlugin(fetch), Tracker()
+    events, me = plugin.poll(tracker, None, 1.0)
+    (start,) = [e for e in events if e.type == "match_start"]
+    assert start.data == {"champion": "Ahri", "team": "ORDER", "mode": "Arena"}
+    plugin.poll(tracker, me, 2.0)
+    assert asked.count("playerlist") == 1 and asked.count("gamestats") == 1
+
+
+def test_the_card_names_the_champion():
+    import datetime
+    from pathlib import Path
+
+    from laqta.storage.library import Clip, match_info
+
+    events = ({"type": "match_start", "offset": 1.0, "data": {"champion": "Ahri", "mode": "ARAM"}}, {"type": "kill", "offset": 9.0})
+    clip = Clip(Path("a.mkv"), "League of Legends", datetime.datetime(2026, 11, 22), 1, "recording", events, 600.0)
+    assert match_info(clip) == {"champion": "Ahri", "mode": "ARAM"}
+    assert match_info(Clip(Path("b.mkv"), "x", datetime.datetime(2026, 11, 22), 1, "clip")) == {}

@@ -246,8 +246,12 @@ class Card(QStyledItemDelegate):
         painter.setPen(QColor(c["muted"]))
         line.translate(0, 20)
         stats = library.summary(clip)
+        champion = library.match_info(clip).get("champion")
         if stats and (stats["kills"] or stats["deaths"] or stats["assists"]) and "goals" not in stats:
-            about = f"{t('card.kda', kills=stats['kills'], deaths=stats['deaths'], assists=stats['assists'])}   {size_text(clip.size)}"
+            kda = t('card.kda', kills=stats['kills'], deaths=stats['deaths'], assists=stats['assists'])
+            about = f"{champion}   {kda}" if champion else f"{kda}   {size_text(clip.size)}"
+        elif champion:
+            about = f"{champion}   {size_text(clip.size)}"
         else:
             about = size_text(clip.size)
         painter.drawText(line, lead | Qt.AlignmentFlag.AlignVCenter, about)
@@ -742,7 +746,9 @@ class LibraryWindow(QDialog):
         if clip:
             self.title.setText(clip.game)
             length = f"{clock(clip.seconds)}   " if clip.seconds else ""
-            self.about.setText(f"{when_text(clip.when)}\n{length}{size_text(clip.size)}")
+            info = library.match_info(clip)
+            played = ", ".join(v for v in (info.get("champion"), info.get("mode")) if v)
+            self.about.setText("\n".join(filter(None, (played, when_text(clip.when), f"{length}{size_text(clip.size)}"))))
             picture = QPixmap(self.thumbs.get(str(clip.path), "")) if str(clip.path) in self.thumbs else placeholder(clip.game)
             self.preview.setPixmap(rounded(picture, self.PREVIEW, 8))
         self.buttons[1].setText(t("library.unfavorite" if clip and clip.favorite else "library.favorite"))
