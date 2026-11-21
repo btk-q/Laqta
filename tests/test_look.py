@@ -106,3 +106,22 @@ def test_a_games_icon_is_read_from_its_program_file_and_kept(tmp_path, monkeypat
     assert gameicons.get("somegame.EXE") is not None  # found again from disk, whatever the letter case
     assert gameicons.blank().width() == gameicons.SIZE
     gameicons._memory.clear()
+
+
+def test_videos_can_be_sorted_by_date_size_or_length():
+    import datetime
+    from pathlib import Path
+
+    from laqta.storage.library import Clip
+    from laqta.ui.library import grouped
+
+    def clip(game, day, hour, size, seconds):
+        return Clip(Path(f"{game}-{day}-{hour}.mkv"), game, datetime.datetime(2026, 11, day, hour), size, "clip", (), seconds)
+
+    clips = [clip("LoL", 10, 9, 500, 60), clip("CS2", 11, 8, 900, None), clip("LoL", 11, 20, 100, 300)]
+    assert [(g, d.day) for g, d, _ in grouped(clips, "oldest")] == [("LoL", 10), ("CS2", 11), ("LoL", 11)]
+    ((_, day, biggest),) = grouped(clips, "biggest")
+    assert day is None and [c.size for c in biggest] == [900, 500, 100]
+    ((_, _, longest),) = grouped(clips, "longest")
+    assert [c.seconds for c in longest] == [300, 60, None]  # a length that is not known yet goes last
+    assert grouped([], "biggest") == []

@@ -23,6 +23,7 @@ from . import gameicons, icons, theme
 
 THUMB = QSize(256, 144)
 HEADING_ROLE = Qt.ItemDataRole.UserRole + 1  # (game, day) on the grid's heading rows
+FLAT_ROLE = Qt.ItemDataRole.UserRole + 2  # in a list sorted by size or length: the card names its game and day
 CACHE = config.DIR / "thumbs"
 
 
@@ -48,11 +49,19 @@ def day_text(day: datetime.date, today: datetime.date | None = None) -> str:
     return t("library.today") if days == 0 else t("library.yesterday") if days == 1 else day.strftime("%Y-%m-%d")
 
 
-def grouped(clips: list[Clip]) -> list[tuple[str, datetime.date, list[Clip]]]:
-    """Videos as the window shows them: one group per game per day, newest day first, and
-    inside a day the game played most recently first."""
+ORDERS = ("newest", "oldest", "biggest", "longest")
+
+
+def grouped(clips: list[Clip], order: str = "newest") -> list[tuple[str, datetime.date | None, list[Clip]]]:
+    """Videos as the window shows them. By date: one group per game per day (newest or oldest
+    day first, and within a day by time). By size or length: one list, biggest or longest first,
+    under one heading that says so (the day is then None)."""
+    if order in ("biggest", "longest"):
+        key = (lambda c: c.size) if order == "biggest" else (lambda c: c.seconds or 0)
+        ranked = sorted(clips, key=lambda c: (-key(c), -c.when.timestamp()))
+        return [(t(f"library.sort_{order}"), None, ranked)] if ranked else []
     groups: dict[tuple[datetime.date, str], list[Clip]] = {}
-    for clip in sorted(clips, key=lambda c: c.when, reverse=True):
+    for clip in sorted(clips, key=lambda c: c.when, reverse=order != "oldest"):
         groups.setdefault((clip.when.date(), clip.game), []).append(clip)
     return [(game, day, members) for (day, game), members in groups.items()]
 
@@ -161,6 +170,7 @@ class Card(QStyledItemDelegate):
 
     def _heading(self, painter: QPainter, option, index, lead) -> None:
         game, day = index.data(HEADING_ROLE)
+        day = day or ""
         c = theme.current
         painter.save()
         box = QRectF(option.rect).adjusted(self.PAD + 2, 12, -self.PAD, 0)
@@ -239,7 +249,7 @@ class Card(QStyledItemDelegate):
         title.setWeight(QFont.Weight.DemiBold)
         painter.setFont(title)
         painter.setPen(QColor(c["text"]))
-        painter.drawText(line, lead | Qt.AlignmentFlag.AlignVCenter, painter.fontMetrics().elidedText(f"{t('card.' + clip.kind) if clip.kind in ('clip', 'recording') else clip.kind}  {clip.when:%H:%M}", Qt.TextElideMode.ElideRight, int(line.width())))
+        painter.drawText(line, lead | Qt.AlignmentFlag.AlignVCenter, painter.fontMetrics().elidedText(f"{clip.game}  {when_text(clip.when)}" if index.data(FLAT_ROLE) else f"{t('card.' + clip.kind) if clip.kind in ('clip', 'recording') else clip.kind}  {clip.when:%H:%M}", Qt.TextElideMode.ElideRight, int(line.width())))
         sub = QFont(option.font)
         sub.setPixelSize(12)
         painter.setFont(sub)
@@ -396,6 +406,12 @@ class LibraryWindow(QDialog):
 
         # -- filters ---------------------------------------------------------------------
         self.game, self.event, self.days, self.kind = QComboBox(), QComboBox(), QComboBox(), QComboBox()
+        self.order = QComboBox()
+        for name in ORDERS:
+            self.order.addItem(t(f"library.order_{name}"), name)
+        self.order.setToolTip(t("library.order"))
+        self.order.setAccessibleName(t("library.order"))
+        self.order.currentIndexChanged.connect(lambda _: self.reload(self.selected().path if self.selected() else None))
         for label, value in (("library.all_time", None), ("library.today", 1), ("library.week", 7), ("library.month", 30)):
             self.days.addItem(t(label), value)
         for label, value in (("library.everything", None), ("library.clips", "clip"), ("library.recordings", "recording")):
@@ -418,6 +434,7 @@ class LibraryWindow(QDialog):
             combo.currentIndexChanged.connect(self._filter)
             filters.addWidget(combo)
         filters.addWidget(self.favorites)
+        filters.addWidget(self.order)
 
         # -- the videos ------------------------------------------------------------------
         self.grid = QListWidget()
@@ -433,6 +450,7 @@ class LibraryWindow(QDialog):
         self.grid.itemSelectionChanged.connect(self._selection_changed)
         self.grid.verticalScrollBar().valueChanged.connect(lambda _: self._want_thumbnails())
         self._asked: set[str] = set()  # videos whose picture has been asked for in this window
+        self._pictures: dict[str, QIcon] = {}
         self.grid.itemDoubleClicked.connect(lambda _: self._play())
         self.empty = QLabel()
         self.empty.setObjectName("empty")
@@ -651,16 +669,20 @@ class LibraryWindow(QDialog):
         self.grid.clear()
         self.items.clear()
         self.icon_finder.find([self.exe_of[c.game.casefold()] for c in self.clips if c.game.casefold() in self.exe_of])
-        for game, day, members in grouped(self.clips):
+        for game, day, members in grouped(self.clips, self.order.currentData()):
             heading = QListWidgetItem()
             heading.setFlags(Qt.ItemFlag.NoItemFlags)  # not a video: cannot be selected
-            heading.setData(HEADING_ROLE, (game, day_text(day)))
-            if (exe := self.exe_of.get(game.casefold())) and (picture := gameicons.get(exe)):
+            heading.setData(HEADING_ROLE, (game, day_text(day) if day else ""))
+            if day and (exe := self.exe_of.get(game.casefold())) and (picture := gameicons.get(exe)):
                 heading.setData(Qt.ItemDataRole.DecorationRole, picture)
             self.grid.addItem(heading)
             for clip in members:
-                item = QListWidgetItem(QIcon(placeholder(clip.game)), caption(clip))
+                # A picture this window already has goes straight back on: the list is rebuilt after
+                # every sort, favourite or delete, and the pictures must not vanish when it is.
+                known = self.thumbs.get(str(clip.path))
+                item = QListWidgetItem(self._picture(known) if known else QIcon(placeholder(clip.game)), caption(clip))
                 item.setData(Qt.ItemDataRole.UserRole, clip)
+                item.setData(FLAT_ROLE, day is None)
                 item.setToolTip(str(clip.path))
                 self.grid.addItem(item)
                 self.items[str(clip.path)] = item
@@ -674,9 +696,15 @@ class LibraryWindow(QDialog):
             self.thumbs[video] = thumb
             if (chosen := self.selected()) and str(chosen.path) == video:
                 self._selection_changed()
+            item.setIcon(self._picture(thumb))
+
+    def _picture(self, thumb: str) -> QIcon:
+        """A thumbnail file cropped to fill a card, made once per window."""
+        if thumb not in self._pictures:
             pixmap = QPixmap(thumb).scaled(THUMB, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
             x, y = (pixmap.width() - THUMB.width()) // 2, (pixmap.height() - THUMB.height()) // 2
-            item.setIcon(QIcon(pixmap.copy(x, y, THUMB.width(), THUMB.height())))
+            self._pictures[thumb] = QIcon(pixmap.copy(x, y, THUMB.width(), THUMB.height()))
+        return self._pictures[thumb]
 
     def _filter(self) -> None:
         shown, total, heading = 0, 0, None
