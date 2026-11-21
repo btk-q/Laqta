@@ -143,3 +143,15 @@ def test_instant_replay_marks_the_moment_while_recording_and_does_nothing_otherw
 
 def test_recorder_exposes_no_new_required_arguments():
     assert Recorder.instant_replay.__name__ == "instant_replay"
+
+
+def test_space_per_game_biggest_first():
+    import datetime as dt
+
+    from laqta.storage.library import Clip, usage
+
+    def clip(game, size):
+        return Clip(Path(f"{game}-{size}.mkv"), game, dt.datetime(2026, 11, 22), size, "clip")
+
+    rows = usage([clip("LoL", 5), clip("RL", 30), clip("LoL", 10), clip("Hades", 1)])
+    assert rows == [("RL", 30, 1), ("LoL", 15, 2), ("Hades", 1, 1)] and usage([]) == []

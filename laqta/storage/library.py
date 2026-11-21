@@ -120,6 +120,16 @@ def set_meta(path: Path, **fields) -> None:
     tmp.replace(sidecar)  # never leave half a file where the event marks were
 
 
+def usage(clips: list[Clip]) -> list[tuple[str, int, int]]:
+    """Space taken per game, biggest first: (game, bytes, number of videos)."""
+    per: dict[str, list[int]] = {}
+    for clip in clips:
+        entry = per.setdefault(clip.game, [0, 0])
+        entry[0] += clip.size
+        entry[1] += 1
+    return sorted(((game, size, count) for game, (size, count) in per.items()), key=lambda row: -row[1])
+
+
 def summary(clip: Clip) -> dict | None:
     """Kills / deaths / assists and the result, for a video whose plugin reported events."""
     counted = [e["type"] for e in clip.events]

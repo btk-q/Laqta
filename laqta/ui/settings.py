@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import copy
+import os
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QCheckBox, QGridLayout, QColorDialog, QComboBox, QDialog, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QKeySequenceEdit, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
+    QListWidget, QListWidgetItem, QProgressBar, QPushButton, QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
 )  # fmt: skip
 
 from ..core import health
@@ -20,9 +21,10 @@ from ..i18n import LANGUAGES, t
 from ..obs_controller import audio, encoders
 from ..obs_controller.capture import KINDS
 from ..plugins import PLUGINS
-from ..storage import autostart, clips, config
+from ..storage import autostart, clips, config, library
 from ..storage.clips import usable_folder
 from . import gameicons, icons, theme
+from .library import size_text
 
 # -- config edits (no Qt: unit-tested) ------------------------------------------------
 
@@ -219,7 +221,7 @@ class SettingsWindow(QDialog):
         self.rail.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.pages = QStackedWidget()
         for key, page in (("nav.general", self._general()), ("nav.games", self._games()), ("nav.recording", self._recording()),
-                          ("nav.audio", self._audio()), ("nav.appearance", self._appearance()), ("nav.sharing", self._sharing()), ("nav.health", self._health())):
+                          ("nav.storage", self._storage()), ("nav.audio", self._audio()), ("nav.appearance", self._appearance()), ("nav.sharing", self._sharing()), ("nav.health", self._health())):
             self.rail.addItem(t(key))
             scroll = QScrollArea()  # pages outgrow a 768-pixel-high screen
             scroll.setWidgetResizable(True)
@@ -398,31 +400,8 @@ class SettingsWindow(QDialog):
         form.addRow(t("rec.pre"), self.pre)
         form.addRow(t("rec.post"), self.post)
         form.addRow(t("rec.max_clip"), self.max_clip)
-        self.cleanup_days = _spin(self.cfg["cleanup_days"], 0, 3650)
-        self.cleanup_gb = _spin(self.cfg["cleanup_gb"], 0, 100000)
         form.addRow(t("rec.debounce"), self.debounce)
-        form.addRow(t("rec.cleanup_days"), self.cleanup_days)
-        form.addRow(t("rec.cleanup_gb"), self.cleanup_gb)
-        self.min_free = _spin(self.cfg["min_free_gb"], 0, 1000)
-        self.min_free.setSpecialValueText(t("rec.min_free_off"))
-        form.addRow(t("rec.min_free"), self.min_free)
-        form.addRow("", _label(t("rec.min_free_hint"), "hint"))
         layout.addLayout(form)
-        layout.addWidget(_label(t("rec.cleanup_hint"), "hint"))
-        self.save_folder = QLineEdit(self.cfg["save_folder"] or str(clips.DEFAULT_ROOT))
-        self.save_folder.setReadOnly(True)  # chosen with the folder dialog, so it always exists
-        browse, default = QPushButton(t("rec.browse")), QPushButton(t("rec.use_default"))
-        browse.clicked.connect(self._browse_folder)
-        default.clicked.connect(lambda: self.save_folder.setText(str(clips.DEFAULT_ROOT)))
-        row = QHBoxLayout()
-        row.setSpacing(10)
-        row.addWidget(self.save_folder, 1)
-        row.addWidget(browse)
-        row.addWidget(default)
-        layout.addWidget(_label(t("rec.save_folder")))
-        layout.addLayout(row)
-        self.folder_note = _label(t("rec.save_hint"), "hint")
-        layout.addWidget(self.folder_note)
         layout.addStretch(1)
         return page
 
@@ -450,6 +429,87 @@ class SettingsWindow(QDialog):
             return self.folder_note.setText(t("rec.folder_bad", path=str(folder)))
         self.save_folder.setText(str(folder))
         self.folder_note.setText(t("rec.save_hint"))
+
+    # -- Storage ---------------------------------------------------------------
+
+    def _storage(self) -> QWidget:
+        page, layout = self._page("nav.storage")
+        self.space = QVBoxLayout()
+        self.space.setSpacing(8)
+        holder = QWidget()
+        holder.setObjectName("page")
+        holder.setLayout(self.space)
+        layout.addWidget(holder)
+        self._fill_space()
+        layout.addSpacing(12)
+        form = QFormLayout()
+        form.setVerticalSpacing(14)
+        form.setHorizontalSpacing(20)
+        self.cleanup_days = _spin(self.cfg["cleanup_days"], 0, 3650)
+        self.cleanup_gb = _spin(self.cfg["cleanup_gb"], 0, 100000)
+        form.addRow(t("rec.cleanup_days"), self.cleanup_days)
+        form.addRow(t("rec.cleanup_gb"), self.cleanup_gb)
+        self.min_free = _spin(self.cfg["min_free_gb"], 0, 1000)
+        self.min_free.setSpecialValueText(t("rec.min_free_off"))
+        form.addRow(t("rec.min_free"), self.min_free)
+        form.addRow("", _label(t("rec.min_free_hint"), "hint"))
+        layout.addLayout(form)
+        layout.addWidget(_label(t("rec.cleanup_hint"), "hint"))
+        layout.addSpacing(8)
+        self.save_folder = QLineEdit(self.cfg["save_folder"] or str(clips.DEFAULT_ROOT))
+        self.save_folder.setReadOnly(True)  # chosen with the folder dialog, so it always exists
+        browse, default, show = QPushButton(t("rec.browse")), QPushButton(t("rec.use_default")), QPushButton(t("storage.open"))
+        browse.clicked.connect(self._browse_folder)
+        default.clicked.connect(lambda: self.save_folder.setText(str(clips.DEFAULT_ROOT)))
+        show.clicked.connect(lambda: os.startfile(self.save_folder.text()) if Path(self.save_folder.text()).is_dir() else None)
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        row.addWidget(self.save_folder, 1)
+        row.addWidget(show)
+        row.addWidget(browse)
+        row.addWidget(default)
+        layout.addWidget(_label(t("rec.save_folder")))
+        layout.addLayout(row)
+        self.folder_note = _label(t("rec.save_hint"), "hint")
+        layout.addWidget(self.folder_note)
+        layout.addStretch(1)
+        return page
+
+    def _fill_space(self) -> None:
+        """How much room each game's videos take, and how much is left on the drive."""
+        rows = library.usage(library.scan(clips.ROOT))
+        total = sum(size for _, size, _ in rows)
+        free = clips.free_bytes()
+        self.space.addWidget(_label(t("storage.total", size=size_text(total), free=size_text(free) if free is not None else "?"), "gameName"))
+        biggest = rows[0][1] if rows else 1
+        for game, size, count in rows[:10]:
+            name = QLabel(game)
+            picture = QLabel()
+            exe = next((g["exe"] for g in self._effective().values() if (g.get("name") or g["exe"]).casefold() == game.casefold()), None)
+            if exe and (icon := gameicons.get(exe)):
+                picture.setPixmap(icon.scaled(20, 20, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            picture.setFixedWidth(22)
+            bar = QProgressBar()
+            bar.setRange(0, 1000)
+            bar.setValue(int(1000 * size / biggest))
+            bar.setTextVisible(False)
+            bar.setFixedHeight(8)
+            amount = QLabel(t("storage.row", size=size_text(size), count=count))
+            amount.setObjectName("muted")
+            line = QHBoxLayout()
+            line.setSpacing(10)
+            line.addWidget(picture)
+            name.setFixedWidth(170)
+            line.addWidget(name)
+            line.addWidget(bar, 1)
+            amount.setFixedWidth(150)
+            line.addWidget(amount)
+            box = QWidget()
+            box.setObjectName("page")
+            box.setLayout(line)
+            self.space.addWidget(box)
+        if not rows:
+            self.space.addWidget(_label(t("storage.empty"), "hint"))
 
     # -- Audio -----------------------------------------------------------------
 
@@ -828,7 +888,7 @@ class SettingsWindow(QDialog):
             return self.replay_hint.setText(t("general.hotkey_same"))
         webhook = self.webhook.text().strip()
         if webhook and not config.WEBHOOK.fullmatch(webhook):
-            self.rail.setCurrentRow(5)
+            self.rail.setCurrentRow(6)  # Sharing and updates
             return self.webhook_note.setText(t("share.webhook_bad"))
         if self.autostart.isChecked() != (self._autostart == "on"):  # only touch the registry when the box was changed
             try:
