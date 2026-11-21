@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from ..game_detector.detector import Detector, game_window, load_games
+from ..game_detector.detector import Detector, foreground_window, game_window, load_games, processes
 from ..i18n import t
 from ..obs_controller import setup
 from ..obs_controller.audio import Audio, Shout, mic_peak
@@ -44,6 +44,24 @@ def skipped_percent(before: int, after: int, seconds: float, fps: int) -> float:
     """Share of a recording's frames the encoder could not keep up with."""
     frames = max(1.0, seconds * fps)
     return max(0.0, min(100.0, 100.0 * (after - before) / frames))
+
+
+DESKTOP = {"exe": "desktop", "name": "Desktop", "capture": "monitor_capture"}
+NOT_RECORDABLE = {"explorer.exe", "laqta.exe", "python.exe", "pythonw.exe", "shellexperiencehost.exe", "searchhost.exe",
+                  "startmenuexperiencehost.exe", "applicationframehost.exe", "lockapp.exe"}
+
+
+def manual_game(front: tuple[int, str] | None, running: dict[int, str], games: dict[str, dict]) -> dict:
+    """What the start/stop hotkey records: the program in front (a game Laqta knows keeps its own
+    name and settings), or the whole screen when the desktop or Laqta itself is in front."""
+    exe = running.get(front[0], "") if front else ""
+    if not exe or exe.lower() in NOT_RECORDABLE:
+        return {**DESKTOP, "mode": "session", "manual": True}
+    known = games.get(exe.lower())
+    if known:
+        return {**known, "mode": "session", "manual": True}  # the whole session: the user decides when it ends
+    title = (front[1] or "").strip()
+    return {"exe": exe, "name": title[:60] if title else Path(exe).stem, "mode": "session", "manual": True}
 
 
 def with_usable_mode(game: dict) -> dict:
@@ -99,6 +117,10 @@ class Core(threading.Thread):
 
     def clip_now(self) -> None:
         self.inbox.put(("event", GameEvent("manual", time.monotonic(), source="manual")))
+
+    def record_now(self) -> None:
+        """The start/stop hotkey: record whatever is in front, or stop that recording."""
+        self.inbox.put(("record",))
 
     def replay_now(self) -> None:
         self.inbox.put(("replay", GameEvent("replay", time.monotonic(), source="manual")))
@@ -299,6 +321,8 @@ class Core(threading.Thread):
             rec.event(ev)
         elif kind == "obs":
             rec.obs_event(*args)
+        elif kind == "record":
+            self._toggle_manual()
         elif kind == "replay":
             if not rec.instant_replay(args[0], self.cfg["replay_seconds"]):
                 self.notify(t("toast.hotkey_idle") if rec.state == "active" else t("toast.no_game"))
@@ -318,6 +342,21 @@ class Core(threading.Thread):
                 self.obs.meters = wanted  # OBS is told at connect time
                 if rec.game is None and rec.next_deadline() is None:
                     self.obs.close()  # idle: reconnect for the next game with the new choice
+
+    def _toggle_manual(self) -> None:
+        rec = self.recorder
+        if rec.game is not None and rec.game.get("manual"):
+            name = rec.game.get("name")
+            rec.stop_now()
+            self.notify(t("toast.manual_stopped", game=name))
+            if self.detector.current is not None:  # a known game started meanwhile: record it now
+                self._start_game(self.detector.current)
+        elif rec.game is not None:
+            self.notify(t("toast.manual_busy", game=rec.game.get("name")))
+        else:
+            game = manual_game(foreground_window(), processes(), self.detector.games)
+            rec.game_started(game)
+            self.notify(t("toast.manual_started", game=game["name"], hotkey=self.cfg["record_hotkey"]))
 
     def _start_game(self, game: dict) -> None:
         self.recorder.game_started(with_usable_mode(game))
@@ -367,7 +406,8 @@ class Core(threading.Thread):
                     if change and change[0] == "game_started":
                         self._start_game(change[1])
                     elif change and change[0] == "game_exited":
-                        self.recorder.game_exited()
+                        if not (self.recorder.game or {}).get("manual"):  # a recording started by hand ends by hand
+                            self.recorder.game_exited()
                     elif change:
                         self.on_prompt(change[1])
                 self.recorder.tick()

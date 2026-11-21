@@ -78,6 +78,20 @@ class _MonitorInfo(ctypes.Structure):
     _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT), ("rcWork", wintypes.RECT), ("dwFlags", wintypes.DWORD)]
 
 
+def foreground_window() -> tuple[int, str] | None:
+    """(pid, window title) of the window in front, whatever its size. Asks the window manager only."""
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.GetForegroundWindow.restype = wintypes.HWND
+    window = user32.GetForegroundWindow()
+    if not window:
+        return None
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(window, ctypes.byref(pid))
+    title = ctypes.create_unicode_buffer(256)
+    user32.GetWindowTextW(window, title, 256)
+    return pid.value, title.value
+
+
 def foreground_fullscreen() -> tuple[int, str] | None:
     """(pid, window title) if the foreground window covers its whole monitor, else None."""
     user32 = ctypes.WinDLL("user32", use_last_error=True)

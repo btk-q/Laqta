@@ -320,8 +320,12 @@ class SettingsWindow(QDialog):
         self.replay_seconds = _spin(self.cfg["replay_seconds"], 5, 300)
         self.replay_hint = _label(t("general.replay_hint"), "hint")
         form.addRow(t("general.replay_hotkey"), self.replay_hotkey)
+        self.record_hotkey = QKeySequenceEdit(QKeySequence(self.cfg["record_hotkey"]))
+        self.record_hotkey.setMaximumSequenceLength(1)
         form.addRow(t("general.replay_seconds"), self.replay_seconds)
         form.addRow("", self.replay_hint)
+        form.addRow(t("general.record_hotkey"), self.record_hotkey)
+        form.addRow("", _label(t("general.record_hint"), "hint"))
         form.addRow(t("general.default_mode"), self.default_mode)
         form.addRow("", self.default_mode_help)
         layout.addLayout(form)
@@ -883,7 +887,8 @@ class SettingsWindow(QDialog):
     def _save(self) -> None:
         clip_key = self.hotkey.keySequence().toString() or self.cfg["hotkey"]
         replay_key = self.replay_hotkey.keySequence().toString() or self.cfg["replay_hotkey"]
-        if clip_key == replay_key:  # one key cannot do both: say so instead of silently breaking one
+        record_key = self.record_hotkey.keySequence().toString() or self.cfg["record_hotkey"]
+        if len({clip_key, replay_key, record_key}) < 3:  # one key cannot do two things: say so instead of silently breaking one
             self.rail.setCurrentRow(0)
             return self.replay_hint.setText(t("general.hotkey_same"))
         webhook = self.webhook.text().strip()
@@ -898,6 +903,7 @@ class SettingsWindow(QDialog):
                 return self.autostart_note.setText(t("general.autostart_failed", error=e))
         self.cfg.update(
             replay_hotkey=replay_key,
+            record_hotkey=record_key,
             replay_seconds=self.replay_seconds.value(),
             language=self.language.currentData(),
             hotkey=self.hotkey.keySequence().toString() or self.cfg["hotkey"],

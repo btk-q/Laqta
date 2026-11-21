@@ -2,6 +2,20 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## 0.7.0
+
+### New
+- **Start and stop a recording yourself** with Ctrl+Alt+F11 (or from the tray menu): for a
+  game Laqta doesn't know, or anything else on screen. Press it again to stop.
+- **Select several videos** with Ctrl-click or Shift-click, then favourite, export or delete
+  them together, or make a highlight reel from just those.
+- **Storage page** in Settings: how much space each game's videos take, how much is free, and
+  the cleanup and folder settings in one place.
+
+### Fixed
+- Arabic: game names and lines that begin with a number now line up from the right, and
+  choice tiles start on the right.
+
 ## 0.6.1
 
 **Fixes from a real evening of play.**

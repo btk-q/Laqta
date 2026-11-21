@@ -89,6 +89,9 @@ Two hotkeys, both changeable in **Settings → General**:
 
 - **Ctrl+Alt+F9, clip:** in Events only, saves a clip around this moment (with time before and
   after). In the recording modes it adds a mark.
+- **Ctrl+Alt+F11, start/stop recording:** records whatever is in front until you press it again:
+  a game Laqta doesn't know, a game that is in the list (in Full session), or the whole screen
+  when the desktop is in front.
 - **Ctrl+Alt+F10, instant replay:** saves the last 30 seconds, ending the moment you press it.
   In the recording modes it adds a mark.
 
@@ -102,7 +105,9 @@ event happened; click a symbol there to open the trim window on that moment.
 in the middle of changing stay as they are while you look at your clips, until you press Save
 changes or Cancel. Each game shows its own icon, read from the game's program file on your PC.
 
-**Clips window:** videos are grouped by game and day, newest first. Search by game, tag or event; filter by game, event, date and favourites;
+**Clips window:** videos are grouped by game and day, newest first. Ctrl-click or Shift-click to
+select several and favourite, export, delete them, or make a highlight reel from just those.
+**Settings → Storage** shows how much space each game's videos take. Search by game, tag or event; filter by game, event, date and favourites;
 play, tag, export as MP4, show in folder, or delete to the Recycle Bin.
 
 **Watching:** Play (or a double-click) opens the video in Laqta's own player, with each event's
