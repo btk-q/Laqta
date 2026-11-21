@@ -90,6 +90,9 @@ class Recorder:
         self._marks: list[GameEvent] = []
         self._in_match = False
         self._stop_at: float | None = None  # match ended; stop after the post-roll
+        self._paused_at: float | None = None  # clock when the recording was paused (None = not paused)
+        self._pauses: list[tuple[float, float]] = []  # (from, to) of each pause in the current recording
+        self.paused_total = 0.0  # seconds the recording just finished spent paused (read by on_recording)
 
     @property
     def replay_seconds(self) -> int:
@@ -161,7 +164,7 @@ class Recorder:
                 # Merge: push the save back, but never past what the replay buffer still holds.
                 self._window[1] = min(ev.t + self.post, self._window[0] + self.max_clip)
                 self._events.append(ev)
-        elif self._rec_start is not None:
+        elif self._rec_start is not None and self._paused_at is None:  # nothing is recorded while paused
             self._marks.append(ev)  # every recording mode keeps marks: a recording without them cannot be searched
 
     @_obs_guard
@@ -216,10 +219,33 @@ class Recorder:
             self._pending = (self.game, events, keep, keep - (ev.t - events[0].t))
             self._save_timeout = self.clock() + SAVE_TIMEOUT
             return True
-        if self._rec_start is not None:
+        if self._rec_start is not None and self._paused_at is None:
             self._marks.append(ev)
             return True
         return False
+
+    @property
+    def paused(self) -> bool:
+        return self._paused_at is not None
+
+    @_obs_guard
+    def toggle_pause(self) -> str | None:
+        """Pause or resume the running recording (queues, loading screens, a break). Returns
+        "paused", "resumed", or None when there is no recording to pause (Events only keeps none)."""
+        if not self.recording:
+            return None
+        if self._paused_at is None:
+            self.obs.call("PauseRecord")
+            self._paused_at = self.clock()
+            return "paused"
+        self.obs.call("ResumeRecord")
+        self._pauses.append((self._paused_at, self.clock()))
+        self._paused_at = None
+        return "resumed"
+
+    def _video_time(self, t: float) -> float:
+        """A clock reading as a clock reading of the video: minus the paused time before it."""
+        return t - sum(min(b, t) - a for a, b in self._pauses if a < t)
 
     @_obs_guard
     def stop_now(self) -> None:
@@ -273,10 +299,17 @@ class Recorder:
     def _start_record(self) -> None:
         self.obs.call("StartRecord")
         self._rec_start, self._marks = self.clock(), []
+        self._paused_at, self._pauses = None, []
 
     def _stop_record(self) -> None:
-        start, marks = self._rec_start, self._marks
+        if self._paused_at is not None:  # stopped while paused: the pause runs to the end
+            self._pauses.append((self._paused_at, self.clock()))
+        # Marks are moved back by the pauses before them, so they point at the right moment in the video.
+        marks = [GameEvent(m.type, self._video_time(m.t), m.confidence, m.source, m.data) for m in self._marks]
+        start = self._rec_start
+        self.paused_total = sum(b - a for a, b in self._pauses)
         self._rec_start, self._marks, self._stop_at = None, [], None
+        self._paused_at, self._pauses = None, []
         path = Path(self.obs.call("StopRecord")["outputPath"])
         self.on_recording(path, self.game, marks, start)
 

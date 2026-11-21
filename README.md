@@ -92,6 +92,9 @@ Two hotkeys, both changeable in **Settings → General**:
 - **Ctrl+Alt+F11, start/stop recording:** records whatever is in front until you press it again:
   a game Laqta doesn't know, a game that is in the list (in Full session), or the whole screen
   when the desktop is in front.
+- **Ctrl+Alt+F12, pause/resume:** pauses the running recording (a queue, a loading screen, a
+  break) and carries on when pressed again. The paused time is not in the video, and marks
+  still point at the right moments.
 - **Ctrl+Alt+F10, instant replay:** saves the last 30 seconds, ending the moment you press it.
   In the recording modes it adds a mark.
 
@@ -121,7 +124,8 @@ microphone alone. "Open in another player" is still there.
 **Trim and export** shows the same player above a filmstrip with two handles and a symbol for
 each event. Drag the handles (or use the arrow keys), click a symbol to jump to it, or
 double-click it to select a clip around it; "Play selection" plays from one handle to the
-other. Then save a trimmed copy, or export as vertical 9:16, as a Discord-sized file under
+other. Then save a trimmed copy, **save a copy without the selected part** (a loading screen, a long
+wait), or export as vertical 9:16, as a Discord-sized file under
 10 MB, or as 1080p 60 MP4, with a progress bar and Cancel. "Leave my microphone out" uses the
 game-sound track.
 

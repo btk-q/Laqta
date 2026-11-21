@@ -163,6 +163,9 @@ class SettingsWindow(QDialog):
         form.addRow(t("general.replay_seconds"), self.replay_seconds)
         form.addRow("", self.replay_hint)
         form.addRow(t("general.record_hotkey"), self.record_hotkey)
+        self.pause_hotkey = QKeySequenceEdit(QKeySequence(self.cfg["pause_hotkey"]))
+        self.pause_hotkey.setMaximumSequenceLength(1)
+        form.addRow(t("general.pause_hotkey"), self.pause_hotkey)
         form.addRow("", _label(t("general.record_hint"), "hint"))
         form.addRow(t("general.default_mode"), self.default_mode)
         form.addRow("", self.default_mode_help)
@@ -726,7 +729,8 @@ class SettingsWindow(QDialog):
         clip_key = self.hotkey.keySequence().toString() or self.cfg["hotkey"]
         replay_key = self.replay_hotkey.keySequence().toString() or self.cfg["replay_hotkey"]
         record_key = self.record_hotkey.keySequence().toString() or self.cfg["record_hotkey"]
-        if len({clip_key, replay_key, record_key}) < 3:  # one key cannot do two things: say so instead of silently breaking one
+        pause_key = self.pause_hotkey.keySequence().toString() or self.cfg["pause_hotkey"]
+        if len({clip_key, replay_key, record_key, pause_key}) < 4:  # one key cannot do two things: say so instead of silently breaking one
             self.rail.setCurrentRow(0)
             return self.replay_hint.setText(t("general.hotkey_same"))
         webhook = self.webhook.text().strip()
@@ -742,6 +746,7 @@ class SettingsWindow(QDialog):
         self.cfg.update(
             replay_hotkey=replay_key,
             record_hotkey=record_key,
+            pause_hotkey=pause_key,
             replay_seconds=self.replay_seconds.value(),
             language=self.language.currentData(),
             hotkey=self.hotkey.keySequence().toString() or self.cfg["hotkey"],

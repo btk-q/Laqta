@@ -53,6 +53,8 @@ def _with_dot(base: QPixmap, color: str) -> QIcon:
 def status_text(s: dict) -> str:
     if s["state"] != "active":
         key = f"status.{s['state']}"
+    elif s.get("paused"):
+        key = "status.paused"
     elif s["mode"] == "match":
         key = "status.match_rec" if s["recording"] else "status.match_wait"
     else:
@@ -76,6 +78,7 @@ class TrayApp:
         self.hotkey: Hotkey | None = None
         self.replay_key: Hotkey | None = None
         self.record_key: Hotkey | None = None
+        self.pause_key: Hotkey | None = None
         self.popup: Toast | None = None  # made on first use, and only if the user turned it on
 
         base = QPixmap(str(ICON))
@@ -116,6 +119,8 @@ class TrayApp:
         self.replay = self.menu.addAction(f"{t('menu.replay', seconds=self.cfg['replay_seconds'])}\t{self.cfg['replay_hotkey']}")
         self.replay.triggered.connect(self.core.replay_now)
         self.menu.addAction(f"{t('menu.record')}\t{self.cfg['record_hotkey']}").triggered.connect(self.core.record_now)
+        self.pause = self.menu.addAction(f"{t('menu.pause')}\t{self.cfg['pause_hotkey']}")
+        self.pause.triggered.connect(self.core.pause_now)
         self.menu.addAction(t("menu.library")).triggered.connect(self.open_library)
         self.menu.addAction(t("menu.folder")).triggered.connect(self._open_folder)
         self.menu.addAction(t("menu.settings")).triggered.connect(self.open_settings)
@@ -128,6 +133,7 @@ class TrayApp:
         self.hotkey = self._bind(self.hotkey, self.cfg["hotkey"], self.core.clip_now, 1)
         self.replay_key = self._bind(self.replay_key, self.cfg["replay_hotkey"], self.core.replay_now, 2)
         self.record_key = self._bind(self.record_key, self.cfg["record_hotkey"], self.core.record_now, 3)
+        self.pause_key = self._bind(self.pause_key, self.cfg["pause_hotkey"], self.core.pause_now, 4)
 
     def _bind(self, old: Hotkey | None, combo: str, callback, id: int) -> Hotkey | None:
         if old is not None:
@@ -153,7 +159,9 @@ class TrayApp:
         live = s["state"] == "active" and (s["recording"] or s["mode"] == "events")
         self.clip.setEnabled(live)
         self.replay.setEnabled(live)
-        kind = "rec" if live else "idle" if s["state"] == "idle" else "busy"
+        self.pause.setEnabled(s["state"] == "active" and s["recording"])
+        self.pause.setText(f"{t('menu.resume' if s.get('paused') else 'menu.pause')}	{self.cfg['pause_hotkey']}")
+        kind = "busy" if s.get("paused") else "rec" if live else "idle" if s["state"] == "idle" else "busy"
         self.tray.setIcon(self.icons[kind])
         if self.library is not None:
             self.library.set_state(text, kind)
@@ -264,7 +272,7 @@ class TrayApp:
         self.library.show_settings()
 
     def _make_settings(self) -> SettingsWindow:
-        keys = {self.cfg[name]: bool(key and key.registered) for name, key in (('hotkey', self.hotkey), ('replay_hotkey', self.replay_key), ('record_hotkey', self.record_key))}
+        keys = {self.cfg[name]: bool(key and key.registered) for name, key in (('hotkey', self.hotkey), ('replay_hotkey', self.replay_key), ('record_hotkey', self.record_key), ('pause_hotkey', self.pause_key))}
         self.settings = window = SettingsWindow(self.cfg, hotkeys=keys)
         window.finished.connect(lambda result: self._settings_closed(window, result))
         return window
@@ -279,13 +287,13 @@ class TrayApp:
         self.core.apply(self.cfg)
         if self.library is not None:
             self.library.set_webhook(self.cfg["discord_webhook"])
-        keys = ("hotkey", "replay_hotkey", "record_hotkey", "replay_seconds")
+        keys = ("hotkey", "replay_hotkey", "record_hotkey", "pause_hotkey", "replay_seconds")
         if self.cfg["language"] != old["language"] or any(self.cfg[k] != old[k] for k in keys):
             self._apply_language()
         if self.cfg["language"] != old["language"] and self.library is not None:
             # The main window's words are set when it is built: rebuild it in the new language.
             QTimer.singleShot(0, lambda: (self.library.close(), self.open_library()))
-        if any(self.cfg[k] != old[k] for k in keys[:3]):
+        if any(self.cfg[k] != old[k] for k in keys[:4]):
             self._bind_hotkey()
         theme.apply(self.app, self.cfg["accent"])
 
@@ -340,7 +348,7 @@ def run(cfg: dict, show: bool = True) -> int:
         tray.library.close()  # also closes the video player and lets go of its file, before Qt shuts down
     tray.core.quit()
     tray.core.join(timeout=10)
-    for key in (tray.hotkey, tray.replay_key, tray.record_key):
+    for key in (tray.hotkey, tray.replay_key, tray.record_key, tray.pause_key):
         if key is not None:
             key.unregister()
     tray.tray.hide()

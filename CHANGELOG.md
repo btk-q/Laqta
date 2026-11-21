@@ -2,6 +2,16 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## 0.9.0
+
+### New
+- **Pause a recording** with Ctrl+Alt+F12 (or from the tray menu) during a queue, a loading
+  screen or a break, and press it again to carry on. The paused time is left out of the video,
+  and marks still point at the right moments.
+- **Save a video without a part of it.** In the trim window, put the handles around a loading
+  screen or a long wait and press "Save without this part". You get a copy with that part
+  taken out; the original is kept.
+
 ## 0.8.1
 
 ### New

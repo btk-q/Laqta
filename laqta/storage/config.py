@@ -26,6 +26,7 @@ FPS = (30, 60, 120)
 DEFAULTS = {
     "language": "en",
     "hotkey": "Ctrl+Alt+F9",
+    "pause_hotkey": "Ctrl+Alt+F12",  # pause/resume the running recording
     "record_hotkey": "Ctrl+Alt+F11",  # start/stop a recording of whatever is in front, game or not
     "replay_hotkey": "Ctrl+Alt+F10",  # "what just happened": keep the last replay_seconds
     "replay_seconds": 30,

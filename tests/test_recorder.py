@@ -289,3 +289,29 @@ def test_obs_crash_mid_match_starts_a_new_segment(rig):
     rig.obs.active["GetRecordStatus"] = False
     rig.at(8)
     assert rig.obs.count("StartRecord") == 2 and rig.rec.recording
+
+
+
+def test_pausing_moves_later_marks_back_and_leaves_no_marks_from_the_pause(rig):
+    rig.rec.game_started(dict(SESSION, mode="hybrid"))
+    rig.ev(10)  # before the pause
+    rig.now = 120.0
+    assert rig.rec.toggle_pause() == "paused" and rig.rec.paused and rig.obs.count("PauseRecord") == 1
+    rig.ev(25)  # during the pause: not in the video
+    rig.now = 150.0
+    assert rig.rec.toggle_pause() == "resumed" and not rig.rec.paused
+    rig.ev(60)  # 40 s after start of play, minus the 30 s pause = 30 s into the video
+    rig.now = 170.0
+    rig.rec.toggle_pause()  # paused again, and the game closes while paused
+    rig.rec.game_exited()
+    rig.at(85)
+    (_, _, marks, start), = rig.recordings
+    assert [(m.type, round(m.t - start, 1)) for m in marks] == [("kill", 10.0), ("kill", 30.0)]
+    assert rig.rec.paused_total == pytest.approx(30 + 15)  # the second pause ran until the stop
+    assert not rig.rec.paused
+
+
+def test_there_is_nothing_to_pause_without_a_recording(rig):
+    assert rig.rec.toggle_pause() is None  # no game
+    rig.rec.game_started(dict(SESSION, mode="events"))
+    assert rig.rec.toggle_pause() is None and rig.obs.count("PauseRecord") == 0  # a replay buffer has no pause

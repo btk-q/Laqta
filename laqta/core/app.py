@@ -118,6 +118,10 @@ class Core(threading.Thread):
     def clip_now(self) -> None:
         self.inbox.put(("event", GameEvent("manual", time.monotonic(), source="manual")))
 
+    def pause_now(self) -> None:
+        """The pause hotkey: pause or resume the running recording."""
+        self.inbox.put(("pause",))
+
     def record_now(self) -> None:
         """The start/stop hotkey: record whatever is in front, or stop that recording."""
         self.inbox.put(("record",))
@@ -244,7 +248,8 @@ class Core(threading.Thread):
 
     def _on_recording(self, path: Path, game: dict, marks: list[GameEvent], start: float) -> None:
         try:
-            clips.write_sidecar(path, game, marks, start, seconds=round(time.monotonic() - start, 1), kind="recording")
+            length = time.monotonic() - start - self.recorder.paused_total  # paused time is not in the video
+            clips.write_sidecar(path, game, marks, start, seconds=round(length, 1), kind="recording")
         except OSError:
             log.exception("could not write event marks for %s", path)
         self.notify(t("toast.recording_saved", name=path.name))
@@ -256,7 +261,7 @@ class Core(threading.Thread):
             cfg = self.cfg
             args = (path, wanted, cfg["pre_seconds"], cfg["post_seconds"], cfg["laugh_clip_minutes"] if listen else None)
             threading.Thread(target=self._after_recording, args=args, name="laqta-after", daemon=True).start()
-        self._report_skipped(time.monotonic() - start)
+        self._report_skipped(time.monotonic() - start - self.recorder.paused_total)
         self._cleanup()
 
     def _after_recording(self, path: Path, wanted: tuple, before: float, after: float, minutes: int | None) -> None:
@@ -323,6 +328,9 @@ class Core(threading.Thread):
             rec.obs_event(*args)
         elif kind == "record":
             self._toggle_manual()
+        elif kind == "pause":
+            done = rec.toggle_pause()
+            self.notify(t(f"toast.{done}") if done else t("toast.nothing_to_pause"))
         elif kind == "replay":
             if not rec.instant_replay(args[0], self.cfg["replay_seconds"]):
                 self.notify(t("toast.hotkey_idle") if rec.state == "active" else t("toast.no_game"))
@@ -424,6 +432,7 @@ class Core(threading.Thread):
             "game": (rec.game or {}).get("name"),
             "mode": (rec.game or {}).get("mode"),
             "recording": rec.recording,
+            "paused": rec.paused,
             "obs": self.obs.alive,
             "error": self._obs_error if rec.game else None,
         }
