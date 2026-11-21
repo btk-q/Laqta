@@ -419,6 +419,7 @@ class LibraryWindow(QDialog):
         self.grid = QListWidget()
         self.grid.setObjectName("grid")
         self.grid.setViewMode(QListView.ViewMode.IconMode)
+        self.grid.setSelectionMode(QListView.SelectionMode.ExtendedSelection)  # Ctrl- and Shift-click pick several
         self.grid.setItemDelegate(Card(self.grid))
         self.grid.setIconSize(THUMB)
         self.grid.setSpacing(4)
@@ -510,6 +511,32 @@ class LibraryWindow(QDialog):
         self.panel.setFixedWidth(self.PREVIEW.width() + 44)
         self.panel.addWidget(nothing)
         self.panel.addWidget(scroll)
+        # Several videos selected: what can be done to all of them at once.
+        many = QWidget()
+        many.setObjectName("detailBody")
+        group = QVBoxLayout(many)
+        group.setContentsMargins(16, 24, 16, 16)
+        group.setSpacing(8)
+        self.many_title = QLabel()
+        self.many_title.setObjectName("gameName")
+        self.many_about = QLabel()
+        self.many_about.setObjectName("muted")
+        self.many_about.setWordWrap(True)
+        group.addWidget(self.many_title)
+        group.addWidget(self.many_about)
+        group.addSpacing(10)
+        for key, handler, name in (("library.favorite_all", self._favorite_all, ""), ("library.export_all", self._export_all, ""),
+                                   ("library.reel_these", self._reel_selected, ""), ("library.delete_all", self._delete, "danger")):
+            button = QPushButton(t(key))
+            button.setObjectName(name)
+            button.clicked.connect(handler)
+            group.addWidget(button)
+        group.addStretch(1)
+        hint = QLabel(t("library.many_hint"))
+        hint.setObjectName("hint")
+        hint.setWordWrap(True)
+        group.addWidget(hint)
+        self.panel.addWidget(many)
 
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
@@ -688,14 +715,25 @@ class LibraryWindow(QDialog):
         self._want_thumbnails()
 
     def selected(self) -> Clip | None:
-        items = self.grid.selectedItems()
-        return items[0].data(Qt.ItemDataRole.UserRole) if items else None
+        """The one video selected, or None when there are none or several."""
+        chosen = self.chosen()
+        return chosen[0] if len(chosen) == 1 else None
+
+    def chosen(self) -> list[Clip]:
+        """Every selected video, in the order shown."""
+        rows = sorted(self.grid.selectedItems(), key=self.grid.row)
+        return [item.data(Qt.ItemDataRole.UserRole) for item in rows if item.data(Qt.ItemDataRole.UserRole) and not item.isHidden()]
 
     def _selection_changed(self) -> None:
-        clip = self.selected()
+        chosen = self.chosen()
+        clip = chosen[0] if len(chosen) == 1 else None
         for button in self.buttons:
             button.setEnabled(clip is not None)
-        self.panel.setCurrentIndex(1 if clip else 0)
+        self.panel.setCurrentIndex(2 if len(chosen) > 1 else 1 if clip else 0)
+        if len(chosen) > 1:
+            self.many_title.setText(t("library.many", count=len(chosen)))
+            games = sorted({c.game for c in chosen}, key=str.lower)
+            self.many_about.setText(f"{size_text(sum(c.size for c in chosen))}\n{', '.join(games[:4])}{'…' if len(games) > 4 else ''}")
         self.strip.show_clip(clip)
         # One fact per line in the narrow panel; the length moves up beside the date.
         facts = summary_text(clip).split("     ") if clip else []
@@ -776,12 +814,12 @@ class LibraryWindow(QDialog):
         items = (self.grid.item(i) for i in range(self.grid.count()))
         return [item.data(Qt.ItemDataRole.UserRole) for item in items if not item.isHidden() and item.data(Qt.ItemDataRole.UserRole)]
 
-    def _reel(self) -> None:
-        """Join the best moments of everything currently shown (so the filters choose the material)."""
-        segments = highlights.pick(highlights.candidates(self.visible()))
+    def _reel(self, material: list[Clip] | None = None) -> None:
+        """Join the best moments of the chosen videos, or of everything shown (so the filters choose)."""
+        shown = material or self.visible()
+        segments = highlights.pick(highlights.candidates(shown))
         if not segments:
             return self.status.setText(t("reel.none"))
-        shown = self.visible()
         name = shown[0].game if len({c.game for c in shown}) == 1 else "Laqta"
         length = sum(s.length for s in segments)
         signals = _ReelSignals(self)
@@ -844,12 +882,47 @@ class LibraryWindow(QDialog):
             self._attempt(lambda: library.export(clip.path, self.root), "library.exported")
 
     def _delete(self) -> None:
-        if clip := self.selected():
-            if self.viewer is not None and self.viewer.clip == clip:
-                self.viewer.close()  # the player holds the file open: let go of it first
-            # Recycle Bin, so a slip is recoverable and no confirmation dialog is needed.
-            if not QFile.moveToTrash(str(clip.path)):
-                return self.status.setText(t("library.failed", error=clip.path.name))
-            QFile.moveToTrash(str(clip.path.with_suffix(".json")))
-            self.reload()
-            self.status.setText(t("library.deleted"))
+        """To the Recycle Bin, so a slip is recoverable and no confirmation is needed. Several at once
+        ask first all the same: one stray Ctrl+A should not empty the window."""
+        chosen = self.chosen()
+        if not chosen:
+            return
+        if len(chosen) > 1:
+            asked = QMessageBox.question(self, t("library.delete_all"), t("library.delete_confirm", count=len(chosen), size=size_text(sum(c.size for c in chosen))))
+            if asked != QMessageBox.StandardButton.Yes:
+                return
+        if self.viewer is not None and self.viewer.clip in chosen:
+            self.viewer.close()  # the player holds the file open: let go of it first
+        failed = []
+        for clip in chosen:
+            if QFile.moveToTrash(str(clip.path)):
+                QFile.moveToTrash(str(clip.path.with_suffix(".json")))
+            else:
+                failed.append(clip.path.name)
+        self.reload()
+        if failed:
+            return self.status.setText(t("library.failed", error=", ".join(failed[:3])))
+        self.status.setText(t("library.deleted") if len(chosen) == 1 else t("library.deleted_many", count=len(chosen)))
+
+    def _favorite_all(self) -> None:
+        """Make them all favourites; if they already all are, take the mark off."""
+        chosen = self.chosen()
+        mark = not all(c.favorite for c in chosen)
+        for clip in chosen:
+            library.set_meta(clip.path, favorite=mark)
+        self.reload()
+        self.status.setText(t("library.favorited" if mark else "library.unfavorited", count=len(chosen)))
+
+    def _export_all(self) -> None:
+        chosen = self.chosen()
+        if not chosen:
+            return
+
+        def work() -> Path:
+            made = [library.export(clip.path, self.root) for clip in chosen]
+            return made[-1].parent
+
+        self._attempt(work, "library.exported_many")
+
+    def _reel_selected(self) -> None:
+        self._reel(self.chosen())
