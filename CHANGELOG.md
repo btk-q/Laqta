@@ -2,6 +2,14 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## Unreleased
+
+### Fixed
+- Find installed games no longer skips Battle.net and EA games with "origin" or another
+  launcher's name in their title, such as Dragon Age: Origins.
+- A correction to the 0.9.1 notes: finding Battle.net and EA games has only been tested with
+  made-up install lists so far, not with the real games named there.
+
 ## 0.9.1
 
 ### New

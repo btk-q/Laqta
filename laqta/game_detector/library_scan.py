@@ -174,7 +174,7 @@ def _publisher_folders(entries: list[dict] | None = None) -> list[tuple[str, Pat
     out = []
     for e in installed_programs() if entries is None else entries:
         name, folder = e.get("DisplayName", "").strip(), e.get("InstallLocation", "").strip().strip('"')
-        if name and folder and PUBLISHERS.search(e.get("Publisher", "")) and not LAUNCHERS.search(name) and Path(folder).is_dir():
+        if name and folder and PUBLISHERS.search(e.get("Publisher", "")) and not LAUNCHERS.fullmatch(name) and Path(folder).is_dir():
             out.append((name, Path(folder)))
     return out
 

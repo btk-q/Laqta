@@ -82,3 +82,13 @@ def test_battle_net_and_ea_games_come_from_the_installed_programs_list(tmp_path)
     ]
     assert library_scan.scan_publishers(entries) == [{"exe": "Overwatch.exe", "name": "Overwatch"}, {"exe": "r5apex.exe", "name": "Apex Legends"}]
     assert isinstance(library_scan.installed_programs(), list)  # reads this PC's real list without error
+
+
+def test_a_game_with_a_launchers_word_in_its_name_is_not_taken_for_the_launcher(tmp_path):
+    entries = []
+    for number, name in enumerate(("Dragon Age: Origins", "Origin", "EA app", "EA Desktop", "Battle.net")):
+        folder = tmp_path / str(number)
+        folder.mkdir()
+        (folder / "DAOrigins.exe").write_bytes(b"x")
+        entries.append({"DisplayName": name, "Publisher": "Electronic Arts", "InstallLocation": str(folder)})
+    assert [g["name"] for g in library_scan.scan_publishers(entries)] == ["Dragon Age: Origins"]
