@@ -2,7 +2,7 @@
 
 The section for a version is what people see in the update window. Newest first.
 
-## Unreleased
+## 0.9.2
 
 ### Fixed
 - Find installed games no longer skips Battle.net and EA games with "origin" or another
