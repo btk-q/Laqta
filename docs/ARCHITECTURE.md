@@ -245,7 +245,7 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Update rollback | Works | For real, on a test copy: a deliberately broken build was undone after 45 s and the old version restarted; a good build was kept after about 12 s |
 | Automatic clips per event | Works on a test recording | Real ffmpeg cut in tests; not yet seen after a real match |
 | Self-update from GitHub releases | see ADR 0005 | Check, hash-verified download and file swap described there with what was run for real |
-| Library scan | Steam, Epic, GOG | Steam checked on a real library; Epic and GOG from fixtures |
+| Library scan | Steam, Epic, GOG, Riot, Battle.net, EA | Steam and Riot checked on real installs; Epic and GOG from fixtures; Battle.net and EA from Windows' installed-programs list, read for real here (410 entries in 0.01 s) but with no Blizzard or EA game on this PC, so matched only against a made-up list |
 | Unknown-fullscreen prompt | Unit-tested | Has not fired for real |
 | Packaged exe | Builds, imports cleanly | Not run as the only instance |
 
@@ -277,6 +277,5 @@ Differences from the plan above:
 - **Full session keeps event marks.** It was built to keep none (that was Hybrid's job), and a
   real League game showed the result: objectives taken, nothing in the recording. Hybrid is
   now the same mode under an older name.
-- **Not built:** audio cue detection, Battle.net/EA scan, per-game resolution/bitrate/encoder,
-  OBS chapter markers (recordings are MKV), Dota 2 and Rocket League plugins, an installer
-  (the build produces a zip).
+- **Not built:** audio cue detection, OBS chapter markers (recordings are MKV), a Dota 2
+  plugin, an installer (the build produces a zip).

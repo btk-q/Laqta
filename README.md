@@ -180,7 +180,7 @@ Everything here is off until you turn it on, in **Settings → Sharing**.
 ### Adding a game
 
 **Settings → Add a game…** (at the bottom of the sidebar, under **My games**) opens a searchable list of the games installed on this PC
-(from your Steam, Epic and GOG libraries) and the programs running right now. Select one or
+(from your Steam, Epic, GOG, Riot, Battle.net and EA libraries) and the programs running right now. Select one or
 more and add them; "Browse for a program…" covers anything else. The list is built from your
 own PC; nothing is looked up online. Deadlock is in the built-in list (recording and hotkeys;
 it has no event detection, because the game offers no official data feed).
@@ -234,7 +234,7 @@ many frames were skipped; lowering the output size is the usual cure.
 ### Games
 
 Ten games are built in. **Settings → Games → Find installed games** adds what it finds in
-Steam, Epic and GOG; **Add a running app…** adds anything else. When an unknown app goes
+Steam, Epic, GOG, Riot, Battle.net and EA; **Add a running app…** adds anything else. When an unknown app goes
 fullscreen, Laqta asks once with a toast, and clicking the toast adds it.
 
 ### Event detection
@@ -277,7 +277,8 @@ worked for that game. You can also force a method per game in **Settings → Gam
   for that game.
 - **AMD and Intel encoders are unverified.** Laqta tries NVENC, AMF, Quick Sync, then x264,
   and uses the first that starts; only NVENC and x264 have been run.
-- **Battle.net and EA libraries** are not scanned.
+- **Battle.net and EA games** are found through Windows' list of installed programs; this has
+  only been tested with a made-up list, since neither launcher is installed on the PC it was built on.
 - **Post to Discord has never uploaded to a real channel.** The request is tested against a
   stand-in; it needs a webhook address to try for real.
 - **Clutches are not detected in any game.** CS2 tells a playing client only about its own

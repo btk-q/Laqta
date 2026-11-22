@@ -1,8 +1,8 @@
 """Find installed games by reading the launchers' own files and registry keys.
 
-Covered: Steam, Epic Games, GOG and Riot. Battle.net and EA keep their install lists in formats that
-need per-launcher parsers; games from those are picked up by the "looks like a game" prompt
-or added by hand.
+Covered: Steam, Epic Games, GOG and Riot from their own lists; Battle.net and EA games from
+Windows' list of installed programs, where both register each game with its publisher and folder.
+Anything else is picked up by the "looks like a game" prompt or added by hand.
 """
 
 from __future__ import annotations
@@ -137,6 +137,56 @@ def scan_riot(installs: Path | None = None) -> list[dict]:
     return games
 
 
+UNINSTALL = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+# Publishers whose games come from Battle.net and the EA app. Their launchers register under the
+# same publisher and are left out by name.
+PUBLISHERS = re.compile(r"blizzard|activision|electronic arts", re.IGNORECASE)
+LAUNCHERS = re.compile(r"battle\.net|ea app|origin|ea desktop", re.IGNORECASE)
+
+
+def installed_programs() -> list[dict]:
+    """Windows' list of installed programs (what Settings > Apps shows): name, publisher, folder.
+    Reads the registry only."""
+    entries = []
+    for hive, view in ((winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY), (winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY),
+                       (winreg.HKEY_CURRENT_USER, 0)):
+        try:
+            with winreg.OpenKey(hive, UNINSTALL, 0, winreg.KEY_READ | view) as root:
+                for i in range(winreg.QueryInfoKey(root)[0]):
+                    try:
+                        with winreg.OpenKey(root, winreg.EnumKey(root, i)) as key:
+                            entry = {}
+                            for field in ("DisplayName", "Publisher", "InstallLocation"):
+                                try:
+                                    entry[field] = str(winreg.QueryValueEx(key, field)[0])
+                                except OSError:
+                                    entry[field] = ""
+                            entries.append(entry)
+                    except OSError:
+                        continue
+        except OSError:
+            continue
+    return entries
+
+
+def _publisher_folders(entries: list[dict] | None = None) -> list[tuple[str, Path]]:
+    """(name, folder) of each installed Battle.net or EA game."""
+    out = []
+    for e in installed_programs() if entries is None else entries:
+        name, folder = e.get("DisplayName", "").strip(), e.get("InstallLocation", "").strip().strip('"')
+        if name and folder and PUBLISHERS.search(e.get("Publisher", "")) and not LAUNCHERS.search(name) and Path(folder).is_dir():
+            out.append((name, Path(folder)))
+    return out
+
+
+def scan_publishers(entries: list[dict] | None = None) -> list[dict]:
+    games = []
+    for name, folder in _publisher_folders(entries):
+        if exe := main_exe(folder, name):
+            games.append({"exe": exe, "name": name.replace("™", "").replace("®", "").strip()})
+    return games
+
+
 def _exes_under(folder: Path, depth: int) -> dict[str, Path]:
     found: dict[str, Path] = {}
     try:
@@ -161,7 +211,7 @@ def program_files() -> dict[str, Path]:
         for folder in folders:
             for name, path in _exes_under(folder, 4).items():
                 found.setdefault(name, path)
-    for folder in riot_folders():
+    for folder in riot_folders() + [folder for _, folder in _publisher_folders()]:
         for name, path in _exes_under(folder, 5).items():  # Valorant's is five folders down
             found.setdefault(name, path)
     manifests = Path(os.environ.get("ProgramData", r"C:\ProgramData")) / "Epic/EpicGamesLauncher/Data/Manifests"
@@ -191,7 +241,7 @@ def program_files() -> dict[str, Path]:
 def scan(known: set[str]) -> list[dict]:
     """Installed games not already in `known` (lower-case exe names), one entry per exe."""
     found: dict[str, dict] = {}
-    for scanner in (scan_steam, scan_epic, scan_gog, scan_riot):
+    for scanner in (scan_steam, scan_epic, scan_gog, scan_riot, scan_publishers):
         try:
             for game in scanner():
                 key = game["exe"].lower()

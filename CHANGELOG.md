@@ -2,6 +2,12 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## Unreleased
+
+### New
+- **Find installed games** now also finds Battle.net and EA games (Overwatch, Diablo, Call of
+  Duty, Apex Legends, EA FC and others), so you can add them with one click.
+
 ## 0.9.0
 
 ### New

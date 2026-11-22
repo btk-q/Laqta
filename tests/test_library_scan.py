@@ -33,6 +33,7 @@ def test_scan_skips_known_games_and_survives_a_broken_scanner(tmp_path, monkeypa
     monkeypatch.setattr(library_scan, "scan_epic", lambda: 1 / 0)
     monkeypatch.setattr(library_scan, "scan_gog", lambda: [{"exe": "HADES2.EXE", "name": "duplicate"}, {"exe": "Witcher3.exe", "name": "The Witcher 3"}])
     monkeypatch.setattr(library_scan, "scan_riot", lambda: [{"exe": "LoR.exe", "name": "LoR"}])
+    monkeypatch.setattr(library_scan, "scan_publishers", lambda: [])
     assert library_scan.scan({"cs2.exe"}) == [{"exe": "Hades2.exe", "name": "Hades II"}, {"exe": "LoR.exe", "name": "LoR"},
                                               {"exe": "Witcher3.exe", "name": "The Witcher 3"}]
 
@@ -62,3 +63,22 @@ def test_program_files_are_found_by_name_with_the_copy_nearest_the_top_winning(t
     assert found == {"tool.exe": tmp_path / "Game" / "a" / "Tool.exe"}  # four folders down is out of reach at depth 3
     assert library_scan._exes_under(tmp_path / "missing", 3) == {}
     assert isinstance(library_scan.program_files(), dict)  # runs on this PC without error
+
+
+
+def test_battle_net_and_ea_games_come_from_the_installed_programs_list(tmp_path):
+    def game(folder, exe):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / exe).write_bytes(b"x" * 1000)
+        return str(tmp_path / folder)
+
+    entries = [
+        {"DisplayName": "Overwatch", "Publisher": "Blizzard Entertainment", "InstallLocation": game("Overwatch", "Overwatch.exe")},
+        {"DisplayName": "Apex Legends™", "Publisher": "Electronic Arts", "InstallLocation": '"' + game("Apex", "r5apex.exe") + '"'},
+        {"DisplayName": "Battle.net", "Publisher": "Blizzard Entertainment", "InstallLocation": game("Battle.net", "Battle.net.exe")},
+        {"DisplayName": "Notepad++", "Publisher": "Notepad++ Team", "InstallLocation": game("npp", "notepad++.exe")},
+        {"DisplayName": "Diablo IV", "Publisher": "Blizzard Entertainment", "InstallLocation": str(tmp_path / "gone")},
+        {"DisplayName": "", "Publisher": "Electronic Arts", "InstallLocation": ""},
+    ]
+    assert library_scan.scan_publishers(entries) == [{"exe": "Overwatch.exe", "name": "Overwatch"}, {"exe": "r5apex.exe", "name": "Apex Legends"}]
+    assert isinstance(library_scan.installed_programs(), list)  # reads this PC's real list without error
