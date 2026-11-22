@@ -2,7 +2,7 @@
 
 The section for a version is what people see in the update window. Newest first.
 
-## Unreleased
+## 0.9.1
 
 ### New
 - **Find installed games** now also finds Battle.net and EA games (Overwatch, Diablo, Call of
