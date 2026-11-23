@@ -11,6 +11,10 @@ The section for a version is what people see in the update window. Newest first.
 - **Your webcam in recordings.** Settings → Recording → "Show my webcam in a corner of
   recordings": pick the camera, the corner and the size. The camera is on only while a game is
   being recorded.
+- **Install Laqta like a normal app.** The first time you run it from the unzipped folder,
+  Laqta offers to install itself: Start menu and Desktop shortcuts, and an entry in Windows'
+  Settings → Apps with Uninstall. No administrator rights; your recordings and settings are
+  never touched. You can also choose "Install Laqta on this PC…" in the tray menu.
 
 ### Fixed
 - In Arabic, a game's name in the clips window headings is on the right, beside its icon,

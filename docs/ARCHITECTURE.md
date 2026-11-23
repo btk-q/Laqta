@@ -238,6 +238,9 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Player speed, frame steps, marks while watching, remembered volume | Works | Driven on a 60 fps test video: 2x played 4 s in 2 s, one step moved 16 ms, M wrote a mark to the file |
 | League champion and mode on cards | Unit-tested | From Riot's documented playerlist and gamestats shapes; LAQTA_LOL_DUMP saves the real answers to check against; not yet seen in a real match |
 | Clips window sorting | Works | On the owner's real library: by date, size and length |
+| Tick boxes (Select mode, Add a game) | Works | Driven with real mouse clicks on the windows offscreen: plain clicks add and remove, Select all respects the filters; rendered in English and Arabic. Not clicked by hand |
+| Webcam in recordings | Works with OBS | OBS 33 with the owner's real camera: source created, camera picture arrived after 2 s (2560x1440), placed bottom-right above the game, removed again; nothing was recorded. Not yet seen in a real game recording |
+| Install / uninstall without a zip | Parts run for real | The copy line (skipping update leftovers), the folder removal, the Apps entry (throwaway registry key) and real shortcuts (throwaway name) were run on this PC; the whole flow from a packaged zip has not been run, because it would replace the owner's own shortcuts and Apps entry |
 | Save without the selected part | Works | Real ffmpeg in tests: 12 s minus 3.5 s gave 8.5 s with both sound tracks; marks after the gap moved up, marks inside it dropped |
 | Pause/resume hotkey | Works with OBS | OBS 33 paused and resumed Laqta's recording: 9 s with 3 paused gave a 5.9 s file; mark shifting and paused length tested in the recorder; not pressed during a real game |
 | First-run setup screen | Works with a made-up empty PC | Every step and button driven by script with the installs faked; the WebSocket switch tested on a copy of OBS's real settings file. Never run on a PC that really lacks OBS or ffmpeg |
@@ -278,4 +281,5 @@ Differences from the plan above:
   real League game showed the result: objectives taken, nothing in the recording. Hybrid is
   now the same mode under an older name.
 - **Not built:** audio cue detection, OBS chapter markers (recordings are MKV), a Dota 2
-  plugin, an installer (the build produces a zip).
+  plugin. There is no separate installer program: the app installs itself from the zip
+  (`storage/install.py`), per user, without administrator rights.

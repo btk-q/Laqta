@@ -48,6 +48,12 @@ opens; closing it leaves Laqta running next to the clock. Windows may show a "Wi
 protected your PC" notice the first time, because the app is not code-signed: choose
 **More info → Run anyway**.
 
+The first time it runs from the unzipped folder, Laqta offers to **install itself**: it copies
+itself to `%LOCALAPPDATA%\Programs\Laqta`, adds Start menu and Desktop shortcuts and shows in
+**Settings → Apps**, where **Uninstall** removes it (your recordings and settings stay). No
+administrator rights are needed, and the zip folder can be deleted afterwards. Say no and it
+keeps running from where it is; **Install Laqta on this PC…** in the tray menu asks again.
+
 **Updates:** at start Laqta asks GitHub whether a newer version exists. If there is one it
 shows the patch notes and installs it with one click (the update is needed to keep using
 Laqta; if it fails you can carry on with the old version). It waits until no game is being
@@ -231,6 +237,10 @@ size, frame rate, encoder and bitrate in **Settings → Recording**, or per game
 **Settings → Games**. If the encoder cannot keep up, Laqta tells you after the recording how
 many frames were skipped; lowering the output size is the usual cure.
 
+**Webcam:** Settings → Recording → "Show my webcam in a corner of recordings" puts your camera
+in a corner of the video (choose the camera, the corner and the size). OBS switches the camera
+on only while a game is being recorded and off when it ends.
+
 ### Games
 
 Ten games are built in. **Settings → Games → Find installed games** adds what it finds in
@@ -357,6 +367,10 @@ to save the raw data CS2, League or Rocket League sends, for building test fixtu
 1. شغّل OBS وافتح **Tools ← WebSocket Server Settings** وفعّل **Enable WebSocket server**.
 2. شغّل لقطة؛ ستظهر أيقونتها بجانب الساعة.
 3. شغّل لعبتك. تُحفظ التسجيلات في `Videos\Laqta`.
+
+في أول تشغيل من المجلد المفكوك يعرض لقطة **تثبيت نفسه**: يُنسخ إلى `%LOCALAPPDATA%\Programs\Laqta`
+ويُضاف له اختصار في قائمة ابدأ وعلى سطح المكتب، ويظهر في **الإعدادات ← التطبيقات** حيث تزيله
+بزر **إلغاء التثبيت** (تبقى تسجيلاتك وإعداداتك). لا يحتاج صلاحيات المسؤول.
 
 لتغيير اللغة: انقر بالزر الأيمن على الأيقونة ← **Settings** ← **Language** ← العربية.
 اختصار اللقطة الافتراضي هو **Ctrl+Alt+F9**.

@@ -57,6 +57,7 @@ DEFAULTS = {
     "cleanup_gb": 0,  # keep the recordings folder under this size; 0 = no limit
     "min_free_gb": 5,  # do not record with less free disk space than this; 0 = no guard
     "accent": "#8B5CF6",  # UI colour
+    "install_asked": False,  # the "install Laqta on this PC?" question has been answered once
     "setup_done": False,  # the first-run setup screen has been finished (or everything was already in place)
     "update_check": True,  # ask GitHub for a newer Laqta at start (one anonymous request)
     "toast_window": False,  # show Laqta's notes in a small corner window instead of Windows notifications
@@ -96,6 +97,7 @@ def _check(cfg: dict) -> dict:
     need(isinstance(cfg["toast_window"], bool), "toast_window must be true or false")
     need(isinstance(cfg["update_check"], bool), "update_check must be true or false")
     need(isinstance(cfg["setup_done"], bool), "setup_done must be true or false")
+    need(isinstance(cfg["install_asked"], bool), "install_asked must be true or false")
     need(cfg["discord_webhook"] == "" or (isinstance(cfg["discord_webhook"], str) and WEBHOOK.fullmatch(cfg["discord_webhook"])),
          "discord_webhook must be empty or a Discord webhook address (https://discord.com/api/webhooks/...)")
     need(isinstance(cfg["mic_trigger_db"], (int, float)) and -60 <= cfg["mic_trigger_db"] <= 0, "mic_trigger_db must be between -60 and 0")

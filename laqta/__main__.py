@@ -291,6 +291,29 @@ def diagnose(out: str | None) -> int:
     return 1 if any(check.status == "bad" for check in results) else 0
 
 
+def uninstall_now() -> int:
+    """Settings > Apps > Uninstall runs this. Asks first; recordings and settings stay."""
+    from PySide6.QtWidgets import QApplication, QMessageBox
+
+    from .i18n import set_language, t
+    from .storage import install, update
+
+    try:
+        set_language(config.load()["language"])
+    except (ValueError, OSError):
+        pass
+    app = QApplication(sys.argv)  # noqa: F841 (message boxes need it)
+    folder = update.app_dir()
+    if folder is None or not install.is_installed(folder):
+        QMessageBox.information(None, "Laqta", t("install.not_installed"))
+        return 1
+    if QMessageBox.question(None, t("install.uninstall_title"), t("install.uninstall_ask")) != QMessageBox.StandardButton.Yes:
+        return 1
+    install.uninstall(folder)
+    QMessageBox.information(None, t("install.uninstall_title"), t("install.uninstalled"))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="laqta")
     parser.add_argument("--version", action="version", version=f"laqta {__version__}")
@@ -317,6 +340,7 @@ def main(argv: list[str] | None = None) -> int:
     upd.add_argument("--from", dest="source", help="install this Laqta zip instead of asking GitHub")
     test = sub.add_parser("selftest", help="load every part of the app without showing it; used on the packaged app before a release")
     test.add_argument("--out", help="also write the report to this file")
+    sub.add_parser("uninstall", help="remove the installed Laqta (what Settings > Apps runs); recordings and settings are kept")
     diag = sub.add_parser("diagnose", help="check that everything Laqta needs is in place and save a diagnostic zip")
     diag.add_argument("--out", help="where to write the zip (default: the current folder)")
     args = parser.parse_args(argv)
@@ -337,6 +361,8 @@ def main(argv: list[str] | None = None) -> int:
         return calibrate(args.plugin, args.video, args.at, args.cut, args.out)
     if args.command == "diagnose":
         return diagnose(args.out)
+    if args.command == "uninstall":
+        return uninstall_now()
     if args.command == "vision-test":
         return vision_test(args.plugin, args.video, args.fps)
 

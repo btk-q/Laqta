@@ -18,7 +18,7 @@ from .. import __version__, i18n
 from ..core.app import Core
 from ..game_detector.detector import load_games
 from ..i18n import t
-from ..storage import clips, config, update
+from ..storage import autostart, clips, config, install, update
 from . import theme
 from .hotkey import Hotkey
 from .library import LibraryWindow
@@ -125,6 +125,8 @@ class TrayApp:
         self.menu.addAction(t("menu.folder")).triggered.connect(self._open_folder)
         self.menu.addAction(t("menu.settings")).triggered.connect(self.open_settings)
         self.menu.addAction(t("menu.update")).triggered.connect(lambda: self.check_update(asked=True))
+        if update.app_dir() and not install.is_installed(update.app_dir()):  # running from an unpacked zip
+            self.menu.addAction(t("install.menu")).triggered.connect(lambda: self.install_now(ask=True))
         self.menu.addSeparator()
         self.menu.addAction(t("menu.quit")).triggered.connect(self.app.quit)
         self._on_state(self.state)
@@ -238,6 +240,42 @@ class TrayApp:
         self.cfg["setup_done"] = True
         self._save()
 
+    # -- installing -----------------------------------------------------------------------
+
+    def offer_install(self) -> None:
+        """At start. The installed copy keeps its Apps entry and start-with-Windows pointing at
+        itself; a copy run from an unpacked zip asks once whether to install."""
+        app = update.app_dir()
+        if app is None:  # running from source
+            return
+        if install.is_installed(app):
+            try:
+                install.register(app / "Laqta.exe", __version__)
+                if autostart.state() == "on" and autostart._read(autostart.RUN) != autostart.command():
+                    autostart.set_enabled(True)  # it was switched on in the zip copy, before installing
+            except OSError:
+                log.warning("could not refresh the installed-app entry", exc_info=True)
+            return
+        if self.cfg["install_asked"] or (install.TARGET / "Laqta.exe").exists():
+            return
+        self.cfg["install_asked"] = True
+        self._save()
+        self.install_now(ask=True)
+
+    def install_now(self, ask: bool) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        if ask and QMessageBox.question(None, t("install.title"), t("install.ask", folder=str(install.TARGET)),
+                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            install.install(update.app_dir(), __version__)
+        except Exception as e:
+            log.exception("install failed")
+            QMessageBox.warning(None, t("install.title"), t("install.failed", error=e))
+            return
+        self.app.quit()  # the copy script waits for this, then starts the installed Laqta
+
     # -- updates --------------------------------------------------------------------------
 
     def check_update(self, asked: bool = False) -> None:
@@ -337,6 +375,7 @@ def run(cfg: dict, show: bool = True) -> int:
     if undone and update.newer(undone):
         tray.toast(t("update.undone", version=undone))
     tray.first_run()
+    tray.offer_install()
     if show:
         tray.open_library()
     if cfg["update_check"]:
