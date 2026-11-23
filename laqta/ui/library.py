@@ -165,6 +165,20 @@ class LibraryWindow(QDialog):
             filters.addWidget(combo)
         filters.addWidget(self.favorites)
         filters.addWidget(self.order)
+        # Picking several videos without holding Ctrl: "Select" puts a tick box on every card and
+        # a click then ticks or unticks one. Ctrl- and Shift-click keep working either way.
+        self.picking = QPushButton(t("library.select"))
+        self.picking.setCheckable(True)
+        self.picking.setToolTip(t("library.select_hint"))
+        self.picking.toggled.connect(self._picking)
+        self.pick_all, self.pick_none = QPushButton(t("library.select_all")), QPushButton(t("library.select_none"))
+        self.pick_all.clicked.connect(self._select_all)
+        self.pick_none.clicked.connect(lambda: self.grid.clearSelection())
+        for button in (self.pick_all, self.pick_none):
+            button.setVisible(False)
+        filters.addWidget(self.picking)
+        filters.addWidget(self.pick_all)
+        filters.addWidget(self.pick_none)
 
         # -- the videos ------------------------------------------------------------------
         self.grid = QListWidget()
@@ -485,6 +499,22 @@ class LibraryWindow(QDialog):
         """Every selected video, in the order shown."""
         rows = sorted(self.grid.selectedItems(), key=self.grid.row)
         return [item.data(Qt.ItemDataRole.UserRole) for item in rows if item.data(Qt.ItemDataRole.UserRole) and not item.isHidden()]
+
+    def _picking(self, on: bool) -> None:
+        self.grid.setSelectionMode(QListView.SelectionMode.MultiSelection if on else QListView.SelectionMode.ExtendedSelection)
+        self.grid.setProperty("ticking", on)  # Card draws the tick boxes
+        for button in (self.pick_all, self.pick_none):
+            button.setVisible(on)
+        if not on:
+            self.grid.clearSelection()
+        self.grid.viewport().update()
+
+    def _select_all(self) -> None:
+        """Every video the filters show; headings and hidden videos are left alone."""
+        for i in range(self.grid.count()):
+            item = self.grid.item(i)
+            if item.data(Qt.ItemDataRole.UserRole) and not item.isHidden():
+                item.setSelected(True)
 
     def _selection_changed(self) -> None:
         chosen = self.chosen()

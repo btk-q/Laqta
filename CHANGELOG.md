@@ -2,6 +2,17 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## Unreleased
+
+### New
+- **Pick several videos without holding Ctrl.** Press **Select** above your clips: every card
+  gets a tick box, and a click ticks or unticks it. **Select all** and **Clear** sit beside it.
+  The games in **Add a game** have tick boxes too.
+
+### Fixed
+- In Arabic, a game's name in the clips window headings is on the right, beside its icon,
+  instead of on the other side under the day.
+
 ## 0.9.2
 
 ### Fixed

@@ -121,7 +121,9 @@ class AddGameDialog(QDialog):
         self.filter.setPlaceholderText(t("games.search"))
         self.filter.setClearButtonEnabled(True)
         self.list = QListWidget()
-        self.list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        # A click ticks or unticks a game; no Ctrl needed. The tick boxes mirror the selection.
+        self.list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        self.list.itemSelectionChanged.connect(self._ticks)
         self.setCursor(Qt.CursorShape.WaitCursor)
         try:  # ponytail: scanned on the UI thread, about a second; a worker thread if big libraries stall it
             installed = library_scan.scan(known)
@@ -139,10 +141,12 @@ class AddGameDialog(QDialog):
                 self.list.addItem(head)
             item = QListWidgetItem(game["name"] if game["where"] == "running" else f"{game['name']}   ({game['exe']})")
             item.setData(Qt.ItemDataRole.UserRole, game)
+            item.setCheckState(Qt.CheckState.Unchecked)  # shown only; clicking the row is what ticks it
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
             self.list.addItem(item)
         self.note = _label(t("games.add_hint") if self.list.count() else t("games.add_none"), "hint")
         self.filter.textChanged.connect(self._apply_filter)
-        self.list.itemDoubleClicked.connect(lambda _: self.accept())
+        self.list.itemDoubleClicked.connect(self._add_this)
         browse, add, cancel = QPushButton(t("games.browse")), QPushButton(t("button.add")), QPushButton(t("button.cancel"))
         add.setObjectName("primary")
         add.setDefault(True)
@@ -161,6 +165,17 @@ class AddGameDialog(QDialog):
         layout.addWidget(self.note)
         layout.addLayout(buttons)
         self.filter.setFocus()
+
+    def _ticks(self) -> None:
+        for i in range(self.list.count()):
+            item = self.list.item(i)
+            if item.data(Qt.ItemDataRole.UserRole):
+                item.setCheckState(Qt.CheckState.Checked if item.isSelected() else Qt.CheckState.Unchecked)
+
+    def _add_this(self, item: QListWidgetItem) -> None:
+        """A double-click adds that game: its second click must not untick it first."""
+        item.setSelected(True)
+        self.accept()
 
     def _apply_filter(self, text: str) -> None:
         text = text.strip().lower()

@@ -151,10 +151,10 @@ class Card(QStyledItemDelegate):
         picture = index.data(Qt.ItemDataRole.DecorationRole)
         if isinstance(picture, QPixmap) and not picture.isNull():  # the game's own icon, before its name
             side = 24
-            x = box.right() - side if lead == Qt.AlignmentFlag.AlignRight else box.x()
+            x = box.right() - side if lead & Qt.AlignmentFlag.AlignRight else box.x()
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
             painter.drawPixmap(QRectF(x, box.center().y() - side / 2, side, side).toRect(), picture)
-            box = box.adjusted(0, 0, -(side + 8), 0) if lead == Qt.AlignmentFlag.AlignRight else box.adjusted(side + 8, 0, 0, 0)
+            box = box.adjusted(0, 0, -(side + 8), 0) if lead & Qt.AlignmentFlag.AlignRight else box.adjusted(side + 8, 0, 0, 0)
         painter.setFont(name)
         painter.setPen(QColor(c["text"]))
         painter.drawText(box, lead | Qt.AlignmentFlag.AlignVCenter, game)
@@ -163,7 +163,7 @@ class Card(QStyledItemDelegate):
         when.setPixelSize(13)
         painter.setFont(when)
         painter.setPen(QColor(c["muted"]))
-        rest = box.adjusted(0, 0, -used, 0) if lead == Qt.AlignmentFlag.AlignRight else box.adjusted(used, 0, 0, 0)
+        rest = box.adjusted(0, 0, -used, 0) if lead & Qt.AlignmentFlag.AlignRight else box.adjusted(used, 0, 0, 0)
         painter.drawText(rest, lead | Qt.AlignmentFlag.AlignVCenter, day)
         painter.restore()
 
@@ -171,7 +171,8 @@ class Card(QStyledItemDelegate):
         clip: Clip = index.data(Qt.ItemDataRole.UserRole)
         c = theme.current
         rtl = option.direction == Qt.LayoutDirection.RightToLeft
-        lead = Qt.AlignmentFlag.AlignRight if rtl else Qt.AlignmentFlag.AlignLeft
+        # Absolute: a Latin game name in Arabic mode would otherwise be pushed to the other side.
+        lead = (Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignAbsolute) if rtl else Qt.AlignmentFlag.AlignLeft
         if clip is None:
             return self._heading(painter, option, index, lead)
         painter.save()
@@ -212,6 +213,17 @@ class Card(QStyledItemDelegate):
             painter.drawEllipse(star)
             painter.setPen(QColor(c["on_accent"]))
             painter.drawText(star, Qt.AlignmentFlag.AlignCenter, "★")
+
+        if self.parent().property("ticking"):  # the clips window's Select mode: a tick box in the top corner
+            tick = QRectF(0, 0, 24, 24)
+            tick.moveTopRight(thumb.topRight() + QPointF(-6, 6))
+            painter.setPen(QPen(QColor("#FFFFFF"), 2))
+            painter.setBrush(QColor(c["accent_fill"]) if selected else QColor(0, 0, 0, 120))
+            painter.drawRoundedRect(tick, 6, 6)
+            if selected:  # drawn as lines, so it does not depend on the font having a ✓
+                painter.setPen(QPen(QColor(c["on_accent"]), 2.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+                x, y = tick.x(), tick.y()
+                painter.drawPolyline([QPointF(x + 6, y + 12.5), QPointF(x + 10.5, y + 17), QPointF(x + 18, y + 8)])
 
         # words under it
         line = QRectF(thumb.x() + 2, thumb.bottom() + 8, thumb.width() - 4, 20)
