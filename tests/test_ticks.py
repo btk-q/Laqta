@@ -65,3 +65,32 @@ def test_add_a_game_ticks_with_plain_clicks(app, monkeypatch):
     click(dialog.list, games[0])
     assert [g["name"] for g in dialog.chosen()] == ["Beta"] and games[0].checkState() == Qt.CheckState.Unchecked
     dialog.close()
+
+
+def test_clicking_a_cards_tick_box_ticks_it_without_ctrl_or_select_mode(app, tmp_path):
+    from PySide6.QtCore import QRectF
+
+    from laqta.ui.cards import Card
+    from laqta.ui.library import LibraryWindow
+
+    (tmp_path / "Game" / "2026-11-23").mkdir(parents=True)
+    for n in range(3):
+        (tmp_path / "Game" / "2026-11-23" / f"clip {n}.mkv").write_bytes(b"x" * 100)
+    window = LibraryWindow(root=tmp_path)
+    window.resize(1400, 900)
+    window.show()
+    videos = [window.grid.item(i) for i in range(window.grid.count()) if window.grid.item(i).data(Qt.ItemDataRole.UserRole)]
+
+    def tick(item):
+        box = Card.tick_rect(QRectF(window.grid.visualItemRect(item))).center().toPoint()
+        QTest.mouseClick(window.grid.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, box)
+
+    assert not window.picking.isChecked()
+    tick(videos[0]); tick(videos[2])
+    assert len(window.chosen()) == 2  # both kept, without Select mode
+    tick(videos[0])
+    assert [c.path for c in window.chosen()] == [videos[2].data(Qt.ItemDataRole.UserRole).path]
+    click(window.grid, videos[1])
+    assert len(window.chosen()) == 1  # a click on the card itself still picks just that one
+    window.pool.waitForDone(30000)
+    window.close()

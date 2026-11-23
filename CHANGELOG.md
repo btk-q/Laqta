@@ -10,6 +10,10 @@ The section for a version is what people see in the update window. Newest first.
   with a laugh every minute or two, that is 1.4 GB of clips instead of 7 GB, and no clip of over
   half an hour. Every laugh is still marked in the recording.
 - Event clips respect "Longest clip, seconds" instead of joining into one long clip.
+- **Tick boxes are easier to find.** Hover over a video and a box appears in the corner of its
+  picture; click it to tick the video and keep the others ticked, as in Windows Explorer. No
+  need to press Select first. The box now shows clearly on bright pictures too.
+- The filter row above your clips no longer squeezes the search box on smaller windows.
 
 ## 0.10.0
 

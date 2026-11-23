@@ -216,7 +216,7 @@ STRINGS: dict[str, tuple[str, str]] = {
     "share.update": ("Check for a new version when Laqta starts", "ابحث عن إصدار جديد عند تشغيل لقطة"),
     "share.update_hint": ("On by default. This contacts GitHub: one anonymous request asking for the latest version number, and the download if you accept an update. Nothing about you or your PC is sent. Turn it off and Laqta never goes online by itself; you can still check from the tray menu.", "مفعّل افتراضيًا. هذا يتصل بـ GitHub: طلب واحد مجهول يسأل عن رقم أحدث إصدار، ثم التنزيل إذا قبلت التحديث. لا يُرسَل أي شيء عنك أو عن حاسوبك. أوقفه فلا يتصل لقطة بالإنترنت من تلقاء نفسه أبدًا؛ ويبقى الفحص متاحًا من قائمة الأيقونة."),
     "library.many": ("{count} videos selected", "{count} فيديو محدد"),
-    "library.many_hint": ("Press Select at the top to tick videos with a click. Ctrl-click and Shift-click work too.", "اضغط «تحديد» في الأعلى لتحديد الفيديوهات بنقرة. النقر مع Ctrl أو Shift يعمل أيضًا."),
+    "library.many_hint": ("Click the box in a picture's corner to tick or untick a video. With Select pressed, a click anywhere on a card does it. Ctrl-click and Shift-click work too.", "انقر المربع في زاوية الصورة لتحديد فيديو أو إلغاء تحديده. وعند الضغط على «تحديد» تكفي نقرة في أي مكان على البطاقة. النقر مع Ctrl أو Shift يعمل أيضًا."),
     "library.select": ("Select", "تحديد"),
     "library.select_hint": ("Tick several videos with a click, to favourite, export or delete them together", "حدّد عدة فيديوهات بنقرة لتضيفها إلى المفضّلة أو تصدّرها أو تحذفها معًا"),
     "library.select_all": ("Select all", "تحديد الكل"),

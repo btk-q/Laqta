@@ -134,6 +134,14 @@ class Card(QStyledItemDelegate):
 
     HEADING = 44
 
+    @classmethod
+    def tick_rect(cls, card: QRectF) -> QRectF:
+        """Where a card's tick box is: the picture's top corner. The window uses it to tell a
+        click on the box from a click on the card."""
+        box = QRectF(0, 0, 26, 26)
+        box.moveTopRight(QPointF(card.x() + cls.PAD + THUMB.width() - 6, card.y() + cls.PAD + 6))
+        return box
+
     def sizeHint(self, option, index) -> QSize:
         if index.data(Qt.ItemDataRole.UserRole) is None:  # a heading takes a whole row of the grid
             return QSize(max(200, self.parent().viewport().width() - 28), self.HEADING)
@@ -214,16 +222,17 @@ class Card(QStyledItemDelegate):
             painter.setPen(QColor(c["on_accent"]))
             painter.drawText(star, Qt.AlignmentFlag.AlignCenter, "★")
 
-        if self.parent().property("ticking"):  # the clips window's Select mode: a tick box in the top corner
-            tick = QRectF(0, 0, 24, 24)
-            tick.moveTopRight(thumb.topRight() + QPointF(-6, 6))
+        # The tick box, as in Windows Explorer: on the card under the mouse and on ticked cards, and on
+        # every card in Select mode. Dark inside, so it shows on a bright picture too.
+        if self.parent().property("ticking") or selected or option.state & QStyle.StateFlag.State_MouseOver:
+            tick = self.tick_rect(QRectF(option.rect))
             painter.setPen(QPen(QColor("#FFFFFF"), 2))
-            painter.setBrush(QColor(c["accent_fill"]) if selected else QColor(0, 0, 0, 120))
+            painter.setBrush(QColor(c["accent_fill"]) if selected else QColor(0, 0, 0, 170))
             painter.drawRoundedRect(tick, 6, 6)
             if selected:  # drawn as lines, so it does not depend on the font having a ✓
                 painter.setPen(QPen(QColor(c["on_accent"]), 2.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
                 x, y = tick.x(), tick.y()
-                painter.drawPolyline([QPointF(x + 6, y + 12.5), QPointF(x + 10.5, y + 17), QPointF(x + 18, y + 8)])
+                painter.drawPolyline([QPointF(x + 6.5, y + 13.5), QPointF(x + 11, y + 18), QPointF(x + 19.5, y + 8.5)])
 
         # words under it
         line = QRectF(thumb.x() + 2, thumb.bottom() + 8, thumb.width() - 4, 20)

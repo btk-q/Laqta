@@ -6,7 +6,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import QFile, QMimeData, QObject, QRunnable, QSize, Qt, QThreadPool, QTimer, QUrl, Signal
+from PySide6.QtCore import QEvent, QFile, QMimeData, QObject, QRectF, QRunnable, QSize, Qt, QThreadPool, QTimer, QUrl, Signal
 from PySide6.QtGui import QGuiApplication, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QProgressDialog,
@@ -149,7 +149,7 @@ class LibraryWindow(QDialog):
         self.search = QLineEdit()
         self.search.setPlaceholderText(t("library.search"))
         self.search.setClearButtonEnabled(True)
-        self.search.setMinimumWidth(240)
+        self.search.setMinimumWidth(160)
         self.search.textChanged.connect(self._filter)
         self.favorites = QCheckBox(t("library.favorites"))
         self.favorites.setToolTip(t("library.fav_hint"))
@@ -159,7 +159,7 @@ class LibraryWindow(QDialog):
         filters.setSpacing(10)
         filters.addWidget(self.search, 1)
         for combo in (self.game, self.event, self.days, self.kind):
-            combo.setMinimumWidth(150)
+            combo.setMinimumWidth(120)
             combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
             combo.currentIndexChanged.connect(self._filter)
             filters.addWidget(combo)
@@ -192,6 +192,8 @@ class LibraryWindow(QDialog):
         self.grid.setMovement(QListView.Movement.Static)
         self.grid.setMouseTracking(True)  # for the hover highlight
         self.grid.itemSelectionChanged.connect(self._selection_changed)
+        self._grid_view = self.grid.viewport()  # kept: the filter must not ask a grid that Qt has deleted
+        self._grid_view.installEventFilter(self)  # a click on a card's tick box
         self.grid.verticalScrollBar().valueChanged.connect(lambda _: self._want_thumbnails())
         self._asked: set[str] = set()  # videos whose picture has been asked for in this window
         self._pictures: dict[str, QIcon] = {}
@@ -499,6 +501,17 @@ class LibraryWindow(QDialog):
         """Every selected video, in the order shown."""
         rows = sorted(self.grid.selectedItems(), key=self.grid.row)
         return [item.data(Qt.ItemDataRole.UserRole) for item in rows if item.data(Qt.ItemDataRole.UserRole) and not item.isHidden()]
+
+    def eventFilter(self, watched, event) -> bool:
+        """A click on a card's tick box ticks or unticks just that video, keeping the others,
+        as in Windows Explorer: no Ctrl and no Select mode needed."""
+        if (watched is self._grid_view and event.type() == QEvent.Type.MouseButtonPress
+                and event.button() == Qt.MouseButton.LeftButton and not event.modifiers()):
+            item = self.grid.itemAt(event.position().toPoint())
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) and                     Card.tick_rect(QRectF(self.grid.visualItemRect(item))).contains(event.position()):
+                item.setSelected(not item.isSelected())
+                return True
+        return super().eventFilter(watched, event)
 
     def _picking(self, on: bool) -> None:
         self.grid.setSelectionMode(QListView.SelectionMode.MultiSelection if on else QListView.SelectionMode.ExtendedSelection)
