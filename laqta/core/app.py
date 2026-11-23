@@ -16,7 +16,7 @@ from ..i18n import t
 from ..obs_controller import setup
 from ..obs_controller.audio import Audio, Shout, mic_peak
 from ..obs_controller.capture import Capture
-from ..obs_controller import encoders
+from ..obs_controller import encoders, webcam
 from ..obs_controller.client import Obs, ObsDown, ObsError
 from ..plugins import PLUGINS
 from ..storage import clips, config, library
@@ -196,7 +196,20 @@ class Core(threading.Thread):
         self._skipped = self._skipped_frames()
         self.capture.start(game, setup.pick_monitor(self.obs.call("GetMonitorList")["monitors"], window))
         self.audio.start(game, cfg["mic_enabled"], cfg["mic_device"], cfg["mic_volume"])
+        self._webcam(cfg)
         self._capture_check_at = time.monotonic() + CAPTURE_CHECK
+
+    def _webcam(self, cfg: dict | None) -> None:
+        """Camera in the corner while a game is recorded (cfg), and off again afterwards (None).
+        A camera that cannot be shown never stops the recording."""
+        try:
+            if cfg and cfg["webcam"]:
+                if not webcam.show(self.obs, setup.NAME, cfg["webcam_device"], cfg["webcam_corner"], cfg["webcam_size"]):
+                    self.notify(t("toast.no_webcam"))
+            elif self.obs.alive:
+                webcam.hide(self.obs)
+        except Exception:
+            log.exception("webcam")
 
     def _check_capture(self) -> None:
         """A few seconds into a game, make sure OBS is not recording a black screen, and aim
@@ -375,6 +388,8 @@ class Core(threading.Thread):
         if game is None:
             if self.plugin is not None:
                 self.plugin.stop()
+            if self._plugin_game is not None:  # the game just ended: release the camera
+                self._webcam(None)
             self.plugin = self._plugin_game = None
         elif self._plugin_game is not game:
             self._plugin_game = game

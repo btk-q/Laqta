@@ -17,10 +17,10 @@ from ..core import health
 from ..core.recorder import BOUNDARIES, MODES
 from ..game_detector.detector import load_games
 from ..i18n import LANGUAGES, isolate, t
-from ..obs_controller import audio, encoders
+from ..obs_controller import audio, encoders, webcam
 from ..obs_controller.capture import KINDS
 from ..plugins import PLUGINS
-from ..storage import autostart, clips, config, library
+from ..storage import autostart, clips, config, library, tools
 from ..storage.clips import usable_folder
 from . import gameicons, icons, theme
 from .library import size_text
@@ -247,6 +247,35 @@ class SettingsWindow(QDialog):
         form.addRow(t("rec.max_clip"), self.max_clip)
         form.addRow(t("rec.debounce"), self.debounce)
         layout.addLayout(form)
+        # The webcam in a corner of the recording.
+        layout.addSpacing(10)
+        self.webcam = QCheckBox(t("cam.show"))
+        self.webcam.setChecked(self.cfg["webcam"])
+        # ponytail: ffmpeg is asked once when the page is built (well under a second); cache it if that ever shows
+        found = webcam.cameras(tools.which("ffmpeg"))
+        devices = [(t("cam.first"), ""), *((name, name) for name in found)]
+        if self.cfg["webcam_device"] and self.cfg["webcam_device"] not in found:
+            devices.append((self.cfg["webcam_device"], self.cfg["webcam_device"]))  # unplugged right now: keep the choice
+        self.webcam_device = _combo(devices, self.cfg["webcam_device"])
+        self.webcam_corner = _combo([(t(f"cam.{c}"), c) for c in webcam.CORNERS], self.cfg["webcam_corner"])
+        self.webcam_size = _spin(self.cfg["webcam_size"], 10, 40)
+        self.webcam_size.setSuffix(" %")
+        cam = QFormLayout()
+        cam.setVerticalSpacing(14)
+        cam.setHorizontalSpacing(20)
+        cam.addRow(t("cam.device"), self.webcam_device)
+        cam.addRow(t("cam.corner"), self.webcam_corner)
+        cam.addRow(t("cam.size"), self.webcam_size)
+        layout.addWidget(self.webcam)
+        layout.addLayout(cam)
+        layout.addWidget(_label(t("cam.hint") if found else t("cam.none"), "hint"))
+
+        def sync() -> None:
+            for widget in (self.webcam_device, self.webcam_corner, self.webcam_size):
+                widget.setEnabled(self.webcam.isChecked())
+
+        self.webcam.toggled.connect(sync)
+        sync()
         layout.addStretch(1)
         return page
 
@@ -766,6 +795,10 @@ class SettingsWindow(QDialog):
             mic_enabled=self.mic_enabled.isChecked(),
             mic_device=self.mic_device.currentData(),
             mic_volume=self.mic_volume.value(),
+            webcam=self.webcam.isChecked(),
+            webcam_device=self.webcam_device.currentData(),
+            webcam_corner=self.webcam_corner.currentData(),
+            webcam_size=self.webcam_size.value(),
             toast_window=self.toast_window.isChecked(),
             update_check=self.update_check.isChecked(),
             discord_webhook=webhook,

@@ -14,6 +14,7 @@ from ..core.recorder import MODES
 from ..i18n import LANGUAGES
 from ..obs_controller.capture import KINDS
 from ..obs_controller.encoders import ORDER as ENCODERS
+from ..obs_controller.webcam import CORNERS
 
 DIR = Path(os.environ.get("APPDATA", Path.home())) / "Laqta"
 PATH = DIR / "config.toml"
@@ -47,6 +48,10 @@ DEFAULTS = {
     "auto_clips": ["ace", "multikill"],  # after a recording, also save a short clip around each event of these types
     "voice_detect": False,  # find laughs and shouts on the microphone track with the sound recogniser (needs mic_enabled)
     "laugh_clip_minutes": 5,  # after a recording, also save this many minutes around each laugh as its own clip; 0 = mark only
+    "webcam": False,  # show the webcam in a corner of recordings (only while a game is recorded)
+    "webcam_device": "",  # camera name; "" = the first camera
+    "webcam_corner": "bottom_right",  # bottom_right, bottom_left, top_right or top_left
+    "webcam_size": 20,  # width of the camera picture, percent of the recording's width
     "save_folder": "",  # where recordings go; "" = Videos\\Laqta
     "cleanup_days": 0,  # delete recordings older than this; 0 = never
     "cleanup_gb": 0,  # keep the recordings folder under this size; 0 = no limit
@@ -98,6 +103,9 @@ def _check(cfg: dict) -> dict:
     need(isinstance(cfg["auto_clips"], list) and all(isinstance(kind, str) for kind in cfg["auto_clips"]), "auto_clips must be a list of event names")
     need(isinstance(cfg["laugh_clip_minutes"], int) and 0 <= cfg["laugh_clip_minutes"] <= 15, "laugh_clip_minutes must be between 0 and 15")
     need(isinstance(cfg["mic_volume"], int) and 0 <= cfg["mic_volume"] <= 200, "mic_volume must be between 0 and 200")
+    need(isinstance(cfg["webcam"], bool) and isinstance(cfg["webcam_device"], str), "webcam must be true or false")
+    need(cfg["webcam_corner"] in CORNERS, f'webcam_corner must be one of {", ".join(CORNERS)}')
+    need(isinstance(cfg["webcam_size"], int) and 10 <= cfg["webcam_size"] <= 40, "webcam_size must be between 10 and 40")
     for game in cfg["games"]:
         need("exe" in game, "every [[games]] entry needs an exe")
         need(game.get("mode", "session") in MODES, f'{game["exe"]}: mode must be one of {", ".join(MODES)}')

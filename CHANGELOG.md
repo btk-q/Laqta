@@ -8,6 +8,9 @@ The section for a version is what people see in the update window. Newest first.
 - **Pick several videos without holding Ctrl.** Press **Select** above your clips: every card
   gets a tick box, and a click ticks or unticks it. **Select all** and **Clear** sit beside it.
   The games in **Add a game** have tick boxes too.
+- **Your webcam in recordings.** Settings → Recording → "Show my webcam in a corner of
+  recordings": pick the camera, the corner and the size. The camera is on only while a game is
+  being recorded.
 
 ### Fixed
 - In Arabic, a game's name in the clips window headings is on the right, beside its icon,
