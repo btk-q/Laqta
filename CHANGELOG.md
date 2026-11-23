@@ -2,7 +2,7 @@
 
 The section for a version is what people see in the update window. Newest first.
 
-## Unreleased
+## 0.10.0
 
 ### New
 - **Pick several videos without holding Ctrl.** Press **Select** above your clips: every card
