@@ -73,17 +73,19 @@ def test_the_apps_entry_is_written_and_removed(tmp_path):
 
 
 def test_real_shortcuts_are_made_and_only_removed_when_they_point_at_this_copy(tmp_path):
-    name = f"Laqta-test-{uuid.uuid4().hex[:8]}.lnk"  # never the user's own Laqta.lnk
+    folders = [tmp_path / "Programs", tmp_path / "Desktop"]  # never the real Desktop: Explorer shows stale icons of test files
+    for folder in folders:
+        folder.mkdir()
+    links = [folder / "Laqta.lnk" for folder in folders]
     exe = tmp_path / "Laqta.exe"
-    places = 'foreach ($p in "Programs","Desktop") { Join-Path (New-Object -ComObject WScript.Shell).SpecialFolders.Item($p) "%s" }' % name
-    links = [Path(p) for p in subprocess.run(["powershell", "-NoProfile", "-Command", places], capture_output=True, text=True).stdout.splitlines() if p.strip()]
-    try:
-        install._powershell(install.shortcuts_command(exe, name=name))
-        assert len(links) == 2 and all(link.exists() for link in links)
-        install._powershell(install.shortcuts_command(tmp_path / "Other.exe", remove=True, name=name))
-        assert all(link.exists() for link in links)  # someone else's shortcut stays
-        install._powershell(install.shortcuts_command(exe, remove=True, name=name))
-        assert not any(link.exists() for link in links)
-    finally:
-        for link in links:
-            link.unlink(missing_ok=True)
+    install._powershell(install.shortcuts_command(exe, folders=folders))
+    assert all(link.exists() for link in links)
+    install._powershell(install.shortcuts_command(tmp_path / "Other.exe", remove=True, folders=folders))
+    assert all(link.exists() for link in links)  # someone else's shortcut stays
+    install._powershell(install.shortcuts_command(exe, remove=True, folders=folders))
+    assert not any(link.exists() for link in links)
+
+
+def test_the_real_shortcuts_go_where_windows_says_the_start_menu_and_desktop_are():
+    command = install.shortcuts_command(Path(r"C:\Apps\Laqta\Laqta.exe"))
+    assert "SpecialFolders.Item('Programs')" in command and "SpecialFolders.Item('Desktop')" in command

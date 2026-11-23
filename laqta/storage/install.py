@@ -31,11 +31,16 @@ def _quote_ps(text: str) -> str:
     return "'" + str(text).replace("'", "''") + "'"
 
 
-def shortcuts_command(exe: Path, remove: bool = False, name: str = "Laqta.lnk") -> str:
+def shortcuts_command(exe: Path, remove: bool = False, folders: list[Path] | None = None) -> str:
     """PowerShell that makes, or removes, the Start menu and Desktop shortcuts to `exe`. Windows
-    says where those folders are, so a Desktop moved to OneDrive is found too. Removing leaves a
-    shortcut alone unless it points at `exe` (one to an unpacked copy stays)."""
-    places = f"foreach ($place in 'Programs', 'Desktop') {{ $lnk = Join-Path $shell.SpecialFolders.Item($place) {_quote_ps(name)}; "
+    says where those folders are, so a Desktop moved to OneDrive is found too; tests pass their
+    own `folders` instead, so they never touch the real Desktop. Removing leaves a shortcut alone
+    unless it points at `exe` (one to an unpacked copy stays)."""
+    if folders is None:
+        dirs = "$shell.SpecialFolders.Item('Programs'), $shell.SpecialFolders.Item('Desktop')"
+    else:
+        dirs = ", ".join(_quote_ps(f) for f in folders)
+    places = f"foreach ($dir in @({dirs})) {{ $lnk = Join-Path $dir 'Laqta.lnk'; "
     if remove:
         body = places + f"if ((Test-Path -LiteralPath $lnk) -and $shell.CreateShortcut($lnk).TargetPath -eq {_quote_ps(exe)}) {{ Remove-Item -LiteralPath $lnk -Force }} }}"
     else:
