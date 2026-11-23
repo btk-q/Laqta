@@ -2,7 +2,7 @@
 
 The section for a version is what people see in the update window. Newest first.
 
-## Unreleased
+## 0.10.1
 
 ### Fixed
 - **Funny clips: only the best three.** After a recording, Laqta saves the three 5-minute
