@@ -272,19 +272,20 @@ class Core(threading.Thread):
             # Its own thread: cutting clips and listening through a long recording take seconds, and
             # the core must stay free for the next game. It only touches this recording's files.
             cfg = self.cfg
-            args = (path, wanted, cfg["pre_seconds"], cfg["post_seconds"], cfg["laugh_clip_minutes"] if listen else None)
+            args = (path, wanted, cfg["pre_seconds"], cfg["post_seconds"], cfg["laugh_clip_minutes"] if listen else None, cfg["max_clip_seconds"] or None)
             threading.Thread(target=self._after_recording, args=args, name="laqta-after", daemon=True).start()
         self._report_skipped(time.monotonic() - start - self.recorder.paused_total)
         self._cleanup()
 
-    def _after_recording(self, path: Path, wanted: tuple, before: float, after: float, minutes: int | None) -> None:
+    def _after_recording(self, path: Path, wanted: tuple, before: float, after: float, minutes: int | None,
+                         longest: float | None = None) -> None:
         """Clips for the chosen event types, then laughs and shouts. One after the other: both
         rewrite this recording's event file."""
         if minutes is not None:
             self._voice(path, minutes)
         if wanted:
             try:
-                made = library.cut_moments(path, wanted, before=before, after=after, label=t("card.clip"))
+                made = library.cut_moments(path, wanted, before=before, after=after, label=t("card.clip"), longest=longest)
                 log.info("auto clips: %d cut from %s", len(made), path.name)
                 if made:
                     self.notify(t("toast.auto_clips", count=len(made)))

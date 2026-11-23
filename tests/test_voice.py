@@ -197,3 +197,14 @@ def test_a_goal_clip_survives_loud_talking_and_just_loses_the_false_shout(tmp_pa
     path = _clip(tmp_path, "speech", [goal, LOUD])
     core._judge_clip(path, False)
     assert path.exists() and json.loads(path.with_suffix(".json").read_text())["events"] == [goal] and len(core.toasts) == 1
+
+
+
+def test_joined_clips_never_grow_past_the_longest_and_never_overlap():
+    laughs = [270 + 90 * n for n in range(20)]  # a laugh every 90 s for half an hour
+    spans = library.moment_spans(laughs, 3600, before=270, after=30, longest=300)
+    assert all(end - start <= 300 for start, end in spans)
+    assert all(a[1] <= b[0] for a, b in zip(spans, spans[1:]))  # nothing is in two clips
+    assert spans[0] == (0.0, 300.0) and spans[-1][1] == laughs[-1] + 30  # every laugh is still in a clip
+    # Moments far apart are unchanged by the limit.
+    assert library.moment_spans([300, 2000], 3600, 270, 30, longest=300) == [(30.0, 330.0), (1730.0, 2030.0)]

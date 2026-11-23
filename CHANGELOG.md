@@ -2,6 +2,14 @@
 
 The section for a version is what people see in the update window. Newest first.
 
+## Unreleased
+
+### Fixed
+- Funny clips are never longer than the length you chose (5 minutes by default). In a party
+  game with a laugh every minute, overlapping clips used to be joined into one clip of over
+  half an hour; now they become clips of that length, one after another, with nothing copied
+  twice. Event clips likewise respect "Longest clip, seconds".
+
 ## 0.10.0
 
 ### New

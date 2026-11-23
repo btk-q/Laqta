@@ -162,5 +162,6 @@ def process(path: Path, clip_minutes: int, label: str) -> tuple[list[Moment], li
     mark(path, moments)
     made = []
     if clip_minutes and any(m.type == "laugh" for m in moments):
-        made = library.cut_moments(path, "laugh", before=max(clip_minutes * 60 - 30, 10), after=30, label=label)
+        made = library.cut_moments(path, "laugh", before=max(clip_minutes * 60 - 30, 10), after=30, label=label,
+                                   longest=clip_minutes * 60)
     return moments, made

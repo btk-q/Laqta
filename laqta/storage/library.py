@@ -233,19 +233,29 @@ def trim(path: Path, start: float, end: float) -> Path:
     return target
 
 
-def moment_spans(offsets: list[float], duration: float, before: float, after: float) -> list[tuple[float, float]]:
-    """The stretch to keep around each moment, with overlapping stretches joined into one."""
+def moment_spans(offsets: list[float], duration: float, before: float, after: float,
+                 longest: float | None = None) -> list[tuple[float, float]]:
+    """The stretch to keep around each moment, with overlapping stretches joined into one, but
+    never longer than `longest` seconds: a party with a laugh every minute once became one clip
+    of 37 minutes. Past that a new stretch starts where the last ended, so nothing is copied twice."""
     spans: list[list[float]] = []
     for offset in sorted(o for o in offsets if 0 <= o <= duration):
         start, end = max(0.0, offset - before), min(duration, offset + after)
         if spans and start <= spans[-1][1]:
-            spans[-1][1] = max(spans[-1][1], end)
+            last = spans[-1]
+            if longest is None or end - last[0] <= longest:
+                last[1] = max(last[1], end)
+            elif offset <= last[1]:  # already in the clip, which is as long as it may be: grow it to the limit
+                last[1] = max(last[1], min(end, last[0] + longest))
+            else:  # a new clip, starting where the last one stops
+                spans.append([last[1], end])
         else:
             spans.append([start, end])
     return [(s, e) for s, e in spans if e - s >= 1.0]
 
 
-def cut_moments(path: Path, kind: str | tuple[str, ...], before: float, after: float, label: str) -> list[Path]:
+def cut_moments(path: Path, kind: str | tuple[str, ...], before: float, after: float, label: str,
+                longest: float | None = None) -> list[Path]:
     """After a recording ends: save a separate clip around each event of `kind` (one type or
     several; for example every laugh, with the minutes that led up to it). The recording itself
     is kept whole. A clip already cut for the same spot is left alone."""
@@ -254,7 +264,7 @@ def cut_moments(path: Path, kind: str | tuple[str, ...], before: float, after: f
     duration = float(meta.get("seconds") or 0)
     offsets = [e["offset"] for e in meta.get("events", []) if e.get("type") in kinds]
     made = []
-    for start, end in moment_spans(offsets, duration, before, after):
+    for start, end in moment_spans(offsets, duration, before, after, longest):
         if end - start >= 0.9 * duration:
             continue  # the "clip" would be the whole recording again
         named = path.with_name(f"{label} {path.stem} {int(start // 60):02d}m{int(start % 60):02d}s{path.suffix}")
