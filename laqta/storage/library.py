@@ -254,8 +254,26 @@ def moment_spans(offsets: list[float], duration: float, before: float, after: fl
     return [(s, e) for s, e in spans if e - s >= 1.0]
 
 
+def best_spans(offsets: list[float], duration: float, before: float, after: float, count: int) -> list[tuple[float, float]]:
+    """The `count` stretches (each `before` + `after` around one moment) holding the most
+    moments, none overlapping another, in time order. For laughs: a party with a laugh every
+    minute would otherwise copy most of the recording into clips. Pure."""
+    moments = sorted(o for o in offsets if 0 <= o <= duration)
+    candidates = []
+    for o in moments:
+        start, end = max(0.0, o - before), min(duration, o + after)
+        candidates.append((sum(start <= m <= end for m in moments), -o, start, end))
+    chosen: list[tuple[float, float]] = []
+    for _, _, start, end in sorted(candidates, reverse=True):  # most moments first; among equals, the earliest
+        if len(chosen) >= count:
+            break
+        if all(end <= s or start >= e for s, e in chosen):
+            chosen.append((start, end))
+    return sorted(span for span in chosen if span[1] - span[0] >= 1.0)
+
+
 def cut_moments(path: Path, kind: str | tuple[str, ...], before: float, after: float, label: str,
-                longest: float | None = None) -> list[Path]:
+                longest: float | None = None, best: int | None = None) -> list[Path]:
     """After a recording ends: save a separate clip around each event of `kind` (one type or
     several; for example every laugh, with the minutes that led up to it). The recording itself
     is kept whole. A clip already cut for the same spot is left alone."""
@@ -264,7 +282,8 @@ def cut_moments(path: Path, kind: str | tuple[str, ...], before: float, after: f
     duration = float(meta.get("seconds") or 0)
     offsets = [e["offset"] for e in meta.get("events", []) if e.get("type") in kinds]
     made = []
-    for start, end in moment_spans(offsets, duration, before, after, longest):
+    spans = best_spans(offsets, duration, before, after, best) if best else moment_spans(offsets, duration, before, after, longest)
+    for start, end in spans:
         if end - start >= 0.9 * duration:
             continue  # the "clip" would be the whole recording again
         named = path.with_name(f"{label} {path.stem} {int(start // 60):02d}m{int(start % 60):02d}s{path.suffix}")

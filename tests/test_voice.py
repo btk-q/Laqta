@@ -208,3 +208,15 @@ def test_joined_clips_never_grow_past_the_longest_and_never_overlap():
     assert spans[0] == (0.0, 300.0) and spans[-1][1] == laughs[-1] + 30  # every laugh is still in a clip
     # Moments far apart are unchanged by the limit.
     assert library.moment_spans([300, 2000], 3600, 270, 30, longest=300) == [(30.0, 330.0), (1730.0, 2030.0)]
+
+
+def test_only_the_stretches_with_the_most_laughs_become_clips():
+    laughs = [100, 400, 410, 420, 430, 1000, 1010, 1020, 2000, 3000, 3005]
+    spans = library.best_spans(laughs, 3600, before=270, after=30, count=3)
+    assert len(spans) == 3 and spans == sorted(spans)  # in time order
+    assert all(a[1] <= b[0] for a, b in zip(spans, spans[1:]))  # none overlap
+    inside = [sum(s <= m <= e for m in laughs) for s, e in spans]
+    assert spans[0][0] <= 430 <= spans[0][1] and inside[0] >= 4  # the busiest stretch is picked
+    assert spans[1][0] <= 1020 <= spans[1][1]
+    assert library.best_spans([500], 3600, 270, 30, 3) == [(230.0, 530.0)]
+    assert library.best_spans([], 3600, 270, 30, 3) == []

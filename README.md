@@ -221,9 +221,10 @@ your microphone. Ordinary players use track 1.
 - **Find my laughs and shouts** (Settings → Audio, off by default, needs the microphone on): a
   sound recogniser (Google's YAMNet) that runs on this PC listens to your microphone track
   and marks each laugh and each shout or scream. Ordinary talking is ignored, however loud.
-  - In **Full session** and **Full match** it listens when the game closes, and around each
-    laugh also saves the minutes leading up to it (5 by default) as a separate clip named
-    "Funny …".
+  - In **Full session** and **Full match** it listens when the game closes and saves the three
+    stretches with the most laughter (5 minutes each by default) as separate clips named
+    "Funny …". Every laugh stays marked in the recording, so the rest are a click away. (Clipping
+    around every laugh copied 78 of 96 minutes of a real party game.)
   - In **Events only** there is no recording to listen to, so a loud moment saves a clip and
     the recogniser listens to that clip: it is kept only if a laugh or a shout is really in it.
   Loudness alone decides nothing. (An earlier version let it, and in one evening of real play

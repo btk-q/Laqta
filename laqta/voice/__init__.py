@@ -153,15 +153,19 @@ def mark(path: Path, moments: list[Moment]) -> None:
     sidecar.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
+# Funny clips per recording: the stretches with the most laughs. Every laugh stays marked in the
+# recording itself. ponytail: fixed; a setting if people want more or fewer.
+BEST_CLIPS = 3
+
+
 def process(path: Path, clip_minutes: int, label: str) -> tuple[list[Moment], list[Path]]:
     """After a recording: find laughs and shouts, mark them, and save the minutes leading up to
-    each laugh as its own clip. Returns (moments, clips made)."""
+    the laughiest moments (at most BEST_CLIPS) as their own clips. Returns (moments, clips made)."""
     from ..storage import library
 
     moments = analyse(path)
     mark(path, moments)
     made = []
     if clip_minutes and any(m.type == "laugh" for m in moments):
-        made = library.cut_moments(path, "laugh", before=max(clip_minutes * 60 - 30, 10), after=30, label=label,
-                                   longest=clip_minutes * 60)
+        made = library.cut_moments(path, "laugh", before=max(clip_minutes * 60 - 30, 10), after=30, label=label, best=BEST_CLIPS)
     return moments, made

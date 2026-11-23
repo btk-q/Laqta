@@ -233,7 +233,7 @@ Decisions made after the original plan are recorded in [docs/adr](adr/). The v2 
 | Multi-select in the clips window | Works | Driven on sample videos: favourite, export, delete (with a question for several) |
 | Storage page | Works | Rendered on the owner's real library (36 GB over two games) |
 | Start/stop recording hotkey | Unit-tested | The decision of what to record and the press-again-to-stop logic tested; the foreground window read live; no hand-started recording made yet |
-| Laughs and shouts in real play | Works | The owner's sessions on 0.6.1: laughs found in League and Pummel Party (59 in one 90-minute party game), clips cut around them; no false shout clips reported |
+| Laughs and shouts in real play | Works; funny clips reworked | The owner's sessions on 0.6.1: laughs found in League and Pummel Party (59 in one 90-minute party game), clips cut around them; no false shout clips reported. One 96-minute party had 59 laughs and its clips joined into 78 minutes (7 GB); now only the three busiest 5-minute stretches are clipped (on those marks: 15 minutes, 6/10/8 laughs) |
 | Problem message instead of raw error boxes | Works | Rendered; hooks tested with errors on the GUI and a background thread (shown once, all logged) |
 | Player speed, frame steps, marks while watching, remembered volume | Works | Driven on a 60 fps test video: 2x played 4 s in 2 s, one step moved 16 ms, M wrote a mark to the file |
 | League champion and mode on cards | Unit-tested | From Riot's documented playerlist and gamestats shapes; LAQTA_LOL_DUMP saves the real answers to check against; not yet seen in a real match |
