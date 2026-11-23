@@ -47,6 +47,7 @@ def test_select_mode_ticks_videos_with_plain_clicks(app, tmp_path):
     assert [c.path.name for c in window.chosen()] == ["clip 1.mkv"]  # only what the filters show
     window.picking.setChecked(False)
     assert window.chosen() == [] and not window.pick_all.isVisible()
+    window.pool.waitForDone(30000)  # its thumbnail jobs run ffmpeg; none may outlive this test
     window.close()
 
 
